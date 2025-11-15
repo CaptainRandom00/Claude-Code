@@ -1,37 +1,22 @@
 [
   {
-    "content": "Push current state to git repository",
+    "content": "Create wordpress-expert agent (comprehensive WordPress specialist)",
     "status": "completed",
-    "activeForm": "Pushing current state to git repository"
+    "activeForm": "Creating wordpress-expert agent"
   },
   {
-    "content": "Create mobile-expert agent (React Native & Flutter specialist)",
-    "status": "completed",
-    "activeForm": "Creating mobile-expert agent"
-  },
-  {
-    "content": "Create realtime-systems agent (WebSockets, real-time features)",
-    "status": "completed",
-    "activeForm": "Creating realtime-systems agent"
-  },
-  {
-    "content": "Create data-engineer agent (Analytics, BI, data pipelines)",
-    "status": "completed",
-    "activeForm": "Creating data-engineer agent"
-  },
-  {
-    "content": "Update AGENT-WORKFORCE-REVIEW.md with new agents",
-    "status": "completed",
-    "activeForm": "Updating AGENT-WORKFORCE-REVIEW.md"
-  },
-  {
-    "content": "Update ORCHESTRATION-STATUS.md with new agent count",
+    "content": "Update ORCHESTRATION-STATUS.md with new agent count (20 → 21)",
     "status": "completed",
     "activeForm": "Updating ORCHESTRATION-STATUS.md"
   },
   {
-    "content": "Push completed changes to git repository",
+    "content": "Update AGENT-WORKFORCE-REVIEW.md with wordpress-expert role",
+    "status": "completed",
+    "activeForm": "Updating AGENT-WORKFORCE-REVIEW.md"
+  },
+  {
+    "content": "Commit and push changes to git repository",
     "status": "in_progress",
-    "activeForm": "Pushing completed changes to git"
+    "activeForm": "Committing and pushing changes"
   }
 ]

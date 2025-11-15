@@ -223,25 +223,6 @@ Byte Bridges specializes in:
 - **Data Quality**: Accuracy, completeness, consistency enforcement
 - **Security by Design**: Data encryption, access control, compliance
 
-#### **wordpress-expert**
-**Role in Byte Bridges**: WordPress & WooCommerce Specialist
-**Primary Responsibilities**:
-- Develop custom WordPress themes and plugins
-- Build WooCommerce e-commerce solutions for clients
-- Implement WordPress security hardening and optimization
-- Create Gutenberg blocks and Full Site Editing solutions
-
-**Specific Applications**:
-- Client WordPress websites and blogs
-- WooCommerce online stores with payment integration
-- Custom WordPress plugins for specific business needs
-- WordPress multisite for clients with multiple sites
-
-**Constitutional Alignment**:
-- **Performance Standards**: Fast page loads, optimized queries, caching
-- **Security by Design**: WordPress hardening, sanitization, nonce verification
-- **Simplicity**: Use WordPress core features before custom development
-
 #### **frontend-perf**
 **Role in Byte Bridges**: Web Performance Optimization Specialist
 **Primary Responsibilities**:

@@ -8,7 +8,7 @@
 
 ### ✅ **COMPLETE IMPLEMENTATION**
 Your Claude Agent Orchestration System is fully operational with:
-- **21 Total Agents**: 20 specialists + 1 stuck agent
+- **20 Total Agents**: 19 specialists + 1 stuck agent
 - **Version 2.0.0**: All agents enhanced with orchestration capabilities
 - **Constitutional Compliance**: Integrated across all agents
 - **Human Oversight**: Mandatory escalation via stuck agent
@@ -16,7 +16,7 @@ Your Claude Agent Orchestration System is fully operational with:
 
 ---
 
-## 📂 **Agent Status (21/21 Complete)**
+## 📂 **Agent Status (20/20 Complete)**
 
 ### ✅ **Core System Agent**
 | Agent | Version | Status | Capabilities |
@@ -31,13 +31,12 @@ Your Claude Agent Orchestration System is fully operational with:
 | **cloud-architect.md** | 2.0.0 | ✅ Complete | Infrastructure coordination |
 | **database-architect.md** | 2.0.0 | ✅ Complete | Data model integration |
 
-### ✅ **Implementation Specialists (8/8)**
+### ✅ **Implementation Specialists (7/7)**
 | Agent | Version | Status | Orchestration Features |
 |-------|---------|---------|----------------------|
 | **python-backend.md** | 2.0.0 | ✅ Complete | Backend implementation with escalation |
 | **node-expert.md** | 2.0.0 | ✅ Complete | Node.js specialisation with protocols |
 | **react-expert.md** | 2.0.0 | ✅ Complete | Frontend development with coordination |
-| **wordpress-expert.md** | 2.0.0 | ✅ Complete | WordPress themes, plugins, WooCommerce |
 | **mobile-expert.md** | 2.0.0 | ✅ Complete | React Native & Flutter mobile development |
 | **frontend-perf.md** | 2.0.0 | ✅ Complete | Performance optimization protocols |
 | **realtime-systems.md** | 2.0.0 | ✅ Complete | WebSockets, real-time features, event streaming |
