@@ -1,0 +1,17 @@
+[
+  {
+    "content": "Investigate white screen issue with Playwright",
+    "status": "in_progress",
+    "activeForm": "Investigating white screen issue with Playwright"
+  },
+  {
+    "content": "Implement solution for white screen issue",
+    "status": "pending",
+    "activeForm": "Implementing solution for white screen issue"
+  },
+  {
+    "content": "Verify BBD dashboard loads consistently",
+    "status": "pending",
+    "activeForm": "Verifying BBD dashboard loads consistently"
+  }
+]

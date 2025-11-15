@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create new product_profiles table schema",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add database migration for product_profiles table",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create API endpoint to analyze sales data and populate profiles",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update stock profiles component to display data from new table",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Add forms to edit P1/P2 prices in product profiles",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

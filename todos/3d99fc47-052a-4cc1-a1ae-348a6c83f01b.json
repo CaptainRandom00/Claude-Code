@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create new data layer for sales/stock correlation and management",
+    "status": "completed",
+    "priority": "high",
+    "id": "create-data-layer"
+  },
+  {
+    "content": "Implement business logic: current consumption + 1 case carryover",
+    "status": "completed",
+    "priority": "high",
+    "id": "implement-carryover-logic"
+  },
+  {
+    "content": "Build correlation engine to match EPOS sales with BRN stock",
+    "status": "completed",
+    "priority": "high",
+    "id": "build-correlation-engine"
+  },
+  {
+    "content": "Test the new smart order management data layer",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-new-data-layer"
+  },
+  {
+    "content": "Fix frontend JavaScript error for order recommendations data structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-frontend-error"
+  }
+]

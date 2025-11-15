@@ -1,0 +1,430 @@
+openapi: 3.0.3
+info:
+  title: Product Image Management API
+  version: 1.0.0
+  description: |
+    API endpoints for managing product images in the Stock Profiles module.
+    Supports upload, listing, deletion, and primary image designation.
+
+servers:
+  - url: http://localhost:3000/api/product-profiles
+    description: Development server
+
+paths:
+  /{itemCode}/images:
+    post:
+      summary: Upload product images
+      description: |
+        Upload 1-5 images for a product. Images are automatically compressed to WebP format,
+        resized to max 1200x1200px, and thumbnails (300x300) are generated.
+        First uploaded image automatically becomes primary.
+      operationId: uploadProductImages
+      tags:
+        - Product Images
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          description: Product item code (e.g., "10033")
+          schema:
+            type: string
+            example: "10033"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  minItems: 1
+                  maxItems: 5
+                  description: Image files (JPG, JPEG, PNG, WEBP)
+      responses:
+        '200':
+          description: Images uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductImage'
+                  compressionStats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        originalSize:
+                          type: integer
+                          description: Original file size in bytes
+                          example: 5242880
+                        compressedSize:
+                          type: integer
+                          description: Compressed file size in bytes
+                          example: 1048576
+                        reductionPercent:
+                          type: number
+                          description: Size reduction percentage
+                          example: 80.0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      summary: List product images
+      description: Retrieve all images for a specific product
+      operationId: listProductImages
+      tags:
+        - Product Images
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          description: Product item code
+          schema:
+            type: string
+            example: "10033"
+      responses:
+        '200':
+          description: Images retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductImage'
+                  count:
+                    type: integer
+                    minimum: 0
+                    maximum: 5
+                    example: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /{itemCode}/images/{imageId}:
+    delete:
+      summary: Delete product image
+      description: Delete a specific image and its thumbnail from storage and database
+      operationId: deleteProductImage
+      tags:
+        - Product Images
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          description: Product item code
+          schema:
+            type: string
+            example: "10033"
+        - name: imageId
+          in: path
+          required: true
+          description: Image UUID
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Image deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Image deleted successfully"
+                  remainingCount:
+                    type: integer
+                    minimum: 0
+                    maximum: 4
+                    example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /{itemCode}/images/{imageId}/primary:
+    put:
+      summary: Set image as primary
+      description: Designate an image as the primary product image
+      operationId: setPrimaryImage
+      tags:
+        - Product Images
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          description: Product item code
+          schema:
+            type: string
+            example: "10033"
+        - name: imageId
+          in: path
+          required: true
+          description: Image UUID to set as primary
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Primary image updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Image set as primary"
+                  primaryImagePath:
+                    type: string
+                    example: "/uploads/product-images/10033/a7f3c2d1e4b5f6.webp"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    ProductImage:
+      type: object
+      required:
+        - id
+        - originalName
+        - storedName
+        - path
+        - thumbnailPath
+        - size
+        - width
+        - height
+        - format
+        - isPrimary
+        - uploadedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique image identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        originalName:
+          type: string
+          description: Original filename from user upload
+          example: "mock-duck-front.jpg"
+        storedName:
+          type: string
+          description: Hashed filename on disk
+          example: "a7f3c2d1e4b5f6.webp"
+        path:
+          type: string
+          description: Relative path to compressed image
+          example: "/uploads/product-images/10033/a7f3c2d1e4b5f6.webp"
+        thumbnailPath:
+          type: string
+          description: Relative path to 300x300 thumbnail
+          example: "/uploads/product-images/10033/a7f3c2d1e4b5f6_thumb.webp"
+        size:
+          type: integer
+          description: File size in bytes after compression
+          example: 842750
+          minimum: 1
+        width:
+          type: integer
+          description: Image width in pixels
+          example: 1200
+          minimum: 100
+          maximum: 1200
+        height:
+          type: integer
+          description: Image height in pixels
+          example: 1080
+          minimum: 100
+          maximum: 1200
+        format:
+          type: string
+          enum: [webp]
+          description: Image format (always WebP after processing)
+          example: "webp"
+        isPrimary:
+          type: boolean
+          description: Primary image flag (exactly one per product)
+          example: true
+        uploadedAt:
+          type: string
+          format: date-time
+          description: Upload timestamp (ISO 8601)
+          example: "2025-10-07T08:15:30.123Z"
+
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message
+          example: "Invalid file type"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters or payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalidFileType:
+              summary: Invalid file type
+              value:
+                success: false
+                error: "Only JPG, JPEG, PNG, WEBP formats accepted"
+            fileTooLarge:
+              summary: File size exceeds limit
+              value:
+                success: false
+                error: "File size exceeds 10MB limit"
+            tooManyImages:
+              summary: Image limit exceeded
+              value:
+                success: false
+                error: "Maximum 5 images per product"
+            imageTooSmall:
+              summary: Image dimensions too small
+              value:
+                success: false
+                error: "Image too small. Minimum 100x100 pixels required"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Authentication required"
+
+    NotFound:
+      description: Product or image not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            productNotFound:
+              summary: Product not found
+              value:
+                success: false
+                error: "Product not found"
+            imageNotFound:
+              summary: Image not found
+              value:
+                success: false
+                error: "Image not found"
+
+    PayloadTooLarge:
+      description: Request payload exceeds size limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Request payload too large"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded (10 uploads per minute)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Rate limit exceeded. Maximum 10 uploads per minute."
+
+    InternalServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            compressionFailed:
+              summary: Image compression failed
+              value:
+                success: false
+                error: "Image compression failed"
+            diskSpaceFull:
+              summary: Server storage full
+              value:
+                success: false
+                error: "Upload failed - server storage full. Contact administrator."
+
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: bb.session.id
+      description: Session-based authentication using Express session cookie
+
+security:
+  - sessionAuth: []
+
+tags:
+  - name: Product Images
+    description: Product image management operations

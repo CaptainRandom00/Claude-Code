@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import responseSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-response.schema.json' with { type: 'json' };
+
+const ajv = new Ajv();
+
+test.describe('EPOS Sales API Response Contract', () => {
+  test('should return response with data and meta', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=1000');
+    const data = await response.json();
+
+    const validate = ajv.compile(responseSchema);
+    const valid = validate(data);
+
+    if (!valid) {
+      console.error('Validation errors:', validate.errors);
+    }
+
+    expect(valid).toBe(true);
+    expect(data).toHaveProperty('data');
+    expect(data).toHaveProperty('meta');
+    expect(data.meta).toHaveProperty('totalCount');
+    expect(data.meta).toHaveProperty('limit');
+    expect(data.meta).toHaveProperty('hasMore');
+  });
+
+  test('should enforce 100K safety cap', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=all');
+    const data = await response.json();
+
+    expect(data.data.length).toBeLessThanOrEqual(100000);
+    if (data.meta.totalCount > 100000) {
+      expect(data.meta.limit).toBe(100000);
+    }
+  });
+});

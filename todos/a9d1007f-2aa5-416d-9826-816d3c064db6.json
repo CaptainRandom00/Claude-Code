@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create Streamlit dashboard for monitoring all trading processes",
+    "status": "completed",
+    "priority": "high",
+    "id": "dashboard-1"
+  },
+  {
+    "content": "Add cognitive trader status monitoring",
+    "status": "completed",
+    "priority": "high",
+    "id": "dashboard-2"
+  },
+  {
+    "content": "Add live data streaming status",
+    "status": "completed",
+    "priority": "medium",
+    "id": "dashboard-3"
+  },
+  {
+    "content": "Add trade management monitoring",
+    "status": "completed",
+    "priority": "medium",
+    "id": "dashboard-4"
+  },
+  {
+    "content": "Add system health metrics",
+    "status": "completed",
+    "priority": "medium",
+    "id": "dashboard-5"
+  },
+  {
+    "content": "Install required dependencies for dashboard",
+    "status": "completed",
+    "priority": "high",
+    "id": "dashboard-6"
+  }
+]

@@ -1,0 +1,227 @@
+import { test, expect } from '@playwright/test';
+
+// Configure test options at top level
+test.use({
+  // Disable animations for consistent screenshots
+  launchOptions: {
+    args: ['--disable-animations', '--force-color-profile=srgb']
+  }
+});
+
+test.describe('Visual Regression Tests', () => {
+
+  test.beforeEach(async ({ page }) => {
+    // Set consistent viewport
+    await page.setViewportSize({ width: 1280, height: 720 });
+    
+    // Disable animations via CSS
+    await page.addStyleTag({
+      content: `
+        *, *::before, *::after {
+          animation-duration: 0s !important;
+          animation-delay: 0s !important;
+          transition-duration: 0s !important;
+          transition-delay: 0s !important;
+        }
+      `
+    });
+  });
+
+  test('Homepage visual consistency', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Full page screenshot
+    await expect(page).toHaveScreenshot('homepage-full.png', {
+      fullPage: true,
+      animations: 'disabled',
+      maxDiffPixels: 100
+    });
+
+    // Hero section
+    const hero = page.locator('[data-testid="hero-section"]');
+    await expect(hero).toHaveScreenshot('homepage-hero.png');
+
+    // Services section
+    const services = page.locator('[data-testid="services-section"]');
+    await expect(services).toHaveScreenshot('homepage-services.png');
+
+    // Footer
+    const footer = page.locator('footer');
+    await expect(footer).toHaveScreenshot('homepage-footer.png');
+  });
+
+  test('Navigation states', async ({ page }) => {
+    await page.goto('/');
+
+    // Default state
+    const header = page.locator('header');
+    await expect(header).toHaveScreenshot('header-default.png');
+
+    // Hover state on menu item
+    await page.hover('text=Solutions');
+    await expect(header).toHaveScreenshot('header-hover-solutions.png');
+
+    // Dropdown open
+    await page.click('text=Solutions');
+    await expect(page.locator('[data-testid="solutions-dropdown"]')).toHaveScreenshot('dropdown-solutions.png');
+
+    // Mobile menu
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.click('[data-testid="mobile-menu-button"]');
+    await expect(page.locator('[data-testid="mobile-menu"]')).toHaveScreenshot('mobile-menu.png');
+  });
+
+  test('Form states visual tests', async ({ page }) => {
+    await page.goto('/contact');
+
+    const form = page.locator('form[data-testid="contact-form"]');
+
+    // Empty form
+    await expect(form).toHaveScreenshot('form-empty.png');
+
+    // Focused state
+    await page.focus('input[name="name"]');
+    await expect(form).toHaveScreenshot('form-focused.png');
+
+    // Filled state
+    await page.fill('input[name="name"]', 'John Doe');
+    await page.fill('input[name="email"]', 'john@example.com');
+    await page.fill('textarea[name="message"]', 'Test message content');
+    await expect(form).toHaveScreenshot('form-filled.png');
+
+    // Error state
+    await page.fill('input[name="email"]', 'invalid-email');
+    await page.click('button[type="submit"]');
+    await expect(form).toHaveScreenshot('form-error.png');
+  });
+
+  test('Button states', async ({ page }) => {
+    await page.goto('/');
+
+    // Primary button states
+    const primaryBtn = page.locator('button.btn-primary').first();
+    await expect(primaryBtn).toHaveScreenshot('button-primary-default.png');
+    
+    await primaryBtn.hover();
+    await expect(primaryBtn).toHaveScreenshot('button-primary-hover.png');
+
+    // Secondary button
+    const secondaryBtn = page.locator('button.btn-secondary').first();
+    await expect(secondaryBtn).toHaveScreenshot('button-secondary-default.png');
+
+    // Disabled button
+    await page.goto('/contact');
+    const disabledBtn = page.locator('button[disabled]').first();
+    await expect(disabledBtn).toHaveScreenshot('button-disabled.png');
+  });
+
+  test('Card components', async ({ page }) => {
+    await page.goto('/services');
+
+    // Service cards
+    const serviceCard = page.locator('[data-testid="service-card"]').first();
+    await expect(serviceCard).toHaveScreenshot('card-service.png');
+
+    // Hover state
+    await serviceCard.hover();
+    await expect(serviceCard).toHaveScreenshot('card-service-hover.png');
+
+    // Pricing card
+    await page.goto('/pricing');
+    const pricingCard = page.locator('[data-testid="pricing-card"]').first();
+    await expect(pricingCard).toHaveScreenshot('card-pricing.png');
+  });
+
+  test('Dashboard layouts', async ({ page }) => {
+    // Customer dashboard
+    await page.goto('/signin');
+    await page.fill('input[name="email"]', 'test.customer@example.com');
+    await page.fill('input[name="password"]', 'Test123!@#');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/dashboard');
+
+    await expect(page).toHaveScreenshot('dashboard-customer.png', {
+      fullPage: true,
+      animations: 'disabled'
+    });
+
+    // Admin dashboard
+    await page.goto('/signin');
+    await page.fill('input[name="email"]', 'test.admin@example.com');
+    await page.fill('input[name="password"]', 'Admin123!@#');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/admin');
+
+    await expect(page).toHaveScreenshot('dashboard-admin.png', {
+      fullPage: true,
+      animations: 'disabled'
+    });
+  });
+
+  test('Responsive layouts', async ({ page }) => {
+    const viewports = [
+      { name: 'mobile', width: 375, height: 667 },
+      { name: 'tablet', width: 768, height: 1024 },
+      { name: 'desktop', width: 1920, height: 1080 }
+    ];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(page).toHaveScreenshot(`homepage-${viewport.name}.png`, {
+        fullPage: true,
+        animations: 'disabled'
+      });
+    }
+  });
+
+  test('Dark mode comparison', async ({ page }) => {
+    // Light mode
+    await page.goto('/');
+    await expect(page).toHaveScreenshot('theme-light.png', {
+      fullPage: true
+    });
+
+    // Dark mode
+    await page.click('[data-testid="theme-toggle"]');
+    await page.waitForTimeout(500); // Wait for theme transition
+    await expect(page).toHaveScreenshot('theme-dark.png', {
+      fullPage: true
+    });
+  });
+
+  test('Loading states', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // Capture skeleton loading
+    const skeleton = page.locator('[data-testid="skeleton-loader"]');
+    await expect(skeleton).toHaveScreenshot('loading-skeleton.png');
+
+    // Spinner
+    await page.goto('/');
+    await page.click('button[data-testid="load-more"]');
+    const spinner = page.locator('[data-testid="spinner"]');
+    await expect(spinner).toHaveScreenshot('loading-spinner.png');
+  });
+
+  test('Error states', async ({ page }) => {
+    // 404 page
+    await page.goto('/non-existent-page');
+    await expect(page).toHaveScreenshot('error-404.png', {
+      fullPage: true
+    });
+
+    // Form errors
+    await page.goto('/contact');
+    await page.click('button[type="submit"]');
+    await expect(page.locator('form')).toHaveScreenshot('error-form-validation.png');
+
+    // Network error simulation
+    await page.route('**/api/**', route => route.abort());
+    await page.goto('/dashboard');
+    await expect(page.locator('[data-testid="error-message"]')).toHaveScreenshot('error-network.png');
+  });
+});

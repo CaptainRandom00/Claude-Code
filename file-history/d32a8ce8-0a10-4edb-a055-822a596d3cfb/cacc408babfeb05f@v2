@@ -1,0 +1,468 @@
+openapi: 3.1.0
+info:
+  title: Byte Bridges Blog API
+  version: 1.0.0
+  description: Blog post management and retrieval endpoints
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://bytebridges.com
+    description: Production
+
+paths:
+  /api/blog:
+    get:
+      summary: List blog posts
+      description: Get paginated list of blog posts with optional filtering
+      operationId: listBlogPosts
+      tags:
+        - Blog
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Posts per page
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum:
+              - web-development
+              - mobile-development
+              - cloud-infrastructure
+              - ai-machine-learning
+              - best-practices
+              - case-studies
+              - thought-leadership
+          description: Filter by category
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter by tag
+        - name: published
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter by published status (admin only for false)
+      responses:
+        '200':
+          description: List of blog posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BlogPostSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      summary: Create blog post
+      description: Create a new blog post (admin only)
+      operationId: createBlogPost
+      tags:
+        - Blog
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogPostCreate'
+      responses:
+        '201':
+          description: Blog post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/blog/{slug}:
+    get:
+      summary: Get blog post by slug
+      description: Retrieve a single blog post
+      operationId: getBlogPost
+      tags:
+        - Blog
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Blog post slug
+      responses:
+        '200':
+          description: Blog post details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+        '404':
+          description: Blog post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/blog/{id}:
+    put:
+      summary: Update blog post
+      description: Update an existing blog post (admin only)
+      operationId: updateBlogPost
+      tags:
+        - Blog
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Blog post ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogPostUpdate'
+      responses:
+        '200':
+          description: Blog post updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Blog post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Delete blog post
+      description: Delete a blog post (admin only, soft delete)
+      operationId: deleteBlogPost
+      tags:
+        - Blog
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Blog post ID
+      responses:
+        '204':
+          description: Blog post deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Blog post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    BlogPost:
+      type: object
+      required:
+        - id
+        - slug
+        - title
+        - content
+        - published
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          example: 1
+        slug:
+          type: string
+          example: getting-started-with-nextjs
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+          example: Getting Started with Next.js 14
+        excerpt:
+          type: string
+          nullable: true
+          minLength: 50
+          maxLength: 500
+          example: Learn the fundamentals of Next.js 14 and App Router
+        content:
+          type: string
+          format: markdown
+          example: "# Introduction\n\nNext.js 14 introduces..."
+        authorId:
+          type: integer
+          nullable: true
+          example: 1
+        authorName:
+          type: string
+          example: John Doe
+        category:
+          type: string
+          nullable: true
+          enum:
+            - web-development
+            - mobile-development
+            - cloud-infrastructure
+            - ai-machine-learning
+            - best-practices
+            - case-studies
+            - thought-leadership
+          example: web-development
+        tags:
+          type: array
+          items:
+            type: string
+          example: [nextjs, react, web-development]
+        featuredImageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: /images/blog/nextjs-14.jpg
+        published:
+          type: boolean
+          example: true
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2025-11-07T10:00:00Z
+        viewCount:
+          type: integer
+          minimum: 0
+          example: 1234
+        readingTimeMinutes:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 8
+        createdAt:
+          type: string
+          format: date-time
+          example: 2025-11-01T14:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2025-11-07T09:15:00Z
+
+    BlogPostSummary:
+      type: object
+      description: Abbreviated blog post for list views
+      required:
+        - id
+        - slug
+        - title
+        - published
+        - publishedAt
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+          nullable: true
+        authorName:
+          type: string
+        category:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        featuredImageUrl:
+          type: string
+          nullable: true
+        published:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        readingTimeMinutes:
+          type: integer
+          nullable: true
+
+    BlogPostCreate:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+        excerpt:
+          type: string
+          minLength: 50
+          maxLength: 500
+        content:
+          type: string
+          minLength: 100
+        category:
+          type: string
+          enum:
+            - web-development
+            - mobile-development
+            - cloud-infrastructure
+            - ai-machine-learning
+            - best-practices
+            - case-studies
+            - thought-leadership
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          maxItems: 10
+        featuredImageUrl:
+          type: string
+          format: uri
+        published:
+          type: boolean
+          default: false
+
+    BlogPostUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+        excerpt:
+          type: string
+          minLength: 50
+          maxLength: 500
+        content:
+          type: string
+          minLength: 100
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        featuredImageUrl:
+          type: string
+          format: uri
+        published:
+          type: boolean
+
+    Pagination:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+          example: Validation failed
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            title: ["Title must be at least 10 characters"]
+            content: ["Content is required"]
+
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token

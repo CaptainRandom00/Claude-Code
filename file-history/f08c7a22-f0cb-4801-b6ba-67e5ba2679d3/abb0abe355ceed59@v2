@@ -1,0 +1,28 @@
+#!/usr/bin/env tsx
+
+/**
+ * Route Registry Generation Script
+ * Feature: 028-build-a-widget
+ *
+ * Generates server/routes.registry.json from route files
+ */
+
+import { RouteRegistryGenerator } from '../../server/services/route-registry-generator.js';
+
+async function main() {
+  const args = process.argv.slice(2);
+  const type = args.find(arg => arg.startsWith('--type='))?.split('=')[1] || 'registry';
+
+  try {
+    console.log('Generating route registry...');
+    const generator = new RouteRegistryGenerator();
+    await generator.generateRegistry();
+    console.log('✅ Route registry generated successfully');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Failed to generate route registry:', error);
+    process.exit(1);
+  }
+}
+
+main();

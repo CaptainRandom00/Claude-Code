@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Data Models T009-T013 Complete",
+    "status": "completed",
+    "activeForm": "Data Models T009-T013 Complete"
+  },
+  {
+    "content": "Core Services T014-T018 Complete",
+    "status": "completed",
+    "activeForm": "Core Services T014-T018 Complete"
+  },
+  {
+    "content": "CLI Commands T019-T024 Complete",
+    "status": "completed",
+    "activeForm": "CLI Commands T019-T024 Complete"
+  },
+  {
+    "content": "Execute Phase 3.4: Integration (T025-T030)",
+    "status": "completed",
+    "activeForm": "Executing Phase 3.4: Integration (T025-T030)"
+  },
+  {
+    "content": "T031: Unit Tests - Route Scanner",
+    "status": "in_progress",
+    "activeForm": "Creating unit tests for route scanner functionality"
+  },
+  {
+    "content": "T032: Unit Tests - JSDoc Parser",
+    "status": "pending",
+    "activeForm": "Creating unit tests for JSDoc parser service"
+  },
+  {
+    "content": "T033: Unit Tests - CLI Commands",
+    "status": "pending",
+    "activeForm": "Creating unit tests for CLI command implementations"
+  }
+]

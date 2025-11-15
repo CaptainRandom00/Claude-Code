@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Implement Claude API client and decision state machine",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_1"
+  },
+  {
+    "content": "Create Claude context builders for decision points",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_2"
+  },
+  {
+    "content": "Build Claude response processing system",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_3"
+  },
+  {
+    "content": "Implement dynamic state and variable management",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_4"
+  },
+  {
+    "content": "Create invalidation detection and monitoring system",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_5"
+  },
+  {
+    "content": "Build hybrid trade management system",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_6"
+  },
+  {
+    "content": "Integrate complete Claude-centric cognitive trader",
+    "status": "completed",
+    "priority": "high",
+    "id": "claude_api_integration_7"
+  },
+  {
+    "content": "Create comprehensive demonstration of Claude integration",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "claude_api_integration_8"
+  }
+]

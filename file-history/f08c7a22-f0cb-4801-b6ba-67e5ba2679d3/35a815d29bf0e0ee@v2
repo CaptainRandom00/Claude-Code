@@ -1,0 +1,566 @@
+/**
+ * Contract: ScreenshotViewer Component
+ * Feature: 029-complete-user-guide
+ * Purpose: Define TypeScript interfaces for the ScreenshotViewer component
+ */
+
+// ============================================================================
+// Core Types
+// ============================================================================
+
+/**
+ * Image format types
+ */
+export type ImageFormat = 'png' | 'webp' | 'avif';
+
+/**
+ * Viewport types for screenshot capture
+ */
+export type ViewportType = 'desktop' | 'tablet' | 'mobile';
+
+/**
+ * Annotation types
+ */
+export type AnnotationType = 'rectangle' | 'circle' | 'arrow' | 'text' | 'highlight';
+
+/**
+ * Annotation colors
+ */
+export type AnnotationColor = 'red' | 'blue' | 'yellow' | 'green';
+
+// ============================================================================
+// Component Props
+// ============================================================================
+
+/**
+ * Main ScreenshotViewer component props
+ */
+export interface ScreenshotViewerProps {
+  /** Screenshot source path (without extension) */
+  src: string;
+
+  /** Alt text for accessibility */
+  alt: string;
+
+  /** Optional caption displayed below image */
+  caption?: string;
+
+  /** Annotations overlay (optional) */
+  annotations?: Annotation[];
+
+  /** Enable zoom functionality (default: true) */
+  zoomable?: boolean;
+
+  /** Enable fullscreen view (default: true) */
+  fullscreenable?: boolean;
+
+  /** Lazy load image (default: true) */
+  lazy?: boolean;
+
+  /** Image loading priority (default: 'auto') */
+  loading?: 'eager' | 'lazy' | 'auto';
+
+  /** Screenshot size variant */
+  size?: ScreenshotSize;
+
+  /** Show format selector (default: false) */
+  showFormatSelector?: boolean;
+
+  /** Preferred format (default: auto-detect) */
+  preferredFormat?: ImageFormat;
+
+  /** Callback when image loads */
+  onLoad?: () => void;
+
+  /** Callback when image fails to load */
+  onError?: (error: Error) => void;
+
+  /** Callback when zoom state changes */
+  onZoomChange?: (isZoomed: boolean) => void;
+
+  /** Custom CSS class */
+  className?: string;
+}
+
+// ============================================================================
+// Annotation Types
+// ============================================================================
+
+/**
+ * Annotation overlay definition
+ */
+export interface Annotation {
+  /** Unique annotation ID */
+  id?: string;
+
+  /** Annotation type */
+  type: AnnotationType;
+
+  /** Position (percentage-based for responsive scaling) */
+  position: AnnotationPosition;
+
+  /** Annotation color */
+  color: AnnotationColor;
+
+  /** Optional label text */
+  label?: string;
+
+  /** Step number (for numbered circles) */
+  stepNumber?: number;
+
+  /** Arrow direction (for arrow type) */
+  direction?: ArrowDirection;
+
+  /** Z-index for layering (optional) */
+  zIndex?: number;
+}
+
+/**
+ * Position definition (percentage-based)
+ */
+export interface AnnotationPosition {
+  /** X position (0-100) */
+  x: number;
+
+  /** Y position (0-100) */
+  y: number;
+
+  /** Width for rectangle/highlight (0-100) */
+  width?: number;
+
+  /** Height for rectangle/highlight (0-100) */
+  height?: number;
+
+  /** Radius for circle (0-100) */
+  radius?: number;
+
+  /** End position for arrow */
+  endX?: number;
+  endY?: number;
+}
+
+/**
+ * Arrow direction
+ */
+export type ArrowDirection = 'up' | 'down' | 'left' | 'right' | 'up-right' | 'up-left' | 'down-right' | 'down-left';
+
+// ============================================================================
+// Screenshot Metadata
+// ============================================================================
+
+/**
+ * Screenshot metadata
+ */
+export interface ScreenshotMetadata {
+  /** Unique identifier (filename without extension) */
+  id: string;
+
+  /** Feature this screenshot belongs to */
+  feature: string;
+
+  /** Step number within the feature guide */
+  step: number;
+
+  /** Human-readable description */
+  description: string;
+
+  /** File path relative to public/ */
+  path: string;
+
+  /** Screenshot dimensions */
+  dimensions: {
+    width: number;
+    height: number;
+  };
+
+  /** File size in bytes */
+  fileSize: number;
+
+  /** Image format */
+  format: ImageFormat;
+
+  /** Optional annotations overlay */
+  annotations?: Annotation[];
+
+  /** Capture metadata */
+  capture: CaptureMetadata;
+
+  /** Alt text for accessibility */
+  altText: string;
+
+  /** Optional caption displayed below image */
+  caption?: string;
+
+  /** Available formats */
+  availableFormats: ImageFormat[];
+}
+
+/**
+ * Capture metadata
+ */
+export interface CaptureMetadata {
+  /** Viewport type used for capture */
+  viewport: ViewportType;
+
+  /** Capture timestamp (ISO 8601) */
+  timestamp: string;
+
+  /** Captured by (playwright or manual) */
+  capturedBy: 'playwright' | 'manual';
+
+  /** Browser used for capture (optional) */
+  browser?: string;
+
+  /** OS used for capture (optional) */
+  os?: string;
+}
+
+// ============================================================================
+// Component State
+// ============================================================================
+
+/**
+ * ScreenshotViewer component state
+ */
+export interface ScreenshotViewerState {
+  /** Current screenshot ID */
+  screenshotId: string;
+
+  /** Is zoomed in */
+  isZoomed: boolean;
+
+  /** Zoom level (1.0 = 100%, 2.0 = 200%, etc.) */
+  zoomLevel: number;
+
+  /** Pan position (when zoomed) */
+  panPosition: {
+    x: number;
+    y: number;
+  };
+
+  /** Show annotations overlay */
+  showAnnotations: boolean;
+
+  /** Is in fullscreen mode */
+  isFullscreen: boolean;
+
+  /** Loading state */
+  isLoading: boolean;
+
+  /** Error state */
+  error: string | null;
+
+  /** Available formats */
+  availableFormats: ImageFormat[];
+
+  /** Selected format */
+  selectedFormat: ImageFormat;
+
+  /** Image natural dimensions */
+  naturalDimensions?: {
+    width: number;
+    height: number;
+  };
+}
+
+// ============================================================================
+// Screenshot Size Variants
+// ============================================================================
+
+/**
+ * Screenshot size variants
+ */
+export type ScreenshotSize = 'small' | 'medium' | 'large' | 'full';
+
+/**
+ * Screenshot size configuration
+ */
+export interface ScreenshotSizeConfig {
+  /** Size identifier */
+  size: ScreenshotSize;
+
+  /** Max width (CSS value) */
+  maxWidth: string;
+
+  /** Container class */
+  containerClass: string;
+
+  /** Description */
+  description: string;
+}
+
+// ============================================================================
+// Image Source Set
+// ============================================================================
+
+/**
+ * Image source set for responsive images
+ */
+export interface ImageSourceSet {
+  /** AVIF source */
+  avif?: string;
+
+  /** WebP source */
+  webp?: string;
+
+  /** PNG source (fallback) */
+  png: string;
+
+  /** Source set string for srcset attribute */
+  srcSet?: string;
+}
+
+// ============================================================================
+// Lazy Loading
+// ============================================================================
+
+/**
+ * Lazy loading configuration
+ */
+export interface LazyLoadConfig {
+  /** Root margin for Intersection Observer */
+  rootMargin: string;
+
+  /** Threshold for triggering load */
+  threshold: number;
+
+  /** Placeholder type */
+  placeholder: 'blur' | 'skeleton' | 'none';
+
+  /** BlurHash string (if using blur placeholder) */
+  blurHash?: string;
+}
+
+/**
+ * Lazy loading state
+ */
+export interface LazyLoadState {
+  /** Has image entered viewport */
+  inView: boolean;
+
+  /** Has image loaded */
+  loaded: boolean;
+
+  /** Loading error */
+  error: Error | null;
+}
+
+// ============================================================================
+// Zoom and Pan
+// ============================================================================
+
+/**
+ * Zoom configuration
+ */
+export interface ZoomConfig {
+  /** Minimum zoom level */
+  minZoom: number;
+
+  /** Maximum zoom level */
+  maxZoom: number;
+
+  /** Zoom step increment */
+  zoomStep: number;
+
+  /** Enable pinch zoom on touch devices */
+  enablePinchZoom: boolean;
+
+  /** Enable double-click zoom */
+  enableDoubleClickZoom: boolean;
+}
+
+/**
+ * Pan constraints
+ */
+export interface PanConstraints {
+  /** Min X position */
+  minX: number;
+
+  /** Max X position */
+  maxX: number;
+
+  /** Min Y position */
+  minY: number;
+
+  /** Max Y position */
+  maxY: number;
+}
+
+// ============================================================================
+// Sub-Component Props
+// ============================================================================
+
+/**
+ * AnnotationOverlay component props
+ */
+export interface AnnotationOverlayProps {
+  /** Annotations to render */
+  annotations: Annotation[];
+
+  /** Image dimensions */
+  imageDimensions: {
+    width: number;
+    height: number;
+  };
+
+  /** Show annotations */
+  visible: boolean;
+
+  /** Current zoom level */
+  zoomLevel: number;
+
+  /** Pan position */
+  panPosition: {
+    x: number;
+    y: number;
+  };
+}
+
+/**
+ * AnnotationShape component props
+ */
+export interface AnnotationShapeProps {
+  /** Annotation data */
+  annotation: Annotation;
+
+  /** Image dimensions */
+  imageDimensions: {
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * ZoomControls component props
+ */
+export interface ZoomControlsProps {
+  /** Current zoom level */
+  zoomLevel: number;
+
+  /** Is zoomed */
+  isZoomed: boolean;
+
+  /** Zoom in callback */
+  onZoomIn: () => void;
+
+  /** Zoom out callback */
+  onZoomOut: () => void;
+
+  /** Reset zoom callback */
+  onZoomReset: () => void;
+
+  /** Zoom config */
+  config: ZoomConfig;
+}
+
+/**
+ * FormatSelector component props
+ */
+export interface FormatSelectorProps {
+  /** Available formats */
+  availableFormats: ImageFormat[];
+
+  /** Selected format */
+  selectedFormat: ImageFormat;
+
+  /** Callback when format changes */
+  onFormatChange: (format: ImageFormat) => void;
+
+  /** File sizes for each format (optional) */
+  fileSizes?: Record<ImageFormat, number>;
+}
+
+/**
+ * FullscreenViewer component props
+ */
+export interface FullscreenViewerProps {
+  /** Is fullscreen mode active */
+  isOpen: boolean;
+
+  /** Screenshot source */
+  src: string;
+
+  /** Alt text */
+  alt: string;
+
+  /** Annotations (optional) */
+  annotations?: Annotation[];
+
+  /** Close callback */
+  onClose: () => void;
+
+  /** Enable zoom in fullscreen */
+  zoomable?: boolean;
+}
+
+/**
+ * ImagePlaceholder component props
+ */
+export interface ImagePlaceholderProps {
+  /** Placeholder type */
+  type: 'blur' | 'skeleton' | 'none';
+
+  /** BlurHash string (for blur type) */
+  blurHash?: string;
+
+  /** Aspect ratio */
+  aspectRatio?: number;
+
+  /** Width */
+  width?: number | string;
+
+  /** Height */
+  height?: number | string;
+}
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/**
+ * Screenshot file paths for all formats
+ */
+export interface ScreenshotPaths {
+  /** Base path (without extension) */
+  base: string;
+
+  /** PNG path */
+  png: string;
+
+  /** WebP path (if available) */
+  webp?: string;
+
+  /** AVIF path (if available) */
+  avif?: string;
+}
+
+/**
+ * Format support detection
+ */
+export interface FormatSupport {
+  /** Browser supports AVIF */
+  avif: boolean;
+
+  /** Browser supports WebP */
+  webp: boolean;
+
+  /** Browser supports PNG (always true) */
+  png: boolean;
+}
+
+/**
+ * Performance metrics
+ */
+export interface PerformanceMetrics {
+  /** Time to load image (ms) */
+  loadTime: number;
+
+  /** Image file size (bytes) */
+  fileSize: number;
+
+  /** Format used */
+  format: ImageFormat;
+
+  /** Decode time (ms) */
+  decodeTime?: number;
+}

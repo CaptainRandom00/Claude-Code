@@ -1,0 +1,47 @@
+[
+  {
+    "content": "Access staging server and analyze WordPress core installation",
+    "status": "completed",
+    "activeForm": "Accessing staging server and analyzing WordPress core installation"
+  },
+  {
+    "content": "Examine WordPress version and identify update gaps (5+ years)",
+    "status": "in_progress",
+    "activeForm": "Examining WordPress version and identifying update gaps"
+  },
+  {
+    "content": "Investigate wp-config.php for security and performance issues",
+    "status": "pending",
+    "activeForm": "Investigating wp-config.php for security and performance issues"
+  },
+  {
+    "content": "Analyze database for menu corruption and technical debt",
+    "status": "pending",
+    "activeForm": "Analyzing database for menu corruption and technical debt"
+  },
+  {
+    "content": "Catalog plugins and identify security vulnerabilities",
+    "status": "pending",
+    "activeForm": "Cataloging plugins and identifying security vulnerabilities"
+  },
+  {
+    "content": "Examine theme structure and menu system failures",
+    "status": "pending",
+    "activeForm": "Examining theme structure and menu system failures"
+  },
+  {
+    "content": "Review .htaccess and server configuration for deprecated settings",
+    "status": "pending",
+    "activeForm": "Reviewing .htaccess and server configuration for deprecated settings"
+  },
+  {
+    "content": "Document security vulnerabilities from 5+ years of missed patches",
+    "status": "pending",
+    "activeForm": "Documenting security vulnerabilities from missed patches"
+  },
+  {
+    "content": "Generate comprehensive WordPress performance audit report",
+    "status": "pending",
+    "activeForm": "Generating comprehensive WordPress performance audit report"
+  }
+]

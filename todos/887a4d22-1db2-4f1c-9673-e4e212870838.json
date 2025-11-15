@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Create Puppeteer script to check WordPress application",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Run Puppeteer script to capture screenshots and check accessibility",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Analyze results and provide feedback",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  }
+]

@@ -1,0 +1,43 @@
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import requestSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-request.schema.json' with { type: 'json' };
+
+const ajv = new Ajv();
+addFormats(ajv);
+
+test.describe('EPOS Sales API Request Contract', () => {
+  test('should validate request with limit parameter', () => {
+    const params = {
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
+      limit: 5000,
+      offset: 0
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(true);
+  });
+
+  test('should validate request with "all" limit', () => {
+    const params = {
+      limit: 'all',
+      offset: 0,
+      sortBy: 'totalNet',
+      sortOrder: 'desc'
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(true);
+  });
+
+  test('should reject invalid limit values', () => {
+    const params = {
+      limit: 150000, // Exceeds 100K max
+      offset: 0
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(false);
+  });
+});

@@ -1,0 +1,371 @@
+# Quickstart Guide: Sales Analytics Data Access Enhancement
+
+**Feature**: 027-fix-sales-analytics
+**Purpose**: Manual validation scenarios for configurable record limits and server-side filtering
+**Estimated Time**: 20 minutes
+
+---
+
+## Prerequisites
+
+✅ Development server running: `npm run dev`
+✅ Database populated with EPOS sales data (ideally 50K+ records for full testing)
+✅ Browser DevTools available (for Network tab inspection)
+
+---
+
+## Scenario 1: Change Record Limit (Basic Functionality)
+
+**Goal**: Verify limit dropdown changes number of loaded records
+
+**Steps**:
+1. Navigate to `http://localhost:3000/dashboard`
+2. Click "Sales Aggregation" tab
+3. Look for "Records to Load" dropdown in Sales Filters section
+4. Note current indicator: "10,000 records loaded" (default)
+5. Open the limit dropdown
+6. Select "25,000 records"
+
+**Expected Results**:
+- ⚠️ Warning toast appears: "Loading large datasets may impact browser performance"
+- Loading spinner displays briefly
+- Data refetches automatically
+- New indicator shows: "Showing 25,000 of [total] records"
+- Table displays exactly 25,000 rows (or fewer if total < 25,000)
+- Browser remains responsive
+
+**Verification**:
+- Open DevTools → Network tab
+- Filter by "epos-sales"
+- Check request URL includes `?limit=25000`
+- Response should have `meta.limit = 25000`
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 2: Server-Side Filtering Verification
+
+**Goal**: Prove filters query database, not just client-loaded records
+
+**Setup**:
+- Ensure database has >50,000 total records
+- Identify an item code that appears in <100 records (check via DB query)
+
+**Steps**:
+1. Navigate to Sales Analytics → Detailed Data
+2. Set limit to "1,000 records" (intentionally small)
+3. Wait for load completion
+4. Note: "Showing 1,000 of [total] records"
+5. Open DevTools → Network tab
+6. Apply filter: Enter specific Item Code (e.g., "12345")
+7. Observe API request in Network tab
+
+**Expected Results**:
+- API request URL includes: `itemCode=12345&limit=1000`
+- Response `meta.totalCount` shows actual DB count (not 1000)
+  - Example: If only 5 records match in DB, meta.totalCount = 5
+- Display updates: "Showing 5 of 5 records (filtered)"
+- Only matching records displayed in table
+- If total matches < limit, all matching records shown
+
+**Key Insight**: If filtering was client-side only, totalCount would incorrectly show 1000 or 0
+
+**Verification Questions**:
+- Q: Does meta.totalCount reflect actual DB count? ☐ Yes ☐ No
+- Q: Does display say "(filtered)"? ☐ Yes ☐ No
+- Q: Are ALL matching records shown (if < limit)? ☐ Yes ☐ No
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 3: Performance Warning (>25K Records)
+
+**Goal**: Verify warning appears for large datasets
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Current limit: any value
+3. Open limit dropdown
+4. Select "50,000 records"
+
+**Expected Results**:
+- ⚠️ Warning toast immediately appears (before API call)
+- Warning message: "⚠️ Loading large datasets may impact browser performance"
+- Warning has "Continue" button
+- Clicking "Continue" proceeds with data load
+- Loading spinner displays during fetch
+- After load: "Showing 50,000 of [total] records"
+
+**Verification**:
+- Warning appears for 25K, 50K, and "All Records"
+- No warning for 1K, 5K, 10K
+- Warning can be dismissed without proceeding
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 4: "All Records" Confirmation Dialog
+
+**Goal**: Verify confirmation required for unlimited loading
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Note current total record count (e.g., "Showing 10,000 of 75,000 records")
+3. Open limit dropdown
+4. Select "All Records"
+
+**Expected Results**:
+- Confirmation dialog appears with message:
+  - "This may load 75,000 records. Continue?"
+  - (Number should match current totalCount from display)
+- Dialog has "Cancel" and "Confirm" buttons
+- Clicking "Cancel":
+  - Dialog closes
+  - No API request made
+  - Limit remains unchanged
+- Clicking "Confirm":
+  - Dialog closes
+  - API request made with `limit=all`
+  - Loading spinner displays
+  - All records load (up to 100K safety cap)
+
+**Safety Cap Test** (if total > 100K):
+- If total is 150,000:
+  - System loads maximum 100,000 records
+  - Display shows: "Showing 100,000 of 150,000 records"
+  - Error toast: "Results limited to 100,000 records for performance. Please refine your filters."
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 5: Multi-Filter Server-Side Query
+
+**Goal**: Verify multiple filters combine correctly in database query
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Set limit to "10,000 records"
+3. Apply multiple filters:
+   - Start Date: "2024-01-01"
+   - End Date: "2024-12-31"
+   - Supplier: Select any supplier (e.g., "ABC Distributors")
+   - Category: Select any category (e.g., "Beverages")
+4. Open DevTools → Network tab
+5. Note the API request
+
+**Expected Results**:
+- API request includes ALL filter parameters:
+  - `startDate=2024-01-01`
+  - `endDate=2024-12-31`
+  - `supplier=ABC+Distributors`
+  - `category=Beverages`
+  - `limit=10000`
+- Response meta.totalCount reflects records matching ALL filters (AND condition)
+- Display shows: "Showing [X] of [totalCount] records (filtered)"
+- Only matching records displayed
+
+**Database Verification** (optional, requires DB access):
+```sql
+SELECT COUNT(*)
+FROM epos_sales_summaries
+WHERE report_date BETWEEN '2024-01-01' AND '2024-12-31'
+  AND supplier = 'ABC Distributors'
+  AND category = 'Beverages';
+```
+- Result should match meta.totalCount from API response
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 6: "Load More" Incremental Loading
+
+**Goal**: Verify incremental pagination with "Load More" button
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Set limit to "5,000 records"
+3. Ensure total records > 5,000 (check display)
+4. Scroll to bottom of data table
+5. Look for "Load More" button
+6. Click "Load More"
+
+**Expected Results**:
+- "Load More" button visible when meta.hasMore = true
+- Button shows loading spinner when clicked
+- API request made with `offset=5000&limit=5000`
+- Next 5,000 records append to table (not replace)
+- Display updates: "Showing 10,000 of [total] records"
+- Can continue clicking "Load More" until all records loaded
+- Button disappears when meta.hasMore = false
+
+**Verification**:
+- Check DevTools Network tab for subsequent requests
+- Verify offset increases: 0 → 5000 → 10000 → ...
+- Confirm no duplicate records in table
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 7: Limit Change with Active Filters
+
+**Goal**: Verify limit changes preserve existing filters
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Apply filter: Item Code = "TEST123"
+3. Note filtered total: "Showing [X] of [Y] records (filtered)"
+4. Change limit from 10,000 to 1,000
+5. Observe behavior
+
+**Expected Results**:
+- Filters remain active after limit change
+- New API request includes BOTH limit and itemCode:
+  - `itemCode=TEST123&limit=1000`
+- Response meta.totalCount unchanged (still filtered total)
+- Display: "Showing [min(1000, Y)] of [Y] records (filtered)"
+- Filter indicators still visible in UI
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 8: Performance - Large Dataset Responsiveness
+
+**Goal**: Verify browser remains usable with 50K+ records
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Set limit to "50,000 records"
+3. Confirm warning and load data
+4. Wait for complete load
+5. Test browser responsiveness:
+   - Scroll table up/down (should be smooth)
+   - Click column headers to sort
+   - Apply a new filter
+   - Open limit dropdown
+
+**Expected Results**:
+- ✅ Table scrolling smooth (virtualization working)
+- ✅ Sorting responds within 1-2 seconds
+- ✅ Filters trigger new API call (not client-side filter of 50K)
+- ✅ Dropdown opens without delay
+- ✅ No browser "Page Unresponsive" warnings
+- ✅ Memory usage reasonable (<600MB in DevTools Performance Monitor)
+
+**Verification**:
+- Open DevTools → Performance tab
+- Click "Record"
+- Scroll table for 5 seconds
+- Stop recording
+- Check for long tasks (>50ms)
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 9: Browser Safety Cap (100K Enforcement)
+
+**Goal**: Verify 100K maximum enforced even when more records exist
+
+**Prerequisites**: Database must have >100,000 total records
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Remove all filters to maximize total count
+3. Note display shows >100,000 total (e.g., "Showing 10,000 of 150,000 records")
+4. Select "All Records" from limit dropdown
+5. Confirm dialog
+
+**Expected Results**:
+- System loads exactly 100,000 records (not 150,000)
+- Display shows: "Showing 100,000 of 150,000 records"
+- Error toast appears:
+  - "Results limited to 100,000 records for performance. Please refine your filters."
+- meta.limit in response = 100000
+- Browser remains stable (no crash)
+
+**Pass/Fail**: ☐
+
+---
+
+## Scenario 10: Backward Compatibility Check
+
+**Goal**: Ensure existing functionality unaffected
+
+**Steps**:
+1. Navigate to Sales Analytics
+2. Test all EXISTING features:
+   - Date range picker (start/end dates)
+   - Report date dropdown
+   - Supplier filter dropdown
+   - Category filter dropdown
+   - Item code search
+   - Column sorting (click headers)
+   - Timeframe buttons (1d, 7d, 30d, 90d, ALL)
+   - Export buttons (CSV, Excel, PDF) - if present
+
+**Expected Results**:
+- ✅ All existing filters work as before
+- ✅ No console errors
+- ✅ UI layout unchanged (except new limit dropdown)
+- ✅ Existing performance maintained
+- ✅ TanStack Query caching still functions (60s stale time)
+
+**Pass/Fail**: ☐
+
+---
+
+## Summary Checklist
+
+| Scenario | Pass | Fail | Notes |
+|----------|------|------|-------|
+| 1. Change Record Limit | ☐ | ☐ | |
+| 2. Server-Side Filtering | ☐ | ☐ | |
+| 3. Performance Warning | ☐ | ☐ | |
+| 4. "All Records" Confirmation | ☐ | ☐ | |
+| 5. Multi-Filter Query | ☐ | ☐ | |
+| 6. "Load More" Button | ☐ | ☐ | |
+| 7. Limit Change with Filters | ☐ | ☐ | |
+| 8. Large Dataset Performance | ☐ | ☐ | |
+| 9. Browser Safety Cap | ☐ | ☐ | |
+| 10. Backward Compatibility | ☐ | ☐ | |
+
+**Overall Feature Status**: ☐ PASS ☐ FAIL
+
+**Issues Found**:
+- (List any bugs or unexpected behavior here)
+
+---
+
+## Troubleshooting
+
+### Problem: Limit dropdown not visible
+- **Check**: Feature deployed to correct branch?
+- **Check**: Browser cache cleared? (Cmd+Shift+R)
+- **Check**: Component re-built? (`npm run build`)
+
+### Problem: Filters not querying database
+- **Check**: Network tab shows `limit` parameter in URL?
+- **Check**: Response includes `meta` object?
+- **Check**: Backend routes-epos.ts updated?
+
+### Problem: Browser freezes with large datasets
+- **Check**: Safety cap enforced? (Should never exceed 100K)
+- **Check**: Virtualization enabled for table rendering?
+- **Check**: Memory profiling in DevTools shows leak?
+
+### Problem: "Load More" not working
+- **Check**: `meta.hasMore` true in API response?
+- **Check**: TanStack Query `useInfiniteQuery` implemented?
+- **Check**: Button visible when scrolled to bottom?
+
+---
+
+**Validation Complete**: Feature ready for E2E Playwright test execution
+**Next Step**: Run automated Playwright test suite from `tests/playwright/sales-analytics-*.spec.ts`

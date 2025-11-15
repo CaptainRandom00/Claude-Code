@@ -1,0 +1,518 @@
+# Research & Technical Decisions: Widget-Based Dashboard Framework
+
+**Feature**: Widget-Based Dashboard Framework
+**Branch**: `028-build-a-widget`
+**Date**: 2025-10-11
+
+## Overview
+
+This document captures technical research and decisions made during Phase 0 planning for the widget-based dashboard framework. All unknowns from the Technical Context have been resolved through evaluation of alternatives and best practices research.
+
+---
+
+## 1. Drag-and-Drop Grid Layout Library Selection
+
+### Decision: react-grid-layout v1.5.2
+
+### Rationale:
+- **Purpose-built for dashboards**: Provides out-of-the-box drag-and-drop, resizing, and grid-based layouts without custom implementation
+- **Proven in production**: 942,626 weekly downloads, 21,554 GitHub stars, widely used in data-heavy dashboards
+- **Complete feature set**: Includes all dashboard essentials (dragging, resizing, collision detection, auto-compaction, responsive breakpoints)
+- **Performance**: Optimized for React with `shouldComponentUpdate`, supports 50+ widgets with proper memoization
+- **Responsive support**: Native breakpoints (xs, sm, md, lg, xl) with per-breakpoint layout configurations
+- **Save/load ready**: Serializable layout state works with localStorage, databases, or APIs
+- **Active maintenance**: Latest version 3 months old, strong community support
+
+### Alternatives Considered:
+- **dnd-kit**: Modern and accessible but requires significant custom work for grid behavior, snapping, and collision detection. Better for custom drag-and-drop interactions than grid-based dashboards.
+- **react-dnd**: Lower-level API lacking grid functionality and resizing, known performance issues with large grids
+- **gridstack.js**: Framework-agnostic library with React integration complexity, smaller ecosystem (254K downloads vs 942K)
+- **react-beautiful-dnd**: Designed for lists, not grids; lacks resizing capabilities
+
+### Integration Notes:
+```bash
+npm install react-grid-layout
+npm install --save-dev @types/react-grid-layout
+```
+
+**Key Configuration**:
+- Use `WidthProvider` HOC for automatic width calculation
+- Import both `react-grid-layout/css/styles.css` and `react-resizable/css/styles.css`
+- Responsive breakpoints: `{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }`
+- Grid columns per breakpoint: `{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }`
+
+**Known Limitations**:
+- Basic keyboard navigation not built-in (will require custom implementation for WCAG 2.1 AA compliance)
+- Performance with 50+ widgets requires memoizing children array with `React.memo()`
+- Community-maintained TypeScript types may lag behind library updates
+
+---
+
+## 2. Existing Route Analysis (Principle X)
+
+### Analysis Summary:
+Analyzed existing system routes to identify reusable endpoints and prevent duplication per Constitution Principle X.
+
+**Total System Routes**: 245
+- GET: 171
+- POST: 56
+- DELETE: 9
+- PUT: 6
+- PATCH: 3
+
+**Existing Dashboard Routes** (in `server/routes-dashboard.ts`):
+1. `GET /api/dashboard/overview-metrics` - BRN stock + EPOS sales overview
+2. `GET /api/dashboard/metrics` - Main metrics (sales, stock, expiry)
+3. `GET /api/dashboard/top-items` - Top performing items
+4. `GET /api/dashboard/activity` - Recent activity feed
+5. `GET /api/dashboard/sales-chart` - Sales trend data
+6. `GET /api/dashboard/category-breakdown` - Category analysis
+
+**Top Service Files**:
+- routes-waste (28 routes)
+- routes-excel (16 routes)
+- routes-product-profiles (14 routes)
+- routes-sales-aggregation (14 routes)
+- routes-bbd (13 routes)
+
+### API Reuse Opportunities:
+1. **Existing dashboard endpoints** can be consumed by metric widgets without modification
+2. **Sales aggregation routes** (14 endpoints) provide time-series data suitable for chart widgets
+3. **Product profile routes** (14 endpoints) can power table widgets with product data
+4. **BBD routes** (13 endpoints) provide expiry data for alert widgets
+5. **Waste tracking routes** (28 endpoints) offer comprehensive waste metrics
+
+### New Routes Required:
+The widget framework requires NEW routes (no existing equivalents found):
+1. **Widget Management**: CRUD operations for widget definitions
+2. **Dashboard Management**: CRUD for dashboard configurations
+3. **API Metadata Discovery**: Endpoint to list available APIs with schemas
+4. **Widget Data Proxy**: Unified endpoint to fetch data for widget calculations
+5. **Layout Persistence**: Save/load dashboard layouts
+
+**Decision**: Create new route file `routes-widget-dashboard.ts` for framework-specific endpoints while widgets consume existing API routes directly.
+
+---
+
+## 3. Chart Visualization Library
+
+### Decision: Recharts v2.x (already in project dependencies)
+
+### Rationale:
+- **Already integrated**: Project uses Recharts for existing dashboard charts (confirmed in codebase)
+- **React-native**: Built specifically for React with composable chart components
+- **Declarative API**: Matches React component patterns, easy to configure via props
+- **TypeScript support**: Full TypeScript definitions included
+- **Sufficient chart types**: Line, Bar, Area, Pie, Scatter covers widget requirements
+- **Accessibility**: Built-in ARIA support, keyboard navigation capabilities
+- **Bundle size**: Reasonable (tree-shakeable, ~200KB minified)
+
+### Alternatives Considered:
+- **Chart.js**: Requires react-chartjs-2 wrapper, more imperative API
+- **Apache ECharts**: More powerful but heavier bundle, overkill for dashboard widgets
+- **Victory**: Good React integration but larger bundle size
+- **D3.js**: Too low-level, requires significant custom implementation
+
+### Integration Notes:
+- Already installed in project
+- Supports responsive behavior via `ResponsiveContainer`
+- Custom tooltip and legend components for branded styling
+- Candlestick charts via `ComposedChart` for advanced sales analytics
+
+---
+
+## 4. Client-Side Calculation Engine
+
+### Decision: Custom calculation pipeline using Lodash v4.x
+
+### Rationale:
+- **Lodash already in dependencies**: No new library needed
+- **Functional approach**: Chain operations for pipeline pattern (Fetch → Filter → Group → Aggregate → Compare)
+- **Performance**: Optimized collection operations handle 10K records easily
+- **Flexibility**: Can implement custom aggregations, comparisons, filters
+- **Lightweight**: Use only needed functions (groupBy, sumBy, meanBy, etc.)
+
+### Pipeline Implementation Pattern:
+```typescript
+// Calculation Pipeline Phases (per spec FR-010)
+1. Fetch: Widget calls API endpoint
+2. Filter: _.filter(data, whereClause)
+3. Group: _.groupBy(data, groupByField)
+4. Aggregate: _.sumBy() / _.meanBy() / _.countBy()
+5. Compare: Calculate percent change, difference, ratio
+```
+
+### Alternatives Considered:
+- **sql.js**: Client-side SQLite, too heavy (~1.5MB) and overkill
+- **Arquero**: Data transformation library, adds 100KB+ dependency
+- **Custom implementation**: Reinventing Lodash functionality
+- **DataFrame.js**: Less mature, smaller community
+
+---
+
+## 5. State Management for Widgets
+
+### Decision: TanStack Query v5 (already in project)
+
+### Rationale:
+- **Already integrated**: Project uses TanStack Query for server state management
+- **Perfect for widget data fetching**: Built-in caching, auto-refresh, loading/error states
+- **Independent widget state**: Each widget has isolated query keys
+- **Performance**: Automatic request deduplication, background refetching
+- **Offline support**: Query retries and offline mutation queuing built-in
+
+### Widget State Pattern:
+```typescript
+// Each widget uses independent query
+const { data, isLoading, error, refetch } = useQuery({
+  queryKey: ['widget', widgetId, config],
+  queryFn: () => fetchWidgetData(config),
+  refetchInterval: config.refreshInterval,
+  staleTime: 30000,
+});
+```
+
+### Dashboard Configuration State:
+- **Local state**: React Context for dashboard builder UI state
+- **Server state**: TanStack Query for saved dashboard configurations
+- **Layout state**: React state managed by react-grid-layout
+
+### Alternatives Considered:
+- **Redux Toolkit**: Overkill for widget state, already have TanStack Query
+- **Zustand**: Adds dependency, TanStack Query sufficient for server state
+- **Jotai/Recoil**: Atomic state good but unnecessary with TanStack Query
+
+---
+
+## 6. Data Storage Schema
+
+### Decision: MySQL tables with Drizzle ORM (per Constitution Principle I)
+
+### Schema Design:
+```typescript
+// New tables required (detailed in data-model.md)
+- widget_definitions: Widget type, configuration, metadata
+- dashboards: Dashboard name, owner, global settings
+- dashboard_widgets: Join table linking widgets to dashboards
+- widget_layouts: Layout positions per dashboard per breakpoint
+- dashboard_templates: Pre-built dashboard configurations
+```
+
+### Rationale:
+- **Constitution compliance**: Data-first architecture, Drizzle ORM required
+- **Relationships**: Foreign keys for data integrity (dashboard → widgets → layouts)
+- **Time-series ready**: Timestamps for created_at, updated_at tracking
+- **Multi-user**: User_id foreign keys for ownership and permissions
+- **Server-side storage**: Cross-device access per spec assumption
+
+### Caching Strategy:
+- **Server-side primary**: MySQL for all dashboard configurations
+- **Browser-side cache**: IndexedDB via TanStack Query (max 50MB per spec)
+- **Offline queue**: Service Worker for request queuing when offline
+
+---
+
+## 7. API Metadata Discovery System
+
+### Decision: Runtime route introspection with OpenAPI schema
+
+### Implementation Approach:
+1. **Route registry enhancement**: Extend existing `routes.registry.json` with endpoint metadata
+2. **Schema extraction**: Generate JSON schema from Zod validators (already in use)
+3. **Discovery endpoint**: `GET /api/metadata/endpoints` returns available APIs
+4. **Response format**:
+```typescript
+{
+  endpoint: string;
+  method: string;
+  description: string;
+  params: JSONSchema;
+  response: JSONSchema;
+  rateLimit: string;
+  auth: boolean;
+}
+```
+
+### Rationale:
+- **Leverages existing**: Route registry system already operational
+- **Zod integration**: Project uses Zod for validation, can generate schemas
+- **Constitution aligned**: Extends Principle IX documentation system
+- **Real-time**: Reflects current API state, no manual updates needed
+
+### 7.1 Implementation Algorithm for T057 (Populate api_endpoints_metadata)
+
+**Challenge**: Seed `api_endpoints_metadata` table by parsing `server/routes.registry.json` with schema transformation.
+
+**Algorithm**:
+
+```typescript
+// Implementation for T057: Populate API Metadata
+async function populateApiMetadata() {
+  const registry = JSON.parse(fs.readFileSync('server/routes.registry.json', 'utf-8'));
+
+  for (const route of registry.routes) {
+    // Extract HTTP method and path
+    const [method, path] = route.endpoint.split(' '); // "GET /api/products" → ["GET", "/api/products"]
+
+    // Determine if endpoint returns list or single item
+    const returnsList = !path.includes('/:id') && method === 'GET';
+
+    // Parse description from route manifest comment block
+    const description = route.description || extractFromRouteFile(route.file, path);
+
+    // Infer data shape from response schema (if available)
+    const responseSchema = route.responseSchema || null;
+
+    // Insert into database with conflict handling (upsert)
+    await db.insert(apiEndpointsMetadata).values({
+      endpoint: path,
+      method: method,
+      description: description,
+      returnsList: returnsList,
+      requiresAuth: route.auth !== false, // default true
+      responseSchema: responseSchema ? JSON.stringify(responseSchema) : null,
+      isActive: true,
+      lastValidated: new Date(),
+    }).onConflictDoUpdate({
+      target: [apiEndpointsMetadata.endpoint, apiEndpointsMetadata.method],
+      set: {
+        description: sql`excluded.description`,
+        returnsList: sql`excluded.returnsList`,
+        lastValidated: sql`excluded.lastValidated`,
+      },
+    });
+  }
+}
+```
+
+**Schema Mapping**:
+
+| routes.registry.json Field | api_endpoints_metadata Column | Transformation |
+|----------------------------|-------------------------------|----------------|
+| `route.endpoint` | `endpoint` (path only) | Split on space, take second part |
+| `route.endpoint` | `method` | Split on space, take first part |
+| `route.description` | `description` | Direct copy or extract from route file |
+| `route.responseSchema` | `responseSchema` | JSON.stringify() if present |
+| Inferred from path | `returnsList` | `true` if no `:id` param and GET method |
+| `route.auth` | `requiresAuth` | Default `true` unless explicitly `false` |
+
+**Error Handling**:
+
+1. **Missing registry file**: Skip population, log warning (endpoints can be manually added via UI)
+2. **Malformed JSON**: Parse errors should fail gracefully with detailed error message
+3. **Duplicate endpoints**: Use `onConflictDoUpdate` (upsert pattern) to update existing entries
+4. **Invalid endpoint format**: Skip route, log warning with route file reference
+5. **Missing description**: Fallback to `"No description available"` or parse from route file JSDoc
+
+**Implementation Notes**:
+
+- Run as database seed task (T057) during initial setup
+- **Idempotent**: Can re-run to update metadata after new routes added
+- **Performance**: Batch insert for large registries (245+ routes)
+- Future enhancement: Auto-refresh on route file changes (watch mode)
+- Alternative: Parse route files directly if registry lacks metadata
+
+**Example Output**:
+
+```typescript
+// After running T057, api_endpoints_metadata table contains:
+[
+  {
+    endpoint: '/api/products',
+    method: 'GET',
+    description: 'List all product profiles',
+    returnsList: true,
+    requiresAuth: true,
+    responseSchema: '{"type":"array","items":{"type":"object","properties":{"id":"number","name":"string"}}}',
+    isActive: true,
+    lastValidated: '2025-10-12T10:30:00Z',
+  },
+  {
+    endpoint: '/api/products/:id',
+    method: 'GET',
+    description: 'Get single product profile by ID',
+    returnsList: false,
+    requiresAuth: true,
+    responseSchema: '{"type":"object","properties":{"id":"number","name":"string"}}',
+    isActive: true,
+    lastValidated: '2025-10-12T10:30:00Z',
+  },
+  // ... 245+ more endpoints
+]
+```
+
+---
+
+## 8. Accessibility Implementation (WCAG 2.1 Level AA)
+
+### Decision: Multi-layered accessibility approach
+
+### Component Level:
+- **shadcn/ui base**: Use accessible primitives (Dialog, Select, Button with ARIA)
+- **Recharts accessibility**: Enable built-in ARIA labels, keyboard navigation
+- **react-grid-layout limitation**: Implement custom keyboard navigation layer
+
+### Custom Keyboard Navigation (to address react-grid-layout gap):
+```typescript
+// Widget focus navigation
+- Tab: Move between widgets
+- Arrow keys: Move widget position (when focused)
+- Space/Enter: Activate widget (enter edit mode)
+- Escape: Cancel drag/resize operation
+```
+
+### Screen Reader Support:
+- **Live regions**: Announce widget data updates (`aria-live="polite"`)
+- **Widget labels**: Descriptive `aria-label` for each widget type
+- **Status announcements**: Loading, error, success states announced
+- **Semantic HTML**: Proper heading hierarchy, landmark regions
+
+### Color Contrast:
+- **Text**: 4.5:1 ratio for normal text (WCAG AA)
+- **UI components**: 3:1 ratio for large text and interactive elements
+- **Chart colors**: Color-blind safe palettes, pattern/texture fallbacks
+- **Focus indicators**: 3:1 contrast ratio, 2px minimum thickness
+
+---
+
+## 9. Security Implementation
+
+### Input Validation:
+- **Zod schemas**: All widget configurations, dashboard settings validated
+- **Whitelist approach**: API endpoints, calculation types validated against allowed values
+- **Sanitization**: DOMPurify for user-generated content (dashboard names, widget titles)
+
+### XSS Prevention:
+```typescript
+// React escapes by default, additional layer:
+import DOMPurify from 'isomorphic-dompurify';
+const sanitized = DOMPurify.sanitize(userInput);
+```
+
+### CSRF Protection:
+- **SameSite cookies**: Existing session system uses SameSite=Strict
+- **CSRF tokens**: Implement for state-changing operations (dashboard save, delete)
+- **Double-submit pattern**: Token in cookie + request header validation
+
+### SQL Injection Prevention:
+- **Drizzle ORM**: Parameterized queries by default
+- **Calculation filters**: Validated against whitelist before ORM usage
+- **No raw SQL**: Use Drizzle query builder for all calculation operations
+
+---
+
+## 10. Performance Optimization Strategy
+
+### Widget Rendering:
+- **Virtualization**: React-window for off-screen widgets (>20 widgets)
+- **Memoization**: `React.memo()` for widget components
+- **Lazy loading**: Code-split widget types, load on demand
+- **Debouncing**: Layout change saves debounced to 500ms
+
+### Data Fetching:
+- **Request batching**: Combine multiple widget requests where possible
+- **Stale-while-revalidate**: TanStack Query serves cached data, refetch in background
+- **Request limits**: Max 10 concurrent per dashboard (per spec FR-059)
+- **Bandwidth throttling**: 50MB/min limit, defer non-critical refreshes (per spec FR-061)
+
+### Calculation Pipeline:
+- **Worker threads**: Move heavy calculations to Web Workers (>5K records)
+- **Streaming**: Process large datasets in chunks
+- **Timeout handling**: 30-second limit, offer async calculation (per spec FR-058)
+- **Result caching**: Cache calculation results with TTL
+
+---
+
+## 11. Testing Strategy (Principle VI Compliance)
+
+### Playwright E2E Tests:
+1. **Widget configuration workflow**: Add widget → select API → configure calculation → preview data
+2. **Dashboard builder**: Create dashboard → add widgets → arrange layout → save
+3. **Layout persistence**: Save layout → reload page → verify layout restored
+4. **Responsive behavior**: Test breakpoints (320px, 768px, 1200px, 3840px)
+5. **Accessibility**: Keyboard navigation, screen reader compatibility
+6. **Cross-browser**: Chrome, Firefox, Safari automation
+
+### Audit Trail Structure:
+```
+specs/028-build-a-widget/audit/
+├── playwright-execution-logs/
+│   ├── widget-configuration.log
+│   ├── dashboard-builder.log
+│   ├── layout-persistence.log
+│   └── responsive-behavior.log
+├── failure-analysis/
+│   ├── [test-name]-analysis.md
+│   └── screenshots/
+├── remediation/
+│   ├── fixes-applied.md
+│   └── retest-results.md
+└── validation-report.md
+```
+
+### Unit Tests (Jest):
+- Calculation pipeline functions
+- Widget configuration validators
+- Layout collision detection
+- API metadata parser
+
+### Integration Tests:
+- Widget data fetching + calculation pipeline
+- Dashboard save/load with database
+- API discovery endpoint responses
+
+---
+
+## 12. Migration & Rollout Strategy
+
+### Coexistence Approach (per user selection):
+- **No breaking changes**: Existing dashboard (`/dashboard`) remains unchanged
+- **New route**: Widget framework at `/dashboards/builder`
+- **Gradual adoption**: Users opt-in to new framework
+- **Data separation**: New database tables, no migration of existing dashboard data
+
+### Feature Flags:
+```typescript
+// Enable widget framework per user or role
+const WIDGET_FRAMEWORK_ENABLED = process.env.ENABLE_WIDGET_FRAMEWORK === 'true';
+```
+
+### Rollout Phases:
+1. **Phase 1**: P1 user story (view pre-built dashboard) - internal testing
+2. **Phase 2**: P2 user story (create from template) - beta users
+3. **Phase 3**: P3 user stories (configure widget, customize layout) - general availability
+4. **Phase 4**: P4 user story (advanced calculations) - power users
+
+---
+
+## Summary of Technical Decisions
+
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| **Drag-and-Drop** | react-grid-layout v1.5.2 | Purpose-built for dashboards, proven performance, complete feature set |
+| **Charts** | Recharts v2.x | Already integrated, React-native, sufficient chart types |
+| **Calculations** | Lodash v4.x | Already in dependencies, functional pipeline pattern |
+| **State Management** | TanStack Query v5 | Already integrated, perfect for widget data fetching |
+| **Data Storage** | MySQL + Drizzle ORM | Constitution requirement, server-side primary storage |
+| **API Discovery** | OpenAPI + Zod schemas | Leverages existing route registry and validators |
+| **Accessibility** | Custom keyboard nav + shadcn/ui | Addresses react-grid-layout gap, WCAG 2.1 AA compliance |
+| **Security** | Zod + DOMPurify + CSRF tokens | Input validation, XSS prevention, CSRF protection |
+| **Testing** | Playwright + Jest | E2E browser automation, unit tests, audit trail |
+| **Rollout** | Coexistence with feature flags | No breaking changes, gradual adoption |
+
+---
+
+## Unknowns Resolved
+
+✅ **Drag-drop library selection**: react-grid-layout (RESOLVED)
+✅ **Route reuse analysis**: Existing dashboard routes identified, new routes scoped (RESOLVED)
+✅ **Chart library**: Recharts (already integrated) (RESOLVED)
+✅ **Calculation engine**: Lodash functional pipeline (RESOLVED)
+✅ **State management**: TanStack Query (already integrated) (RESOLVED)
+✅ **Storage strategy**: MySQL + browser cache clarified (RESOLVED)
+✅ **API discovery**: OpenAPI + Zod schema extraction (RESOLVED)
+✅ **Accessibility approach**: Multi-layered with custom keyboard nav (RESOLVED)
+✅ **Security implementation**: Zod + DOMPurify + CSRF (RESOLVED)
+✅ **Testing strategy**: Playwright E2E + Jest unit tests (RESOLVED)
+
+**Status**: All NEEDS CLARIFICATION items resolved. Ready for Phase 1 (Design & Contracts).

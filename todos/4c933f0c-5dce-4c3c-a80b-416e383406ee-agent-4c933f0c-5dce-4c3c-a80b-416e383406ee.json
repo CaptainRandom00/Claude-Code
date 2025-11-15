@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Execute T036: Create database indexes for pagination",
+    "status": "completed",
+    "activeForm": "Executing T036: Create database indexes for pagination"
+  },
+  {
+    "content": "Execute T037: Optimize product_profiles table indexes",
+    "status": "completed",
+    "activeForm": "Executing T037: Optimize product_profiles table indexes"
+  },
+  {
+    "content": "Execute T038: Contract test for pagination API",
+    "status": "completed",
+    "activeForm": "Executing T038: Contract test for pagination API"
+  },
+  {
+    "content": "Execute T039-T041: Backend API enhancement",
+    "status": "completed",
+    "activeForm": "Executing T039-T041: Backend API enhancement"
+  },
+  {
+    "content": "Execute T042-T044: Frontend hooks and types",
+    "status": "completed",
+    "activeForm": "Executing T042-T044: Frontend hooks and types"
+  },
+  {
+    "content": "Execute T045-T047: UI component enhancement",
+    "status": "completed",
+    "activeForm": "Executing T045-T047: UI component enhancement"
+  },
+  {
+    "content": "Execute T048-T049: URL state integration",
+    "status": "in_progress",
+    "activeForm": "Executing T048-T049: URL state integration"
+  }
+]

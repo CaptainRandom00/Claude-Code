@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Update dev.js to properly compile and start TypeScript backend instead of live-backend.js",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-dev-orchestrator"
+  },
+  {
+    "content": "Consolidate Prisma schemas and fix DATABASE_URL path resolution",
+    "status": "completed",
+    "priority": "high",
+    "id": "consolidate-database-config"
+  },
+  {
+    "content": "Ensure backend TypeScript builds properly and update package.json scripts",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-typescript-compilation"
+  },
+  {
+    "content": "Validate and fix environment variables and configurations",
+    "status": "completed",
+    "priority": "medium",
+    "id": "validate-environment"
+  },
+  {
+    "content": "Test that backend starts successfully and API endpoints work",
+    "status": "completed",
+    "priority": "medium",
+    "id": "test-backend-startup"
+  }
+]

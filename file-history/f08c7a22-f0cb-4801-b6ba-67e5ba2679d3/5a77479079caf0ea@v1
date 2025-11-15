@@ -1,0 +1,319 @@
+/**
+ * Widget Type Definitions
+ * Feature: 028-build-a-widget
+ *
+ * TypeScript interfaces for widget dashboard framework
+ * Based on data-model.md entities and shared/schema.ts
+ */
+
+// ============================================================================
+// Widget Types
+// ============================================================================
+
+export type WidgetType = 'metric' | 'chart' | 'table' | 'alert' | 'progress';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type Breakpoint = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
+export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'candlestick';
+export type Format = 'currency' | 'percentage' | 'number' | 'date';
+export type AggregationType = 'sum' | 'average' | 'count' | 'min' | 'max';
+export type ComparisonType = 'percent_change' | 'difference' | 'ratio';
+export type FilterOperator = 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'contains';
+
+// ============================================================================
+// Calculation Pipeline Types
+// ============================================================================
+
+export interface CalculationFilter {
+  field: string;
+  operator: FilterOperator;
+  value: any;
+}
+
+export interface Aggregation {
+  type: AggregationType;
+  field: string;
+  alias?: string;
+}
+
+export interface Comparison {
+  type: ComparisonType;
+  currentField: string;
+  comparisonField: string;
+}
+
+export interface Sort {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
+export interface CalculationConfig {
+  filters?: CalculationFilter[];
+  groupBy?: string[];
+  aggregations: Aggregation[];
+  comparisons?: Comparison[];
+  sort?: Sort[];
+  limit?: number;
+}
+
+// ============================================================================
+// Visualization Config Types
+// ============================================================================
+
+export interface VisualizationConfig {
+  colors?: string[];
+  format?: Format;
+  decimalPlaces?: number;
+  labels?: Record<string, string>;
+  chartType?: ChartType;
+  showLegend?: boolean;
+  showTooltip?: boolean;
+}
+
+// ============================================================================
+// Widget Definition
+// ============================================================================
+
+export interface WidgetDefinition {
+  id: number;
+  userId: number | null;
+  widgetType: WidgetType;
+  name: string;
+  description: string | null;
+  apiEndpoint: string;
+  httpMethod: HttpMethod;
+  queryParams: Record<string, any> | null;
+  calculationConfig: CalculationConfig;
+  visualizationConfig: VisualizationConfig;
+  refreshInterval: number;
+  errorConfig: Record<string, any> | null;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateWidgetDefinition {
+  userId?: number | null;
+  widgetType: WidgetType;
+  name: string;
+  description?: string | null;
+  apiEndpoint: string;
+  httpMethod?: HttpMethod;
+  queryParams?: Record<string, any> | null;
+  calculationConfig: CalculationConfig;
+  visualizationConfig: VisualizationConfig;
+  refreshInterval?: number;
+  errorConfig?: Record<string, any> | null;
+  isSystem?: boolean;
+  isActive?: boolean;
+}
+
+// ============================================================================
+// Dashboard Types
+// ============================================================================
+
+export interface GlobalFilters {
+  dateRange?: {
+    start: string; // ISO 8601
+    end: string;
+  };
+  suppliers?: string[];
+  categories?: string[];
+  customFilters?: Record<string, any>;
+}
+
+export interface Dashboard {
+  id: number;
+  userId: number;
+  name: string;
+  description: string | null;
+  globalFilters: GlobalFilters | null;
+  isTemplate: boolean;
+  templateCategory: string | null;
+  isShared: boolean;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateDashboard {
+  userId: number;
+  name: string;
+  description?: string | null;
+  globalFilters?: GlobalFilters | null;
+  isTemplate?: boolean;
+  templateCategory?: string | null;
+  isShared?: boolean;
+  isActive?: boolean;
+}
+
+// ============================================================================
+// Dashboard Widget (widget instance on dashboard)
+// ============================================================================
+
+export interface DashboardWidget {
+  id: number;
+  dashboardId: number;
+  widgetDefinitionId: number;
+  widgetTitle: string | null;
+  configOverride: Record<string, any> | null;
+  isVisible: boolean;
+  sortOrder: number;
+  createdAt: Date | string;
+}
+
+export interface CreateDashboardWidget {
+  dashboardId: number;
+  widgetDefinitionId: number;
+  widgetTitle?: string | null;
+  configOverride?: Record<string, any> | null;
+  isVisible?: boolean;
+  sortOrder?: number;
+}
+
+// ============================================================================
+// Widget Layout (responsive positioning)
+// ============================================================================
+
+export interface WidgetLayout {
+  id: number;
+  dashboardWidgetId: number;
+  breakpoint: Breakpoint;
+  gridX: number;
+  gridY: number;
+  gridW: number;
+  gridH: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateWidgetLayout {
+  dashboardWidgetId: number;
+  breakpoint: Breakpoint;
+  gridX: number;
+  gridY: number;
+  gridW: number; // 2-12 per FR-020
+  gridH: number; // 2-8 per FR-020
+}
+
+// ============================================================================
+// Dashboard Version
+// ============================================================================
+
+export interface DashboardVersion {
+  id: number;
+  dashboardId: number;
+  versionNumber: number;
+  configSnapshot: Record<string, any>;
+  changeDescription: string | null;
+  createdByUserId: number | null;
+  createdAt: Date | string;
+}
+
+// ============================================================================
+// Dashboard Template
+// ============================================================================
+
+export interface DashboardTemplate {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  previewImageUrl: string | null;
+  config: Record<string, any>;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+// ============================================================================
+// API Endpoint Metadata
+// ============================================================================
+
+export interface ApiEndpointMetadata {
+  id: number;
+  endpointPath: string;
+  httpMethod: HttpMethod;
+  description: string;
+  requestSchema: Record<string, any> | null;
+  responseSchema: Record<string, any>;
+  requiresAuth: boolean;
+  rateLimit: string | null;
+  category: string | null;
+  isDeprecated: boolean;
+  lastScanned: Date | string;
+}
+
+// ============================================================================
+// Widget Data & State Types
+// ============================================================================
+
+export interface WidgetData<T = any> {
+  data: T;
+  loading: boolean;
+  error: string | null;
+  lastFetched: Date | null;
+}
+
+export interface WidgetState {
+  isEditing: boolean;
+  isConfiguring: boolean;
+  isRefreshing: boolean;
+  hasUnsavedChanges: boolean;
+}
+
+// ============================================================================
+// React Grid Layout Types (from react-grid-layout)
+// ============================================================================
+
+export interface ReactGridLayoutItem {
+  i: string; // Widget ID
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+  static?: boolean;
+  isDraggable?: boolean;
+  isResizable?: boolean;
+}
+
+export interface ReactGridLayouts {
+  xxs?: ReactGridLayoutItem[];
+  xs?: ReactGridLayoutItem[];
+  sm?: ReactGridLayoutItem[];
+  md?: ReactGridLayoutItem[];
+  lg?: ReactGridLayoutItem[];
+}
+
+// ============================================================================
+// Breakpoint Configuration (from spec.md FR-022)
+// ============================================================================
+
+export const BREAKPOINT_CONFIG = {
+  xxs: { width: 320, columns: 1 },
+  xs: { width: 480, columns: 2 },
+  sm: { width: 768, columns: 4 },
+  md: { width: 996, columns: 6 },
+  lg: { width: 1200, columns: 12 },
+} as const;
+
+export const BREAKPOINTS = {
+  xxs: 320,
+  xs: 480,
+  sm: 768,
+  md: 996,
+  lg: 1200,
+} as const;
+
+export const COLUMNS = {
+  xxs: 1,
+  xs: 2,
+  sm: 4,
+  md: 6,
+  lg: 12,
+} as const;

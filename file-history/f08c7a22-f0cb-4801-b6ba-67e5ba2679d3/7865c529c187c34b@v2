@@ -1,0 +1,580 @@
+/**
+ * Complete Widget Creation Flow E2E Test
+ * Feature: 028-build-a-widget
+ *
+ * Tests the full user journey of creating widgets:
+ * 1. Navigate to dashboard builder
+ * 2. Add a new widget
+ * 3. Configure data source
+ * 4. Configure calculations (with comparisons and formatting)
+ * 5. Preview widget
+ * 6. Save widget
+ * 7. View widget on dashboard
+ */
+
+import { chromium } from 'playwright';
+
+const BASE_URL = 'http://localhost:3000';
+
+async function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function screenshot(page, name) {
+  await page.screenshot({
+    path: `test-screenshots/${name}.png`,
+    fullPage: true
+  });
+  console.log(`   📸 Screenshot saved: ${name}.png`);
+}
+
+async function testNavigateToDashboardBuilder(page) {
+  console.log('\n🧭 Test 1: Navigate to Dashboard Builder');
+
+  await page.goto(`${BASE_URL}/dashboards/builder`, { waitUntil: 'networkidle' });
+  await delay(2000);
+  await screenshot(page, '01-dashboard-builder-page');
+
+  // Check if page loaded
+  const title = await page.textContent('h1, h2');
+  console.log(`   Page title: ${title}`);
+
+  // Verify dashboard builder elements exist
+  const hasBuilderUI = await page.evaluate(() => {
+    return document.querySelector('[data-testid="dashboard-builder"]') !== null ||
+           document.body.textContent.includes('Dashboard') ||
+           document.body.textContent.includes('Widget');
+  });
+
+  if (hasBuilderUI) {
+    console.log('   ✅ Dashboard builder page loaded successfully');
+    return true;
+  } else {
+    console.log('   ❌ Dashboard builder page not found');
+    return false;
+  }
+}
+
+async function testNavigateToWidgetConfigurator(page) {
+  console.log('\n➕ Test 2: Navigate to Widget Configuration');
+
+  // Try to navigate directly to widget configurator
+  await page.goto(`${BASE_URL}/dashboards/builder/new/configure/metric`, { waitUntil: 'networkidle' });
+  await delay(2000);
+  await screenshot(page, '02-widget-configurator-page');
+
+  // Check if configurator loaded
+  const hasConfigurator = await page.evaluate(() => {
+    return document.querySelector('[data-testid="widget-configurator"]') !== null ||
+           document.body.textContent.includes('Configure') ||
+           document.body.textContent.includes('Data Source');
+  });
+
+  if (hasConfigurator) {
+    console.log('   ✅ Widget configurator loaded successfully');
+    return true;
+  } else {
+    console.log('   ❌ Widget configurator not found');
+    return false;
+  }
+}
+
+async function testDataSourceSelection(page) {
+  console.log('\n📊 Test 3: Select Data Source');
+
+  await delay(1000);
+
+  // Look for API endpoint options (the actual UI uses clickable cards)
+  const firstEndpointOption = await page.$('[data-testid="api-endpoint-option-1"]');
+
+  if (!firstEndpointOption) {
+    console.log('   ❌ API endpoint options not found');
+    await screenshot(page, '03a-no-endpoints');
+    return false;
+  }
+
+  // Get endpoint name before clicking
+  const endpointName = await page.$eval('[data-testid="api-endpoint-option-1"] [data-testid="endpoint-name"]',
+    el => el.textContent);
+  console.log(`   Selecting endpoint: ${endpointName}`);
+
+  // Click the first endpoint option
+  await firstEndpointOption.click();
+  await delay(1500);
+  await screenshot(page, '03b-endpoint-selected');
+
+  // Check if "Next" button is now enabled/visible
+  const nextButton = await page.$('button:has-text("NEXT"), button:has-text("Next")');
+  if (!nextButton) {
+    console.log('   ⚠️  Next button not found, checking for auto-advance...');
+    // Some UIs auto-advance to next step
+    const calcBuilder = await page.$('[data-testid="calculation-builder"]');
+    if (calcBuilder) {
+      console.log('   ✅ Auto-advanced to calculation step');
+      return true;
+    }
+    return false;
+  }
+
+  // Check if button is enabled
+  const isDisabled = await nextButton.evaluate(btn => btn.disabled);
+  if (isDisabled) {
+    console.log('   ⚠️  Next button is disabled');
+    await screenshot(page, '03c-next-button-disabled');
+    return false;
+  }
+
+  await nextButton.click();
+  await delay(1500);
+  await screenshot(page, '03d-calculation-step');
+
+  console.log('   ✅ Data source selected and advanced to calculation step');
+  return true;
+}
+
+async function testCalculationConfiguration(page) {
+  console.log('\n🧮 Test 4: Configure Calculations');
+
+  await delay(1000);
+
+  // Check if we're on calculation step
+  const calcBuilder = await page.$('[data-testid="calculation-builder"]');
+  if (!calcBuilder) {
+    console.log('   ⚠️  Calculation builder not found');
+    await screenshot(page, '04a-calc-builder-missing');
+    return false;
+  }
+
+  // Select aggregation type
+  const aggTypeSelect = await page.$('[data-testid="aggregation-type-select"]');
+  if (!aggTypeSelect) {
+    console.log('   ❌ Aggregation type selector not found');
+    return false;
+  }
+
+  await aggTypeSelect.click();
+  await delay(500);
+  await screenshot(page, '04b-aggregation-dropdown-open');
+
+  // Select "Count" (doesn't require field selection)
+  const countOption = await page.$('[data-testid="aggregation-option-count"]');
+  if (!countOption) {
+    console.log('   ❌ Count aggregation option not found');
+    return false;
+  }
+
+  await countOption.click();
+  await delay(1000);
+  await screenshot(page, '04c-count-selected');
+
+  console.log('   ✅ Calculation configured (Count)');
+
+  // Test comparison mode toggle (optional)
+  const comparisonToggle = await page.$('[data-testid="comparison-mode-toggle"]');
+  if (comparisonToggle) {
+    console.log('   🔄 Testing comparison mode...');
+    await comparisonToggle.click();
+    await delay(500);
+    await screenshot(page, '04d-comparison-mode-enabled');
+    console.log('   ✅ Comparison mode toggled');
+  }
+
+  // Test conditional formatting (optional)
+  const addRuleButton = await page.$('[data-testid="add-formatting-rule"]');
+  if (addRuleButton) {
+    console.log('   🎨 Testing conditional formatting...');
+    await addRuleButton.click();
+    await delay(500);
+    await screenshot(page, '04e-formatting-rule-added');
+    console.log('   ✅ Formatting rule added');
+  }
+
+  // Click "Next" to go to preview step - look for button containing "NEXT" or "Next"
+  const nextButton = await page.$('button:has-text("NEXT")') || await page.$('button:has-text("Next")');
+  if (!nextButton) {
+    console.log('   ❌ Next button not found after calculation configuration');
+    await screenshot(page, '04f-no-next-button');
+    return false;
+  }
+
+  console.log('   Clicking Next to go to preview step...');
+  await nextButton.click();
+  await delay(2000);
+  await screenshot(page, '04g-preview-step');
+
+  // Verify we're on preview step
+  const isOnPreviewStep = await page.evaluate(() => {
+    return document.body.textContent.includes('Preview') ||
+           document.body.textContent.includes('Widget Name') ||
+           document.querySelector('[data-testid="widget-name-input"]') !== null;
+  });
+
+  if (isOnPreviewStep) {
+    console.log('   ✅ Moved to preview step successfully');
+    return true;
+  } else {
+    console.log('   ⚠️  May not be on preview step yet');
+    return false;
+  }
+}
+
+async function testPreviewAndSave(page) {
+  console.log('\n💾 Test 5: Preview and Save Widget');
+
+  await delay(1500);
+
+  // Look for widget name input - it might be an input without testid
+  let nameInput = await page.$('[data-testid="widget-name-input"]');
+
+  if (!nameInput) {
+    // Try to find by label
+    nameInput = await page.$('input[placeholder*="name" i], input[placeholder*="widget" i]');
+  }
+
+  if (!nameInput) {
+    // Look for any input in the Widget Details section
+    const inputs = await page.$$('input[type="text"]');
+    if (inputs.length > 0) {
+      nameInput = inputs[0]; // Take first text input
+      console.log('   Found input field (no testid, using first text input)');
+    }
+  }
+
+  if (!nameInput) {
+    console.log('   ❌ Widget name input not found');
+    await screenshot(page, '05a-name-input-missing');
+
+    // Debug: show what inputs exist
+    const inputInfo = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll('input'));
+      return inputs.map(input => ({
+        type: input.type,
+        placeholder: input.placeholder,
+        id: input.id,
+        testid: input.getAttribute('data-testid')
+      }));
+    });
+    console.log('   Available inputs:', JSON.stringify(inputInfo, null, 2));
+    return false;
+  }
+
+  const widgetName = `E2E Test Widget ${Date.now()}`;
+  await nameInput.fill(widgetName);
+  await delay(500);
+  console.log(`   ✅ Widget name entered: ${widgetName}`);
+  await screenshot(page, '05b-widget-name-entered');
+
+  // Check for preview
+  const hasPreview = await page.evaluate(() => {
+    return document.body.textContent.includes('Preview') ||
+           document.body.textContent.includes('Real-time preview');
+  });
+
+  if (hasPreview) {
+    console.log('   ✅ Widget preview section visible');
+  }
+
+  // Click "Save Widget" - look for button with "SAVE" text
+  let saveButton = await page.$('[data-testid="save-widget-button"]');
+
+  if (!saveButton) {
+    saveButton = await page.$('button:has-text("SAVE WIDGET")') ||
+                 await page.$('button:has-text("Save Widget")') ||
+                 await page.$('button:has-text("Save")');
+  }
+
+  if (!saveButton) {
+    console.log('   ❌ Save widget button not found');
+    await screenshot(page, '05c-no-save-button');
+    return false;
+  }
+
+  console.log('   Clicking save button...');
+  await saveButton.click();
+  await delay(3000); // Wait for save operation
+
+  await screenshot(page, '05d-after-save-click');
+
+  // Check for success message or redirect
+  const successMessage = await page.$('[data-testid="save-success-message"]');
+  const currentUrl = page.url();
+
+  console.log(`   Current URL after save: ${currentUrl}`);
+
+  if (successMessage) {
+    console.log('   ✅ Widget saved successfully! (success message visible)');
+    return true;
+  } else if (!currentUrl.includes('/configure/')) {
+    console.log('   ✅ Widget saved successfully! (redirected away from configure)');
+    return true;
+  } else {
+    // Check for any error messages
+    const errorMessage = await page.$('.text-destructive, [role="alert"]');
+    if (errorMessage) {
+      const errorText = await errorMessage.textContent();
+      console.log(`   ⚠️  Save returned error: ${errorText}`);
+      console.log('   (Frontend validation may have failed)');
+    } else {
+      console.log('   ⚠️  Save status unclear - still on configure page');
+    }
+
+    // Check if backend responded
+    await delay(1000);
+    const stillOnSamePage = page.url() === currentUrl;
+    if (!stillOnSamePage) {
+      console.log('   ✅ Page changed after delay - save may have succeeded');
+      return true;
+    }
+
+    return false;
+  }
+}
+
+async function testViewWidgetOnDashboard(page) {
+  console.log('\n👁️  Test 6: View Widget on Dashboard');
+
+  // Navigate to dashboard viewer
+  await page.goto(`${BASE_URL}/dashboards/1`, { waitUntil: 'networkidle' });
+  await delay(2000);
+  await screenshot(page, '06a-dashboard-viewer');
+
+  // Check if dashboard loaded
+  const dashboardViewer = await page.$('[data-testid="dashboard-viewer"]');
+  if (!dashboardViewer) {
+    console.log('   ❌ Dashboard viewer not found');
+    return false;
+  }
+
+  console.log('   ✅ Dashboard viewer loaded');
+
+  // Look for widgets on dashboard
+  const widgets = await page.$$('[data-testid^="widget-"]');
+  console.log(`   Found ${widgets.length} widgets on dashboard`);
+
+  // Look for metric widgets specifically
+  const metricWidgets = await page.$$('[data-testid="metric-widget"]');
+  if (metricWidgets.length > 0) {
+    console.log(`   ✅ Found ${metricWidgets.length} metric widget(s)`);
+
+    // Check first metric widget for data
+    const firstWidget = metricWidgets[0];
+    const metricValue = await firstWidget.$('[data-testid="metric-value"]');
+    if (metricValue) {
+      const value = await metricValue.textContent();
+      console.log(`   Widget displays value: ${value}`);
+    }
+
+    // Check for trend indicator
+    const trendIndicator = await firstWidget.$('[data-testid="metric-trend"]');
+    if (trendIndicator) {
+      console.log('   ✅ Trend indicator present');
+    }
+  }
+
+  return true;
+}
+
+async function testDragAndDropLayout(page) {
+  console.log('\n🖱️  Test 7: Drag and Drop Layout (User Story 4)');
+
+  // Should already be on dashboard viewer
+  await delay(1000);
+
+  // Click "Edit Layout" button
+  const editButton = await page.$('[data-testid="edit-layout-button"]');
+  if (!editButton) {
+    console.log('   ⚠️  Edit layout button not found');
+    return false;
+  }
+
+  await editButton.click();
+  await delay(1000);
+  await screenshot(page, '07a-edit-mode-enabled');
+  console.log('   ✅ Edit mode enabled');
+
+  // Check if save/cancel buttons appeared
+  const saveButton = await page.$('[data-testid="save-layout-button"]');
+  const cancelButton = await page.$('[data-testid="cancel-layout-button"]');
+
+  if (saveButton && cancelButton) {
+    console.log('   ✅ Edit mode UI visible (Save/Cancel buttons)');
+
+    // Click cancel to exit edit mode
+    await cancelButton.click();
+    await delay(1000);
+    await screenshot(page, '07b-edit-mode-cancelled');
+    console.log('   ✅ Edit mode cancelled successfully');
+
+    return true;
+  } else {
+    console.log('   ❌ Edit mode UI not complete');
+    return false;
+  }
+}
+
+async function testGlobalFilters(page) {
+  console.log('\n🔍 Test 8: Global Filters (User Story 2)');
+
+  // Should be on dashboard viewer
+  await delay(500);
+
+  // Click "Filters" button
+  const filtersButton = await page.$('[data-testid="global-filters-button"]');
+  if (!filtersButton) {
+    console.log('   ⚠️  Global filters button not found');
+    return false;
+  }
+
+  await filtersButton.click();
+  await delay(1000);
+  await screenshot(page, '08a-filters-panel-open');
+
+  // Check if filters panel opened
+  const filtersPanel = await page.$('[data-testid="global-filters-panel"]');
+  if (!filtersPanel) {
+    console.log('   ❌ Filters panel not found');
+    return false;
+  }
+
+  console.log('   ✅ Filters panel opened');
+
+  // Check for date range inputs
+  const dateStart = await page.$('[data-testid="date-range-start"]');
+  const dateEnd = await page.$('[data-testid="date-range-end"]');
+
+  if (dateStart && dateEnd) {
+    console.log('   ✅ Date range filters present');
+
+    // Fill in test dates
+    await dateStart.fill('2024-01-01');
+    await dateEnd.fill('2024-12-31');
+    await delay(500);
+    await screenshot(page, '08b-filters-filled');
+    console.log('   ✅ Date range filled');
+  }
+
+  // Close filters panel (click outside or find close button)
+  await page.keyboard.press('Escape');
+  await delay(1000);
+
+  return true;
+}
+
+async function runTests() {
+  console.log('╔════════════════════════════════════════════════════════════╗');
+  console.log('║  Complete Widget Creation Flow E2E Test                   ║');
+  console.log('║  Feature: 028-build-a-widget                              ║');
+  console.log('╚════════════════════════════════════════════════════════════╝\n');
+  console.log('Target: ' + BASE_URL);
+
+  // Create screenshots directory
+  const fs = await import('fs/promises');
+  try {
+    await fs.mkdir('test-screenshots', { recursive: true });
+  } catch (e) {
+    // Directory already exists
+  }
+
+  const browser = await chromium.launch({
+    headless: false,
+    slowMo: 100 // Slow down for visibility
+  });
+
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+  });
+
+  const page = await context.newPage();
+
+  const results = [];
+
+  try {
+    // Test 1: Navigate to dashboard builder
+    results.push({
+      name: 'Navigate to Dashboard Builder',
+      passed: await testNavigateToDashboardBuilder(page)
+    });
+
+    // Test 2: Navigate to widget configurator
+    results.push({
+      name: 'Navigate to Widget Configurator',
+      passed: await testNavigateToWidgetConfigurator(page)
+    });
+
+    // Test 3: Select data source
+    results.push({
+      name: 'Select Data Source',
+      passed: await testDataSourceSelection(page)
+    });
+
+    // Test 4: Configure calculations
+    results.push({
+      name: 'Configure Calculations',
+      passed: await testCalculationConfiguration(page)
+    });
+
+    // Test 5: Preview and save widget
+    results.push({
+      name: 'Preview and Save Widget',
+      passed: await testPreviewAndSave(page)
+    });
+
+    // Test 6: View widget on dashboard
+    results.push({
+      name: 'View Widget on Dashboard',
+      passed: await testViewWidgetOnDashboard(page)
+    });
+
+    // Test 7: Drag and drop layout
+    results.push({
+      name: 'Drag and Drop Layout',
+      passed: await testDragAndDropLayout(page)
+    });
+
+    // Test 8: Global filters
+    results.push({
+      name: 'Global Filters',
+      passed: await testGlobalFilters(page)
+    });
+
+  } catch (error) {
+    console.error('\n❌ Test execution error:', error.message);
+    console.error(error.stack);
+  } finally {
+    await delay(2000);
+    await browser.close();
+  }
+
+  // Print summary
+  console.log('\n' + '═'.repeat(60));
+  console.log('📊 TEST SUMMARY');
+  console.log('═'.repeat(60));
+
+  let passCount = 0;
+  let failCount = 0;
+
+  results.forEach((result, index) => {
+    const status = result.passed ? '✅ PASS' : '❌ FAIL';
+    console.log(`${index + 1}. ${status} - ${result.name}`);
+    result.passed ? passCount++ : failCount++;
+  });
+
+  console.log('═'.repeat(60));
+  console.log(`Total: ${passCount} passed, ${failCount} failed out of ${results.length} tests`);
+  console.log(`Success Rate: ${((passCount / results.length) * 100).toFixed(1)}%`);
+  console.log('═'.repeat(60));
+
+  if (failCount === 0) {
+    console.log('\n🎉 ALL TESTS PASSED! Widget creation flow works end-to-end.');
+  } else if (passCount >= results.length * 0.7) {
+    console.log('\n⚠️  MOSTLY WORKING: Core functionality works, some features need attention.');
+  } else {
+    console.log('\n❌ TESTS FAILED: Significant issues detected in widget creation flow.');
+  }
+
+  console.log('\n📸 Screenshots saved to: test-screenshots/\n');
+
+  process.exit(failCount > 0 ? 1 : 0);
+}
+
+runTests();

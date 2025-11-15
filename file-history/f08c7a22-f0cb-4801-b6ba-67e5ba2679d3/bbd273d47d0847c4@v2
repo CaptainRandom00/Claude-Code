@@ -1,0 +1,261 @@
+/**
+ * E2E Test: Dashboard Viewer with Live Data
+ * Feature: 028-build-a-widget
+ * User Story 1: View Pre-Built Dashboard with Live Data (P1 - MVP)
+ *
+ * Tests the dashboard viewing experience with auto-refresh and error handling
+ * Expected to FAIL initially (TDD approach) until implementation is complete.
+ */
+
+import { test, expect, Page } from '@playwright/test';
+
+test.describe('Dashboard Viewer - User Story 1', () => {
+  let page: Page;
+
+  test.beforeEach(async ({ browser }) => {
+    page = await browser.newPage();
+
+    // Navigate to dashboards route
+    await page.goto('/dashboards/1'); // Default dashboard ID
+
+    // Wait for dashboard to load (increase timeout for initial load)
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+  });
+
+  test.afterEach(async () => {
+    await page.close();
+  });
+
+  test('should display default dashboard with title', async () => {
+    // Verify dashboard container exists
+    const dashboard = page.locator('[data-testid="dashboard-viewer"]');
+    await expect(dashboard).toBeVisible({ timeout: 10000 });
+
+    // Verify dashboard has a title
+    const title = page.locator('[data-testid="dashboard-title"]');
+    await expect(title).toBeVisible();
+    await expect(title).toContainText(/store overview|sales|dashboard/i);
+  });
+
+  test('should render at least 3 widgets with data', async () => {
+    // Wait for widgets to load
+    await page.waitForSelector('[data-testid^="widget-"]', { timeout: 10000 });
+
+    // Count rendered widgets
+    const widgets = page.locator('[data-testid^="widget-"]');
+    const widgetCount = await widgets.count();
+
+    // Verify at least 3 widgets (per spec.md FR-016 requirement)
+    expect(widgetCount).toBeGreaterThanOrEqual(3);
+
+    // Verify first 3 widgets have content (not just loading states)
+    for (let i = 0; i < Math.min(3, widgetCount); i++) {
+      const widget = widgets.nth(i);
+
+      // Widget should be visible
+      await expect(widget).toBeVisible();
+
+      // Widget should have a title
+      const widgetTitle = widget.locator('[data-testid="widget-title"]');
+      await expect(widgetTitle).toBeVisible();
+
+      // Widget should have either data content OR error message (not stuck in loading)
+      const hasContent = await widget.locator('[data-testid="widget-content"]').count() > 0;
+      const hasError = await widget.locator('[data-testid="widget-error"]').count() > 0;
+
+      expect(hasContent || hasError).toBeTruthy();
+    }
+  });
+
+  test('should display loading indicators during initial data fetch', async () => {
+    // Reload page to catch loading state
+    await page.reload();
+
+    // Immediately check for loading indicators
+    const loadingIndicators = page.locator('[data-testid="widget-loading"]');
+
+    // At least one widget should show loading state initially
+    // (may be very brief, so we use count > 0 OR widgets loaded)
+    const loadingCount = await loadingIndicators.count();
+
+    // If no loading indicators, widgets must be loaded (fast connection)
+    if (loadingCount === 0) {
+      const widgets = page.locator('[data-testid^="widget-"]');
+      const widgetCount = await widgets.count();
+      expect(widgetCount).toBeGreaterThan(0);
+    } else {
+      // Loading indicators should disappear within 5 seconds
+      await expect(loadingIndicators.first()).not.toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test('should auto-refresh widget data after 60 seconds', async () => {
+    // Wait for initial data load
+    await page.waitForSelector('[data-testid="widget-content"]', { timeout: 10000 });
+
+    // Get initial widget data (capture text content of first widget)
+    const firstWidget = page.locator('[data-testid^="widget-"]').first();
+    const initialContent = await firstWidget.locator('[data-testid="widget-content"]').textContent();
+
+    // Record initial network requests count
+    let networkRequestsCount = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/api/widgets/data/fetch')) {
+        networkRequestsCount++;
+      }
+    });
+
+    // Wait 65 seconds for auto-refresh (60s interval + 5s buffer per FR-004)
+    // This is a long test but verifies critical auto-refresh functionality
+    await page.waitForTimeout(65000);
+
+    // Verify at least one data fetch request was made (auto-refresh triggered)
+    expect(networkRequestsCount).toBeGreaterThan(0);
+
+    // Widget content may or may not change (depends on data), but request should fire
+    // This test verifies the auto-refresh mechanism works, not data volatility
+  });
+
+  test('should isolate widget errors without affecting other widgets', async () => {
+    // Wait for widgets to load
+    await page.waitForSelector('[data-testid^="widget-"]', { timeout: 10000 });
+
+    // Intercept API requests to simulate error for one widget
+    await page.route('**/api/widgets/data/fetch', async (route, request) => {
+      const postData = request.postDataJSON();
+
+      // Simulate error for widget ID 2 (second widget)
+      if (postData && postData.widgetDefinitionId === 2) {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Simulated widget error' }),
+        });
+      } else {
+        // Let other requests pass through
+        await route.continue();
+      }
+    });
+
+    // Reload page to trigger intercepted requests
+    await page.reload();
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+
+    // Find all widgets
+    const widgets = page.locator('[data-testid^="widget-"]');
+    const widgetCount = await widgets.count();
+
+    if (widgetCount >= 2) {
+      // Second widget should show error state
+      const secondWidget = widgets.nth(1);
+      const errorElement = secondWidget.locator('[data-testid="widget-error"]');
+
+      // Error should be visible
+      await expect(errorElement).toBeVisible({ timeout: 10000 });
+      await expect(errorElement).toContainText(/error|failed|unavailable/i);
+
+      // Other widgets should still have content (not affected by error)
+      const firstWidget = widgets.nth(0);
+      const firstWidgetContent = firstWidget.locator('[data-testid="widget-content"]');
+
+      // First widget should have content (not error)
+      await expect(firstWidgetContent).toBeVisible();
+    }
+  });
+
+  test('should display manual refresh button for each widget', async () => {
+    // Wait for widgets to load
+    await page.waitForSelector('[data-testid^="widget-"]', { timeout: 10000 });
+
+    // Get first widget
+    const firstWidget = page.locator('[data-testid^="widget-"]').first();
+
+    // Verify refresh button exists (per spec.md FR-005)
+    const refreshButton = firstWidget.locator('[data-testid="widget-refresh-button"]');
+    await expect(refreshButton).toBeVisible();
+
+    // Click refresh button
+    await refreshButton.click();
+
+    // Verify loading indicator appears briefly
+    const loadingIndicator = firstWidget.locator('[data-testid="widget-loading"]');
+
+    // Loading may be very brief, check if it appears OR content reloads
+    const loadingAppeared = await loadingIndicator.isVisible().catch(() => false);
+
+    // If loading didn't appear (too fast), verify content is still present
+    if (!loadingAppeared) {
+      const content = firstWidget.locator('[data-testid="widget-content"]');
+      await expect(content).toBeVisible();
+    }
+  });
+
+  test('should handle slow API responses with loading state', async () => {
+    // Intercept API requests to add delay
+    await page.route('**/api/widgets/data/fetch', async (route) => {
+      // Delay response by 6 seconds (exceeds 5 second threshold per spec)
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      await route.continue();
+    });
+
+    // Reload page
+    await page.reload();
+
+    // Loading indicators should appear
+    const loadingIndicators = page.locator('[data-testid="widget-loading"]');
+    await expect(loadingIndicators.first()).toBeVisible({ timeout: 2000 });
+
+    // Wait for loading to complete (with extended timeout)
+    await expect(loadingIndicators.first()).not.toBeVisible({ timeout: 15000 });
+
+    // Widgets should eventually load
+    const widgets = page.locator('[data-testid^="widget-"]');
+    expect(await widgets.count()).toBeGreaterThan(0);
+  });
+
+  test('should display widget titles from configuration', async () => {
+    // Wait for widgets to load
+    await page.waitForSelector('[data-testid^="widget-"]', { timeout: 10000 });
+
+    // Get all widgets
+    const widgets = page.locator('[data-testid^="widget-"]');
+    const widgetCount = await widgets.count();
+
+    // Each widget should have a title
+    for (let i = 0; i < widgetCount; i++) {
+      const widget = widgets.nth(i);
+      const title = widget.locator('[data-testid="widget-title"]');
+
+      await expect(title).toBeVisible();
+
+      // Title should have meaningful text (not empty or "undefined")
+      const titleText = await title.textContent();
+      expect(titleText).toBeTruthy();
+      expect(titleText?.length).toBeGreaterThan(0);
+      expect(titleText?.toLowerCase()).not.toContain('undefined');
+      expect(titleText?.toLowerCase()).not.toContain('null');
+    }
+  });
+
+  test('should use responsive grid layout', async () => {
+    // Wait for dashboard to load
+    await page.waitForSelector('[data-testid="dashboard-viewer"]', { timeout: 10000 });
+
+    // Verify react-grid-layout container exists
+    const gridLayout = page.locator('.react-grid-layout');
+    await expect(gridLayout).toBeVisible();
+
+    // Verify widgets are positioned within grid
+    const gridItems = page.locator('.react-grid-item');
+    const gridItemCount = await gridItems.count();
+
+    expect(gridItemCount).toBeGreaterThan(0);
+
+    // Each grid item should have position styles
+    const firstGridItem = gridItems.first();
+    const transform = await firstGridItem.getAttribute('style');
+
+    expect(transform).toBeTruthy();
+    expect(transform).toContain('transform'); // Grid uses transform for positioning
+  });
+});

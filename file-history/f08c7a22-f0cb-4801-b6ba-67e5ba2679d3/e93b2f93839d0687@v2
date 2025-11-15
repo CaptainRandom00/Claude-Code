@@ -1,0 +1,639 @@
+/**
+ * Contract: Screenshot Metadata
+ * Feature: 029-complete-user-guide
+ * Purpose: Define TypeScript interfaces for screenshot metadata and capture automation
+ */
+
+import type { ImageFormat, ViewportType, Annotation } from './ScreenshotViewer';
+import type { FeatureId } from './UserGuideSection';
+
+// ============================================================================
+// Screenshot Metadata
+// ============================================================================
+
+/**
+ * Complete screenshot metadata
+ */
+export interface ScreenshotMetadata {
+  /** Unique identifier (filename without extension) */
+  id: string;
+
+  /** Feature this screenshot belongs to */
+  feature: FeatureId;
+
+  /** Step number within the feature guide */
+  step: number;
+
+  /** Human-readable description */
+  description: string;
+
+  /** File path relative to public/ */
+  path: string;
+
+  /** Screenshot dimensions */
+  dimensions: {
+    width: number;
+    height: number;
+  };
+
+  /** File size in bytes */
+  fileSize: number;
+
+  /** Image format */
+  format: ImageFormat;
+
+  /** Optional annotations overlay */
+  annotations?: Annotation[];
+
+  /** Capture metadata */
+  capture: CaptureMetadata;
+
+  /** Alt text for accessibility */
+  altText: string;
+
+  /** Optional caption displayed below image */
+  caption?: string;
+
+  /** Available formats for this screenshot */
+  availableFormats: ImageFormat[];
+
+  /** File sizes for each available format */
+  formatSizes?: Partial<Record<ImageFormat, number>>;
+
+  /** Screenshot hash (for change detection) */
+  hash?: string;
+}
+
+/**
+ * Capture metadata
+ */
+export interface CaptureMetadata {
+  /** Viewport type used for capture */
+  viewport: ViewportType;
+
+  /** Capture timestamp (ISO 8601) */
+  timestamp: string;
+
+  /** Captured by (playwright or manual) */
+  capturedBy: 'playwright' | 'manual';
+
+  /** Browser used for capture (optional) */
+  browser?: string;
+
+  /** Browser version (optional) */
+  browserVersion?: string;
+
+  /** OS used for capture (optional) */
+  os?: string;
+
+  /** Screen DPI (optional) */
+  dpi?: number;
+
+  /** Playwright version (if automated) */
+  playwrightVersion?: string;
+}
+
+// ============================================================================
+// Manifest Structure
+// ============================================================================
+
+/**
+ * Documentation manifest
+ */
+export interface DocumentationManifest {
+  /** Manifest version */
+  version: string;
+
+  /** Generated timestamp (ISO 8601) */
+  generatedAt: string;
+
+  /** All screenshots */
+  screenshots: ScreenshotMetadata[];
+
+  /** Screenshots grouped by feature */
+  screenshotsByFeature: Record<FeatureId, ScreenshotMetadata[]>;
+
+  /** Statistics */
+  statistics: ManifestStatistics;
+
+  /** Configuration used for capture */
+  captureConfig?: PlaywrightCaptureConfig;
+}
+
+/**
+ * Manifest statistics
+ */
+export interface ManifestStatistics {
+  /** Total number of screenshots */
+  totalScreenshots: number;
+
+  /** Total size of all screenshots (bytes) */
+  totalSize: number;
+
+  /** Screenshots by format */
+  byFormat: Record<ImageFormat, number>;
+
+  /** Screenshots by viewport */
+  byViewport: Record<ViewportType, number>;
+
+  /** Screenshots by feature */
+  byFeature: Record<FeatureId, number>;
+
+  /** Average file size (bytes) */
+  averageSize: number;
+
+  /** Largest screenshot (bytes) */
+  largestSize: number;
+
+  /** Smallest screenshot (bytes) */
+  smallestSize: number;
+}
+
+// ============================================================================
+// Feature Metadata
+// ============================================================================
+
+/**
+ * Feature-specific screenshot metadata
+ */
+export interface FeatureScreenshotMetadata {
+  /** Feature ID */
+  featureId: FeatureId;
+
+  /** Feature title */
+  featureTitle: string;
+
+  /** Screenshots for this feature */
+  screenshots: ScreenshotMetadata[];
+
+  /** Total screenshots count */
+  count: number;
+
+  /** Total size (bytes) */
+  totalSize: number;
+
+  /** Last updated timestamp */
+  lastUpdated: string;
+
+  /** Metadata file path */
+  metadataPath: string;
+}
+
+// ============================================================================
+// Playwright Capture Configuration
+// ============================================================================
+
+/**
+ * Playwright screenshot capture configuration
+ */
+export interface PlaywrightCaptureConfig {
+  /** Target base URL */
+  baseUrl: string;
+
+  /** Viewport configurations */
+  viewports: ViewportConfigurations;
+
+  /** Output directory */
+  outputDir: string;
+
+  /** Compression settings */
+  compression: CompressionSettings;
+
+  /** Wait strategy */
+  waitStrategy: WaitStrategy;
+
+  /** Screenshot naming pattern */
+  namingPattern: string;
+
+  /** Enable annotations overlay */
+  enableAnnotations: boolean;
+
+  /** Browser to use */
+  browser: 'chromium' | 'firefox' | 'webkit';
+
+  /** Headless mode */
+  headless: boolean;
+
+  /** Device scale factor (for high-DPI) */
+  deviceScaleFactor: number;
+
+  /** Animation control */
+  animations: 'disabled' | 'allow';
+
+  /** Timeout (ms) */
+  timeout: number;
+}
+
+/**
+ * Viewport configurations
+ */
+export interface ViewportConfigurations {
+  desktop: ViewportConfig;
+  desktopHD: ViewportConfig;
+  tablet: ViewportConfig;
+  mobile: ViewportConfig;
+}
+
+/**
+ * Individual viewport configuration
+ */
+export interface ViewportConfig {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+  isMobile?: boolean;
+  hasTouch?: boolean;
+}
+
+/**
+ * Compression settings for different formats
+ */
+export interface CompressionSettings {
+  png: PngCompressionConfig;
+  webp: WebpCompressionConfig;
+  avif: AvifCompressionConfig;
+}
+
+/**
+ * PNG compression configuration
+ */
+export interface PngCompressionConfig {
+  /** Compression level (0-9) */
+  compressionLevel: number;
+
+  /** Adaptive filtering */
+  adaptiveFiltering: boolean;
+
+  /** Use palette */
+  palette: boolean;
+
+  /** Quality (0-100) */
+  quality?: number;
+}
+
+/**
+ * WebP compression configuration
+ */
+export interface WebpCompressionConfig {
+  /** Quality (0-100) */
+  quality: number;
+
+  /** Lossless compression */
+  lossless: boolean;
+
+  /** Near lossless quality (0-100) */
+  nearLossless?: number;
+
+  /** Compression effort (0-6) */
+  effort?: number;
+}
+
+/**
+ * AVIF compression configuration
+ */
+export interface AvifCompressionConfig {
+  /** Quality (0-100) */
+  quality: number;
+
+  /** Compression speed (0-10, lower is slower but better) */
+  speed: number;
+
+  /** Lossless compression */
+  lossless?: boolean;
+
+  /** Chroma subsampling */
+  chromaSubsampling?: '4:4:4' | '4:2:2' | '4:2:0';
+}
+
+/**
+ * Wait strategy configuration
+ */
+export interface WaitStrategy {
+  /** Wait for network idle */
+  networkIdle: boolean;
+
+  /** Network idle timeout (ms) */
+  networkIdleTimeout?: number;
+
+  /** Timeout (ms) */
+  timeout: number;
+
+  /** Stability delay (ms) - wait after page appears stable */
+  stabilityDelay: number;
+
+  /** Custom wait selectors */
+  waitSelectors?: string[];
+
+  /** Wait for fonts to load */
+  waitForFonts?: boolean;
+}
+
+// ============================================================================
+// Capture Tasks
+// ============================================================================
+
+/**
+ * Screenshot capture task
+ */
+export interface CaptureTask {
+  /** Task identifier */
+  id: string;
+
+  /** Feature this screenshot belongs to */
+  feature: FeatureId;
+
+  /** Step number */
+  step: number;
+
+  /** Description for filename */
+  description: string;
+
+  /** URL to navigate to (relative or absolute) */
+  url: string;
+
+  /** Viewport type */
+  viewport: ViewportType;
+
+  /** Selector to wait for (optional) */
+  waitForSelector?: string;
+
+  /** Actions to perform before screenshot */
+  actions?: CaptureAction[];
+
+  /** Annotations to overlay */
+  annotations?: Annotation[];
+
+  /** Alt text */
+  altText: string;
+
+  /** Caption (optional) */
+  caption?: string;
+
+  /** Delay before capture (ms) */
+  delay?: number;
+
+  /** Full page screenshot */
+  fullPage?: boolean;
+
+  /** Clip area (optional) */
+  clip?: ScreenshotClip;
+
+  /** Mask selectors (hide elements) */
+  mask?: string[];
+
+  /** Omit background */
+  omitBackground?: boolean;
+}
+
+/**
+ * Capture action (before screenshot)
+ */
+export interface CaptureAction {
+  /** Action type */
+  type: 'click' | 'fill' | 'select' | 'hover' | 'scroll' | 'wait' | 'evaluate';
+
+  /** Target selector */
+  selector?: string;
+
+  /** Value (for fill/select) */
+  value?: string;
+
+  /** Wait duration (for wait type, ms) */
+  duration?: number;
+
+  /** JavaScript code (for evaluate type) */
+  code?: string;
+
+  /** Scroll position (for scroll type) */
+  scrollTo?: {
+    x?: number;
+    y?: number;
+    selector?: string;
+  };
+}
+
+/**
+ * Screenshot clip area
+ */
+export interface ScreenshotClip {
+  /** X position */
+  x: number;
+
+  /** Y position */
+  y: number;
+
+  /** Width */
+  width: number;
+
+  /** Height */
+  height: number;
+}
+
+// ============================================================================
+// Capture Results
+// ============================================================================
+
+/**
+ * Capture task result
+ */
+export interface CaptureTaskResult {
+  /** Task ID */
+  taskId: string;
+
+  /** Success status */
+  success: boolean;
+
+  /** Error message (if failed) */
+  error?: string;
+
+  /** Screenshot metadata (if successful) */
+  metadata?: ScreenshotMetadata;
+
+  /** Capture duration (ms) */
+  duration: number;
+
+  /** File paths created */
+  filePaths?: {
+    png: string;
+    webp?: string;
+    avif?: string;
+  };
+
+  /** File sizes */
+  fileSizes?: {
+    png: number;
+    webp?: number;
+    avif?: number;
+  };
+}
+
+/**
+ * Capture batch result
+ */
+export interface CaptureBatchResult {
+  /** Total tasks */
+  totalTasks: number;
+
+  /** Successful captures */
+  successCount: number;
+
+  /** Failed captures */
+  failureCount: number;
+
+  /** Skipped tasks */
+  skippedCount: number;
+
+  /** Individual results */
+  results: CaptureTaskResult[];
+
+  /** Total duration (ms) */
+  totalDuration: number;
+
+  /** Average duration per task (ms) */
+  avgDuration: number;
+
+  /** Total size (all formats, bytes) */
+  totalSize: number;
+
+  /** Errors encountered */
+  errors: Array<{
+    taskId: string;
+    error: string;
+    stack?: string;
+  }>;
+}
+
+// ============================================================================
+// Optimization Results
+// ============================================================================
+
+/**
+ * Image optimization result
+ */
+export interface OptimizationResult {
+  /** Original file path */
+  originalPath: string;
+
+  /** Optimized file path */
+  optimizedPath: string;
+
+  /** Original size (bytes) */
+  originalSize: number;
+
+  /** Optimized size (bytes) */
+  optimizedSize: number;
+
+  /** Size reduction (bytes) */
+  sizeReduction: number;
+
+  /** Size reduction (percentage) */
+  reductionPercent: number;
+
+  /** Format */
+  format: ImageFormat;
+
+  /** Duration (ms) */
+  duration: number;
+
+  /** Success status */
+  success: boolean;
+
+  /** Error (if failed) */
+  error?: string;
+}
+
+/**
+ * Batch optimization result
+ */
+export interface BatchOptimizationResult {
+  /** Total files processed */
+  totalFiles: number;
+
+  /** Successful optimizations */
+  successCount: number;
+
+  /** Failed optimizations */
+  failureCount: number;
+
+  /** Individual results */
+  results: OptimizationResult[];
+
+  /** Total original size (bytes) */
+  totalOriginalSize: number;
+
+  /** Total optimized size (bytes) */
+  totalOptimizedSize: number;
+
+  /** Total size reduction (bytes) */
+  totalReduction: number;
+
+  /** Average reduction (percentage) */
+  avgReductionPercent: number;
+
+  /** Total duration (ms) */
+  totalDuration: number;
+}
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/**
+ * Screenshot naming template variables
+ */
+export interface NamingTemplateVariables {
+  /** Feature ID */
+  feature: FeatureId;
+
+  /** Step number */
+  step: number;
+
+  /** Description (kebab-case) */
+  description: string;
+
+  /** Viewport type */
+  viewport: ViewportType;
+
+  /** Timestamp */
+  timestamp: string;
+
+  /** Format extension */
+  ext: ImageFormat;
+}
+
+/**
+ * Screenshot validation result
+ */
+export interface ValidationResult {
+  /** Is valid */
+  valid: boolean;
+
+  /** Validation errors */
+  errors: string[];
+
+  /** Validation warnings */
+  warnings: string[];
+
+  /** Checked metadata */
+  metadata?: ScreenshotMetadata;
+}
+
+/**
+ * Screenshot comparison result
+ */
+export interface ComparisonResult {
+  /** Are screenshots identical */
+  identical: boolean;
+
+  /** Difference percentage (0-100) */
+  differencePercent: number;
+
+  /** Pixel difference count */
+  pixelDifference: number;
+
+  /** Total pixels */
+  totalPixels: number;
+
+  /** Diff image path (optional) */
+  diffImagePath?: string;
+}

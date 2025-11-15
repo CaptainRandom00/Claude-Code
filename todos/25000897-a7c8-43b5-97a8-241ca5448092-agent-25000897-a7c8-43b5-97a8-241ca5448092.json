@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Investigate skill trees loading error",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "investigate-error"
+  },
+  {
+    "content": "Check if all required services are running",
+    "status": "pending",
+    "priority": "high",
+    "id": "check-services"
+  },
+  {
+    "content": "Verify skill tree API endpoints are working",
+    "status": "pending",
+    "priority": "high",
+    "id": "check-api-endpoints"
+  },
+  {
+    "content": "Ensure database connectivity and data integrity",
+    "status": "pending",
+    "priority": "medium",
+    "id": "check-database"
+  },
+  {
+    "content": "Fix frontend API connection issues",
+    "status": "pending",
+    "priority": "high",
+    "id": "fix-frontend-api"
+  }
+]

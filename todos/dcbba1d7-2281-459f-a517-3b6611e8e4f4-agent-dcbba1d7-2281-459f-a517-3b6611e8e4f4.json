@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Check if Node.js and npm are installed",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Install dependencies with npm install",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Start MAMP/MySQL database on localhost:8889",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Start development server with npm run dev",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Verify app is running at http://localhost:3000",
+    "status": "in_progress",
+    "priority": "medium",
+    "id": "5"
+  }
+]

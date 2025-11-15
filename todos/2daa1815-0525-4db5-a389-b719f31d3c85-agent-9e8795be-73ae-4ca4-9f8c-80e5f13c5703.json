@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Examine project pages and components (project detail pages, project listing)",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Look at project API endpoints in the backend",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check database models and relationships for projects",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Analyze authentication and permission logic for project access",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Look at organization membership requirements for projects",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Identify potential race conditions or data consistency issues",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

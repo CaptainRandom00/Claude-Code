@@ -1,0 +1,278 @@
+/**
+ * @file sales-calendar-navigation.spec.ts
+ * @description E2E tests for Sales Aggregation calendar navigation and date alignment
+ * @feature 026-fix-sales-aggregation
+ * @constitutional-principle VI - End-to-End Testing & Audit Trail
+ */
+
+import { test, expect } from '@playwright/test';
+
+/**
+ * Sales Aggregation Calendar Navigation and Alignment Test Suite
+ *
+ * Tests functional requirements:
+ * - FR-001: Month/year navigation controls
+ * - FR-002: Date alignment with day-of-week headers
+ * - FR-003: Blue highlighting preservation
+ * - FR-004: Date selection functionality
+ * - FR-005: Consistent 6-week grid
+ * - FR-006: Navigate to any month/year
+ * - FR-009: Navigation controls immediately visible
+ * - FR-010: Navigation response <200ms
+ */
+test.describe('Sales Aggregation Calendar Navigation and Alignment', () => {
+  /**
+   * Setup: Navigate to Sales Aggregation page before each test
+   */
+  test.beforeEach(async ({ page }) => {
+    // Navigate to dashboard
+    await page.goto('http://localhost:3000/dashboard', { waitUntil: 'domcontentloaded' });
+
+    // Click Sales Aggregation tab
+    await page.click('button:has-text("Sales Aggregation")');
+
+    // Wait for calendar to be visible
+    await page.waitForSelector('text=Aggregated Data Calendar', { timeout: 10000 });
+
+    // Give calendar time to render
+    await page.waitForTimeout(500);
+  });
+
+  /**
+   * Helper: Get calendar caption (month/year display)
+   */
+  async function getCalendarCaption(page: any): Promise<string> {
+    const caption = await page.locator('.rdp-caption_label, [class*="caption"]').first();
+    return await caption.textContent();
+  }
+
+  /**
+   * Helper: Check if date cells align with day-of-week headers
+   */
+  async function checkDateAlignment(page: any): Promise<boolean> {
+    // Get all day-of-week headers (SU, MO, TU, WE, TH, FR, SA)
+    const headers = page.locator('[role="columnheader"]');
+    const headerCount = await headers.count();
+
+    if (headerCount !== 7) {
+      return false; // Should have exactly 7 day headers
+    }
+
+    // Get all date cells
+    const dateCells = page.locator('[role="gridcell"]');
+    const cellCount = await dateCells.count();
+
+    // With fixedWeeks, should have 42 cells (6 weeks × 7 days)
+    return cellCount === 42;
+  }
+
+  /**
+   * Helper: Get all blue highlighted dates (aggregated data)
+   */
+  async function getHighlightedDates(page: any): Promise<number> {
+    const highlighted = page.locator('[role="gridcell"].bg-blue-500, [role="gridcell"][class*="bg-blue"]');
+    return await highlighted.count();
+  }
+
+  /**
+   * T003: Test month and year dropdown navigation controls are visible
+   * FR-001, FR-006, FR-009
+   * EXPECTED TO FAIL: Dropdowns don't exist yet (captionLayout not implemented)
+   */
+  test('should display month and year dropdown navigation controls', async ({ page }) => {
+    // Wait for calendar to load
+    await page.waitForSelector('[role="grid"]', { timeout: 5000 });
+
+    // Look for month dropdown - react-day-picker with captionLayout="dropdown-buttons"
+    // creates select elements for month and year
+    const dropdowns = page.locator('select');
+    const dropdownCount = await dropdowns.count();
+
+    // Should have at least 2 dropdowns: month and year
+    expect(dropdownCount).toBeGreaterThanOrEqual(2);
+
+    // Verify dropdowns are visible (not hidden)
+    const firstDropdown = dropdowns.first();
+    await expect(firstDropdown).toBeVisible();
+
+    // Navigation arrow buttons should also be visible with full opacity
+    const navButtons = page.locator('button[name*="previous-month"], button[name*="next-month"]').or(
+      page.locator('.rdp-nav_button')
+    );
+    const navButtonCount = await navButtons.count();
+    expect(navButtonCount).toBeGreaterThanOrEqual(2); // Previous and next buttons
+  });
+
+  /**
+   * T004: Test dates maintain correct alignment when navigating months
+   * FR-002, FR-003
+   * EXPECTED TO FAIL: Without fixedWeeks, alignment breaks
+   */
+  test('should maintain correct date alignment when navigating months', async ({ page }) => {
+    await page.waitForSelector('[role="grid"]');
+
+    // Verify initial 6-week grid (42 cells)
+    const initialCells = page.locator('[role="gridcell"]');
+    const initialCount = await initialCells.count();
+    expect(initialCount).toBe(42); // 6 weeks × 7 days with fixedWeeks
+
+    // Get month dropdown and navigate to different month
+    const monthDropdown = page.locator('select').first();
+    await monthDropdown.selectOption({ index: 5 }); // Navigate to June
+    await page.waitForTimeout(300);
+
+    // After navigation, should still have 42 cells (consistent grid)
+    const afterCells = page.locator('[role="gridcell"]');
+    const afterCount = await afterCells.count();
+    expect(afterCount).toBe(42);
+
+    // Verify headers are still present and aligned
+    const headers = page.locator('[role="columnheader"]');
+    const headerCount = await headers.count();
+    expect(headerCount).toBe(7); // SU, MO, TU, WE, TH, FR, SA
+  });
+
+  /**
+   * T005: Test aggregated dates remain highlighted after navigation
+   * FR-003
+   * EXPECTED TO FAIL: Without dropdown implementation, can't navigate
+   */
+  test('should preserve blue highlighting for aggregated dates after navigation', async ({ page }) => {
+    await page.waitForSelector('[role="grid"]');
+
+    // Find blue highlighted dates (aggregated data) - may be 0 if no data
+    const highlightedBefore = page.locator('[role="gridcell"][class*="bg-blue"]');
+    const countBefore = await highlightedBefore.count();
+
+    // Navigate to different month using dropdown
+    const monthDropdown = page.locator('select').first();
+    const currentMonth = new Date().getMonth();
+    const targetMonth = (currentMonth + 1) % 12;
+    await monthDropdown.selectOption({ index: targetMonth });
+    await page.waitForTimeout(300);
+
+    // Navigate back to original month
+    await monthDropdown.selectOption({ index: currentMonth });
+    await page.waitForTimeout(300);
+
+    // Verify highlighting is still present (same count)
+    const highlightedAfter = page.locator('[role="gridcell"][class*="bg-blue"]');
+    const countAfter = await highlightedAfter.count();
+    expect(countAfter).toBe(countBefore);
+
+    // If there are highlighted dates, verify styling unchanged
+    if (countAfter > 0) {
+      const firstHighlighted = highlightedAfter.first();
+      const classes = await firstHighlighted.getAttribute('class');
+      expect(classes).toContain('bg-blue');
+    }
+  });
+
+  /**
+   * T006: Test consistent 6-week grid across multiple months
+   * FR-005
+   * EXPECTED TO FAIL: Without fixedWeeks, different months show different week counts
+   */
+  test('should display consistent 6-week grid across all months', async ({ page }) => {
+    await page.waitForSelector('[role="grid"]');
+
+    // Test multiple months to verify consistent grid
+    const monthsToTest = [0, 1, 2, 3]; // Jan, Feb, Mar, Apr
+
+    for (const monthIndex of monthsToTest) {
+      // Navigate to month
+      const monthDropdown = page.locator('select').first();
+      await monthDropdown.selectOption({ index: monthIndex });
+      await page.waitForTimeout(300);
+
+      // Count total date cells (should be 42 = 6 weeks × 7 days)
+      const dateCells = page.locator('[role="gridcell"]');
+      const cellCount = await dateCells.count();
+      expect(cellCount).toBe(42);
+
+      // Verify rows (should be 6 weeks)
+      const rows = page.locator('[role="row"]').filter({ has: page.locator('[role="gridcell"]') });
+      const rowCount = await rows.count();
+      expect(rowCount).toBe(6);
+    }
+  });
+
+  /**
+   * T007: Test date selection functionality after navigation
+   * FR-004
+   * EXPECTED TO FAIL: Depends on dropdown implementation
+   */
+  test('should maintain date selection functionality after navigation', async ({ page }) => {
+    await page.waitForSelector('[role="grid"]');
+
+    // Select a date by clicking
+    const dateCell = page.locator('[role="gridcell"]').filter({ hasText: /^15$/ }).first();
+    await dateCell.click();
+    await page.waitForTimeout(200);
+
+    // Verify badge appears showing selected date
+    const badge = page.locator('text=/Viewing data for/i');
+    await expect(badge).toBeVisible({ timeout: 2000 });
+
+    // Navigate to different month using dropdown
+    const monthDropdown = page.locator('select').first();
+    const currentMonth = new Date().getMonth();
+    const targetMonth = (currentMonth + 1) % 12;
+    await monthDropdown.selectOption({ index: targetMonth });
+    await page.waitForTimeout(300);
+
+    // Select a different date in new month
+    const newDateCell = page.locator('[role="gridcell"]').filter({ hasText: /^10$/ }).first();
+    await newDateCell.click();
+    await page.waitForTimeout(200);
+
+    // Verify selection still works
+    await expect(badge).toBeVisible({ timeout: 2000 });
+  });
+
+  /**
+   * T008: Test navigation performance (<200ms)
+   * FR-010
+   * MAY PASS: Performance should be good even without implementation
+   */
+  test('should navigate between months in under 200ms', async ({ page }) => {
+    await page.waitForSelector('[role="grid"]');
+
+    // Measure month dropdown navigation time
+    const startTime = Date.now();
+
+    const monthDropdown = page.locator('select').first();
+    await monthDropdown.selectOption({ index: 5 }); // Navigate to June
+
+    // Wait for calendar to update (look for caption change)
+    await page.waitForFunction(() => {
+      const caption = document.querySelector('.rdp-caption_label');
+      return caption?.textContent?.toLowerCase().includes('june') ||
+             caption?.textContent?.includes('06');
+    }, { timeout: 500 });
+
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+
+    // Log performance metric for audit trail
+    console.log(`Month dropdown navigation time: ${responseTime}ms`);
+    expect(responseTime).toBeLessThan(200);
+
+    // Also test arrow button performance (if visible)
+    const nextButton = page.locator('button[name="next-month"]').or(
+      page.locator('.rdp-nav_button_next')
+    );
+    const isNextVisible = await nextButton.isVisible().catch(() => false);
+
+    if (isNextVisible) {
+      const arrowStart = Date.now();
+      await nextButton.click();
+      await page.waitForTimeout(100);
+      const arrowEnd = Date.now();
+
+      const arrowTime = arrowEnd - arrowStart;
+      console.log(`Arrow navigation time: ${arrowTime}ms`);
+      expect(arrowTime).toBeLessThan(200);
+    }
+  });
+});

@@ -1,0 +1,596 @@
+# Data Model: Widget-Based Dashboard Framework
+
+**Feature**: Widget-Based Dashboard Framework
+**Branch**: `028-build-a-widget`
+**Date**: 2025-10-11
+**Storage**: MySQL 8.0+ with Drizzle ORM
+
+## Overview
+
+This document defines the database schema for the widget-based dashboard framework. The data model supports widget definitions, dashboard configurations, layout persistence, and user preferences while maintaining cross-device accessibility through server-side storage.
+
+---
+
+## Entity Relationship Diagram
+
+```
+users (existing)
+  ├─→ dashboards (1:N)
+  │     ├─→ dashboard_widgets (1:N)
+  │     │     ├─→ widget_definitions (N:1)
+  │     │     └─→ widget_layouts (1:N, per breakpoint)
+  │     └─→ dashboard_sharing (1:N, optional)
+  └─→ widget_definitions (1:N, user-created widgets)
+
+dashboard_templates (predefined)
+  └─→ template_widgets (1:N)
+
+api_endpoints_metadata (system-generated)
+```
+
+---
+
+## Core Entities
+
+### 1. widget_definitions
+
+Stores widget type definitions and configurations.
+
+**Table**: `widget_definitions`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique widget definition identifier |
+| `user_id` | INT | FOREIGN KEY → users.id | Owner of widget definition (NULL for system widgets) |
+| `widget_type` | ENUM | NOT NULL | Widget type: 'metric', 'chart', 'table', 'alert', 'progress' |
+| `name` | VARCHAR(255) | NOT NULL | Widget display name |
+| `description` | TEXT | NULL | Widget description |
+| `api_endpoint` | VARCHAR(500) | NOT NULL | API endpoint URL to fetch data |
+| `http_method` | ENUM | DEFAULT 'GET' | HTTP method: 'GET', 'POST', 'PUT', 'DELETE' |
+| `query_params` | JSON | NULL | Query parameters configuration |
+| `calculation_config` | JSON | NOT NULL | Calculation pipeline configuration |
+| `visualization_config` | JSON | NOT NULL | Visual settings (colors, formats, labels) |
+| `refresh_interval` | INT | DEFAULT 60000 | Auto-refresh interval in milliseconds (30000-3600000) |
+| `error_config` | JSON | NULL | Error handling preferences |
+| `is_system` | BOOLEAN | DEFAULT FALSE | TRUE for pre-built widgets |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Widget availability status |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update timestamp |
+
+**Indexes**:
+- `idx_widget_user` ON (`user_id`)
+- `idx_widget_type` ON (`widget_type`)
+- `idx_widget_system` ON (`is_system`, `is_active`)
+
+**Validation Rules** (from spec):
+- `widget_type` MUST be one of: 'metric', 'chart', 'table', 'alert', 'progress' (FR-001)
+- `refresh_interval` MUST be between 30000 and 3600000 ms (FR-004)
+- `api_endpoint` MUST be whitelisted against available system endpoints (FR-038)
+- `calculation_config` structure validated via Zod schema
+
+**JSON Schema - calculation_config**:
+```typescript
+{
+  filters: Array<{
+    field: string;
+    operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'contains';
+    value: any;
+  }>;
+  groupBy?: string[];
+  aggregations: Array<{
+    type: 'sum' | 'average' | 'count' | 'min' | 'max';
+    field: string;
+    alias?: string;
+  }>;
+  comparisons?: Array<{
+    type: 'percent_change' | 'difference' | 'ratio';
+    currentField: string;
+    comparisonField: string;
+  }>;
+  sort?: { field: string; order: 'asc' | 'desc' }[];
+  limit?: number;
+}
+```
+
+**JSON Schema - visualization_config**:
+```typescript
+{
+  colors?: string[];
+  format?: 'currency' | 'percentage' | 'number' | 'date';
+  decimalPlaces?: number;
+  labels?: { [key: string]: string };
+  chartType?: 'line' | 'bar' | 'area' | 'pie' | 'candlestick';
+  showLegend?: boolean;
+  showTooltip?: boolean;
+}
+```
+
+---
+
+### 2. dashboards
+
+Stores dashboard configurations and metadata.
+
+**Table**: `dashboards`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique dashboard identifier |
+| `user_id` | INT | FOREIGN KEY → users.id NOT NULL | Dashboard owner |
+| `name` | VARCHAR(255) | NOT NULL | Dashboard display name |
+| `description` | TEXT | NULL | Dashboard description |
+| `global_filters` | JSON | NULL | Global filters applied to all widgets |
+| `is_template` | BOOLEAN | DEFAULT FALSE | TRUE if dashboard is a template |
+| `template_category` | VARCHAR(100) | NULL | Template category (e.g., 'sales', 'expiry', 'inventory') |
+| `is_shared` | BOOLEAN | DEFAULT FALSE | Shared with other users flag |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Dashboard availability status |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update timestamp |
+
+**Indexes**:
+- `idx_dashboard_user` ON (`user_id`, `is_active`)
+- `idx_dashboard_template` ON (`is_template`, `template_category`)
+- `idx_dashboard_shared` ON (`is_shared`)
+
+**Validation Rules**:
+- `name` length 3-255 characters (inferred from UX best practices)
+- `global_filters` structure validated via Zod schema
+- User can have max 100 dashboards (reasonable limit for UX)
+
+**JSON Schema - global_filters**:
+```typescript
+{
+  dateRange?: {
+    start: string; // ISO 8601 date
+    end: string;   // ISO 8601 date
+  };
+  suppliers?: string[];
+  categories?: string[];
+  customFilters?: { [key: string]: any };
+}
+```
+
+---
+
+### 3. dashboard_widgets
+
+Join table linking widgets to dashboards with widget-specific overrides.
+
+**Table**: `dashboard_widgets`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique mapping identifier |
+| `dashboard_id` | INT | FOREIGN KEY → dashboards.id NOT NULL ON DELETE CASCADE | Dashboard reference |
+| `widget_definition_id` | INT | FOREIGN KEY → widget_definitions.id NOT NULL | Widget definition reference |
+| `widget_title` | VARCHAR(255) | NULL | Custom title override (NULL uses widget definition name) |
+| `config_override` | JSON | NULL | Dashboard-specific widget config overrides |
+| `is_visible` | BOOLEAN | DEFAULT TRUE | Widget visibility on dashboard |
+| `sort_order` | INT | DEFAULT 0 | Display order (for list views) |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When widget added to dashboard |
+
+**Indexes**:
+- `idx_dashwidget_dashboard` ON (`dashboard_id`)
+- `idx_dashwidget_widget` ON (`widget_definition_id`)
+- `idx_dashwidget_visible` ON (`dashboard_id`, `is_visible`, `sort_order`)
+
+**Validation Rules**:
+- Max 50 widgets per dashboard (FR-057, spec assumption)
+- `config_override` allows dashboard-specific refresh intervals, filters, etc.
+
+---
+
+### 4. widget_layouts
+
+Stores widget layout positions per dashboard per responsive breakpoint.
+
+**Table**: `widget_layouts`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique layout entry identifier |
+| `dashboard_widget_id` | INT | FOREIGN KEY → dashboard_widgets.id NOT NULL ON DELETE CASCADE | Dashboard-widget mapping reference |
+| `breakpoint` | ENUM | NOT NULL | Responsive breakpoint: 'xxs', 'xs', 'sm', 'md', 'lg' |
+| `grid_x` | INT | NOT NULL | Grid X position |
+| `grid_y` | INT | NOT NULL | Grid Y position |
+| `grid_w` | INT | NOT NULL | Grid width in cells (2-12 per spec FR-020) |
+| `grid_h` | INT | NOT NULL | Grid height in cells (2-8 per spec FR-020) |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Layout creation timestamp |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Layout update timestamp |
+
+**Indexes**:
+- `idx_layout_dashwidget` ON (`dashboard_widget_id`, `breakpoint`)
+- `idx_layout_position` ON (`dashboard_widget_id`, `breakpoint`, `grid_x`, `grid_y`)
+
+**Validation Rules**:
+- `grid_w` MUST be between 2 and 12 (FR-020)
+- `grid_h` MUST be between 2 and 8 (FR-020)
+- Breakpoints: `xxs` (0-479px), `xs` (480-767px), `sm` (768-995px), `md` (996-1199px), `lg` (1200px+)
+- Each dashboard_widget_id can have max 5 layouts (one per breakpoint)
+
+**Breakpoint Grid Columns**:
+- `xxs`: 2 columns
+- `xs`: 4 columns
+- `sm`: 6 columns
+- `md`: 10 columns
+- `lg`: 12 columns
+
+---
+
+### 5. dashboard_templates
+
+Pre-built dashboard templates for quick creation.
+
+**Table**: `dashboard_templates`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique template identifier |
+| `name` | VARCHAR(255) | NOT NULL UNIQUE | Template name (e.g., "Sales Performance", "Expiry Management") |
+| `description` | TEXT | NOT NULL | Template description |
+| `category` | VARCHAR(100) | NOT NULL | Template category |
+| `preview_image_url` | VARCHAR(500) | NULL | Template preview screenshot URL |
+| `config` | JSON | NOT NULL | Complete dashboard configuration |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Template availability |
+| `sort_order` | INT | DEFAULT 0 | Display order in template gallery |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Template creation timestamp |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Template update timestamp |
+
+**Indexes**:
+- `idx_template_category` ON (`category`, `is_active`, `sort_order`)
+
+**Validation Rules**:
+- Minimum 3 templates required: "Sales Performance", "Expiry Management", "Stock Overview" (FR-016)
+- `config` JSON contains full dashboard structure (widgets, layouts, filters)
+
+**JSON Schema - config**:
+```typescript
+{
+  globalFilters: {...};
+  widgets: Array<{
+    widgetDefinitionId: number;
+    title?: string;
+    layouts: {
+      xxs: { x, y, w, h },
+      xs: { x, y, w, h },
+      sm: { x, y, w, h },
+      md: { x, y, w, h },
+      lg: { x, y, w, h }
+    }
+  }>;
+}
+```
+
+---
+
+### 6. template_widgets
+
+Join table for template widget definitions (reusable across templates).
+
+**Table**: `template_widgets`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique mapping identifier |
+| `template_id` | INT | FOREIGN KEY → dashboard_templates.id NOT NULL ON DELETE CASCADE | Template reference |
+| `widget_definition_id` | INT | FOREIGN KEY → widget_definitions.id NOT NULL | Widget definition reference |
+| `sort_order` | INT | DEFAULT 0 | Widget order in template |
+
+**Indexes**:
+- `idx_tmpwidget_template` ON (`template_id`, `sort_order`)
+
+---
+
+### 7. dashboard_sharing (Optional - for future enhancement)
+
+Manages dashboard sharing between users.
+
+**Table**: `dashboard_sharing`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique sharing record identifier |
+| `dashboard_id` | INT | FOREIGN KEY → dashboards.id NOT NULL ON DELETE CASCADE | Dashboard reference |
+| `shared_with_user_id` | INT | FOREIGN KEY → users.id NOT NULL ON DELETE CASCADE | User who receives access |
+| `permission_level` | ENUM | DEFAULT 'view' | Permission: 'view', 'edit' |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Sharing timestamp |
+
+**Indexes**:
+- `idx_sharing_dashboard` ON (`dashboard_id`)
+- `idx_sharing_user` ON (`shared_with_user_id`)
+- `unique_dashboard_user` UNIQUE ON (`dashboard_id`, `shared_with_user_id`)
+
+**Note**: Spec FR-034 states "Dashboard configurations MUST be private to the creating user unless explicitly shared." This table supports future sharing functionality mentioned in User Story 2 acceptance scenario 5.
+
+---
+
+### 8. api_endpoints_metadata (System-Generated)
+
+Metadata about available system API endpoints for widget configuration.
+
+**Table**: `api_endpoints_metadata`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique endpoint identifier |
+| `endpoint_path` | VARCHAR(500) | NOT NULL UNIQUE | API endpoint path (e.g., "/api/dashboard/metrics") |
+| `http_method` | ENUM | NOT NULL | HTTP method: 'GET', 'POST', 'PUT', 'DELETE', 'PATCH' |
+| `description` | TEXT | NOT NULL | Human-readable endpoint description |
+| `request_schema` | JSON | NULL | Request parameters JSON schema |
+| `response_schema` | JSON | NOT NULL | Response data JSON schema |
+| `requires_auth` | BOOLEAN | DEFAULT TRUE | Authentication requirement |
+| `rate_limit` | VARCHAR(100) | NULL | Rate limit specification (e.g., "100/minute") |
+| `category` | VARCHAR(100) | NULL | Endpoint category (e.g., "sales", "inventory", "expiry") |
+| `is_deprecated` | BOOLEAN | DEFAULT FALSE | Deprecated endpoint flag |
+| `last_scanned` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last metadata update timestamp |
+
+**Indexes**:
+- `idx_endpoint_path` ON (`endpoint_path`, `http_method`)
+- `idx_endpoint_category` ON (`category`, `is_deprecated`)
+
+**Note**: This table is auto-populated by route introspection system (see research.md §7). Extends existing route registry with widget-specific metadata.
+
+---
+
+### 9. widget_calculation_cache (Performance Optimization)
+
+Caches widget calculation results to avoid redundant computation.
+
+**Table**: `widget_calculation_cache`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique cache entry identifier |
+| `widget_definition_id` | INT | FOREIGN KEY → widget_definitions.id NOT NULL ON DELETE CASCADE | Widget reference |
+| `cache_key` | VARCHAR(255) | NOT NULL | Hash of widget config + data params |
+| `result_data` | JSON | NOT NULL | Cached calculation result |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Cache creation timestamp |
+| `expires_at` | TIMESTAMP | NOT NULL | Cache expiration timestamp |
+
+**Indexes**:
+- `idx_cache_key` UNIQUE ON (`widget_definition_id`, `cache_key`)
+- `idx_cache_expiry` ON (`expires_at`)
+
+**Validation Rules**:
+- TTL based on widget refresh interval (e.g., 60s refresh = 60s cache TTL)
+- Max cache size per widget: 5MB (contributes to FR-057 250MB dashboard limit)
+
+---
+
+### 10. dashboard_versions (Audit & Recovery)
+
+Stores dashboard configuration snapshots for version history.
+
+**Table**: `dashboard_versions`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INT | PRIMARY KEY AUTO_INCREMENT | Unique version identifier |
+| `dashboard_id` | INT | FOREIGN KEY → dashboards.id NOT NULL ON DELETE CASCADE | Dashboard reference |
+| `version_number` | INT | NOT NULL | Incremental version number |
+| `config_snapshot` | JSON | NOT NULL | Complete dashboard configuration snapshot |
+| `change_description` | TEXT | NULL | Description of changes made |
+| `created_by_user_id` | INT | FOREIGN KEY → users.id | User who created this version |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Version creation timestamp |
+
+**Indexes**:
+- `idx_version_dashboard` ON (`dashboard_id`, `version_number` DESC)
+- `idx_version_recent` ON (`dashboard_id`, `created_at` DESC)
+
+**Validation Rules**:
+- Retain minimum 5 versions per dashboard (FR-048)
+- Retain versions for 24 hours minimum (FR-048)
+- Auto-prune versions older than 24 hours beyond 5 most recent
+
+---
+
+## State Transitions
+
+### Dashboard Creation Flow:
+1. User creates dashboard → Insert into `dashboards`
+2. Add widgets from template → Insert into `dashboard_widgets` (linking to `widget_definitions`)
+3. Set layouts → Insert into `widget_layouts` (5 breakpoints per widget)
+4. Save version → Insert into `dashboard_versions`
+
+### Widget Configuration Flow:
+1. User creates widget → Insert into `widget_definitions`
+2. Configure data source → Update `api_endpoint`, `query_params`
+3. Configure calculation → Update `calculation_config`
+4. Configure visualization → Update `visualization_config`
+5. Add to dashboard → Insert into `dashboard_widgets`
+
+### Layout Modification Flow:
+1. User drags widget → Update `widget_layouts` (specific breakpoint)
+2. Autosave (30s) → Create new `dashboard_versions` entry
+3. Other breakpoints unchanged unless explicitly modified
+
+---
+
+## Drizzle ORM Schema Definition
+
+**File**: `shared/schema.ts` (append to existing schema)
+
+```typescript
+import { mysqlTable, int, varchar, text, json, boolean, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+
+// Widget Definitions
+export const widgetDefinitions = mysqlTable('widget_definitions', {
+  id: int('id').primaryKey().autoincrement(),
+  userId: int('user_id').references(() => users.id),
+  widgetType: mysqlEnum('widget_type', ['metric', 'chart', 'table', 'alert', 'progress']).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  apiEndpoint: varchar('api_endpoint', { length: 500 }).notNull(),
+  httpMethod: mysqlEnum('http_method', ['GET', 'POST', 'PUT', 'DELETE']).default('GET'),
+  queryParams: json('query_params'),
+  calculationConfig: json('calculation_config').notNull(),
+  visualizationConfig: json('visualization_config').notNull(),
+  refreshInterval: int('refresh_interval').default(60000),
+  errorConfig: json('error_config'),
+  isSystem: boolean('is_system').default(false),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+}, (table) => ({
+  userIdx: index('idx_widget_user').on(table.userId),
+  typeIdx: index('idx_widget_type').on(table.widgetType),
+  systemIdx: index('idx_widget_system').on(table.isSystem, table.isActive),
+}));
+
+// Dashboards
+export const dashboards = mysqlTable('dashboards', {
+  id: int('id').primaryKey().autoincrement(),
+  userId: int('user_id').references(() => users.id).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  globalFilters: json('global_filters'),
+  isTemplate: boolean('is_template').default(false),
+  templateCategory: varchar('template_category', { length: 100 }),
+  isShared: boolean('is_shared').default(false),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+}, (table) => ({
+  userIdx: index('idx_dashboard_user').on(table.userId, table.isActive),
+  templateIdx: index('idx_dashboard_template').on(table.isTemplate, table.templateCategory),
+  sharedIdx: index('idx_dashboard_shared').on(table.isShared),
+}));
+
+// Dashboard Widgets (Join Table)
+export const dashboardWidgets = mysqlTable('dashboard_widgets', {
+  id: int('id').primaryKey().autoincrement(),
+  dashboardId: int('dashboard_id').references(() => dashboards.id, { onDelete: 'cascade' }).notNull(),
+  widgetDefinitionId: int('widget_definition_id').references(() => widgetDefinitions.id).notNull(),
+  widgetTitle: varchar('widget_title', { length: 255 }),
+  configOverride: json('config_override'),
+  isVisible: boolean('is_visible').default(true),
+  sortOrder: int('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  dashboardIdx: index('idx_dashwidget_dashboard').on(table.dashboardId),
+  widgetIdx: index('idx_dashwidget_widget').on(table.widgetDefinitionId),
+  visibleIdx: index('idx_dashwidget_visible').on(table.dashboardId, table.isVisible, table.sortOrder),
+}));
+
+// Widget Layouts
+export const widgetLayouts = mysqlTable('widget_layouts', {
+  id: int('id').primaryKey().autoincrement(),
+  dashboardWidgetId: int('dashboard_widget_id').references(() => dashboardWidgets.id, { onDelete: 'cascade' }).notNull(),
+  breakpoint: mysqlEnum('breakpoint', ['xxs', 'xs', 'sm', 'md', 'lg']).notNull(),
+  gridX: int('grid_x').notNull(),
+  gridY: int('grid_y').notNull(),
+  gridW: int('grid_w').notNull(),
+  gridH: int('grid_h').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+}, (table) => ({
+  dashWidgetIdx: index('idx_layout_dashwidget').on(table.dashboardWidgetId, table.breakpoint),
+  positionIdx: index('idx_layout_position').on(table.dashboardWidgetId, table.breakpoint, table.gridX, table.gridY),
+}));
+
+// Dashboard Templates
+export const dashboardTemplates = mysqlTable('dashboard_templates', {
+  id: int('id').primaryKey().autoincrement(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  description: text('description').notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  previewImageUrl: varchar('preview_image_url', { length: 500 }),
+  config: json('config').notNull(),
+  isActive: boolean('is_active').default(true),
+  sortOrder: int('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+}, (table) => ({
+  categoryIdx: index('idx_template_category').on(table.category, table.isActive, table.sortOrder),
+}));
+
+// API Endpoints Metadata
+export const apiEndpointsMetadata = mysqlTable('api_endpoints_metadata', {
+  id: int('id').primaryKey().autoincrement(),
+  endpointPath: varchar('endpoint_path', { length: 500 }).notNull().unique(),
+  httpMethod: mysqlEnum('http_method', ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']).notNull(),
+  description: text('description').notNull(),
+  requestSchema: json('request_schema'),
+  responseSchema: json('response_schema').notNull(),
+  requiresAuth: boolean('requires_auth').default(true),
+  rateLimit: varchar('rate_limit', { length: 100 }),
+  category: varchar('category', { length: 100 }),
+  isDeprecated: boolean('is_deprecated').default(false),
+  lastScanned: timestamp('last_scanned').defaultNow(),
+}, (table) => ({
+  pathIdx: index('idx_endpoint_path').on(table.endpointPath, table.httpMethod),
+  categoryIdx: index('idx_endpoint_category').on(table.category, table.isDeprecated),
+}));
+
+// Dashboard Versions (Audit Trail)
+export const dashboardVersions = mysqlTable('dashboard_versions', {
+  id: int('id').primaryKey().autoincrement(),
+  dashboardId: int('dashboard_id').references(() => dashboards.id, { onDelete: 'cascade' }).notNull(),
+  versionNumber: int('version_number').notNull(),
+  configSnapshot: json('config_snapshot').notNull(),
+  changeDescription: text('change_description'),
+  createdByUserId: int('created_by_user_id').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  dashboardIdx: index('idx_version_dashboard').on(table.dashboardId, table.versionNumber),
+  recentIdx: index('idx_version_recent').on(table.dashboardId, table.createdAt),
+}));
+```
+
+---
+
+## Migration Strategy
+
+### Phase 1: Core Tables
+1. Create `widget_definitions` table
+2. Create `dashboards` table
+3. Create `dashboard_widgets` join table
+4. Create `widget_layouts` table
+
+### Phase 2: Templates & Metadata
+5. Create `dashboard_templates` table
+6. Create `template_widgets` join table
+7. Create `api_endpoints_metadata` table
+8. Populate metadata from route registry
+
+### Phase 3: Audit & Optimization
+9. Create `dashboard_versions` table
+10. Create `widget_calculation_cache` table (optional)
+
+### Phase 4: Future Enhancements
+11. Create `dashboard_sharing` table (when sharing feature implemented)
+
+**Migration File**: `db/migrations/028_widget_dashboard_framework.sql`
+
+---
+
+## Data Access Patterns
+
+### High-Frequency Queries:
+1. **Load dashboard with widgets**: Join dashboards → dashboard_widgets → widget_definitions → widget_layouts
+2. **Fetch widget data**: widget_definitions.api_endpoint → external API → calculation pipeline
+3. **Save layout changes**: Update widget_layouts (specific breakpoint)
+4. **Auto-refresh widget**: Read widget_definitions.refresh_interval, fetch API, update cache
+
+### Optimization Notes:
+- Eager load all dashboard data in single query (avoid N+1)
+- Use TanStack Query for client-side caching (30s stale time)
+- Index all foreign keys for join performance
+- Partition dashboard_versions by dashboard_id if >100K records
+
+---
+
+## Summary
+
+**Total New Tables**: 8 core tables + 2 optional
+**Foreign Key Relationships**: 15 relationships
+**Indexes**: 22 indexes for query optimization
+**JSON Configurations**: 7 JSON columns for flexible schema
+**Audit Trail**: Version history for 24-hour recovery (FR-048)
+**Performance**: Calculation caching, indexed queries, efficient joins
+
+**Next Steps**:
+1. Create Drizzle schema in `shared/schema.ts`
+2. Generate migration SQL
+3. Define API contracts in Phase 1
+4. Create quickstart.md

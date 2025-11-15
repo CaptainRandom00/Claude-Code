@@ -1,0 +1,56 @@
+[
+  {
+    "content": "Update header.php with enhanced navigation and branding",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-1"
+  },
+  {
+    "content": "Enhance index.php blog listing template",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-2"
+  },
+  {
+    "content": "Update single.php post template with better readability",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-3"
+  },
+  {
+    "content": "Enhance page.php template for all static pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-4"
+  },
+  {
+    "content": "Add CSS styles for all enhanced template elements",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-5"
+  },
+  {
+    "content": "Update footer.php with enhanced styling",
+    "status": "completed",
+    "priority": "high",
+    "id": "site-wide-6"
+  },
+  {
+    "content": "Create archive templates for services and resources",
+    "status": "pending",
+    "priority": "medium",
+    "id": "site-wide-7"
+  },
+  {
+    "content": "Update single service and resource templates",
+    "status": "pending",
+    "priority": "medium",
+    "id": "site-wide-8"
+  },
+  {
+    "content": "Content readability improvements throughout site",
+    "status": "completed",
+    "priority": "medium",
+    "id": "site-wide-9"
+  }
+]

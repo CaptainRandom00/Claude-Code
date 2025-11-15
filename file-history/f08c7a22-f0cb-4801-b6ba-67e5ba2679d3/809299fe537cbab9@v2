@@ -1,0 +1,458 @@
+/**
+ * Contract: UserGuideSection Component
+ * Feature: 029-complete-user-guide
+ * Purpose: Define TypeScript interfaces for the UserGuideSection component
+ */
+
+// ============================================================================
+// Core Types
+// ============================================================================
+
+/**
+ * Feature identifiers matching sidebar navigation
+ */
+export type FeatureId =
+  | 'dashboard'
+  | 'widget-dashboards'
+  | 'widget-builder'
+  | 'widget-templates'
+  | 'stock-control'
+  | 'stock-ordering'
+  | 'sales-analytics'
+  | 'case-sizes'
+  | 'stock-profiles'
+  | 'supplier-profiles'
+  | 'sales-aggregation'
+  | 'waste'
+  | 'expiry-management'
+  | 'tasks'
+  | 'reports'
+  | 'data-upload'
+  | 'settings';
+
+/**
+ * Difficulty levels for tasks
+ */
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/**
+ * Section types within user guide
+ */
+export type SectionType = 'overview' | 'tasks' | 'common-tasks' | 'troubleshooting';
+
+// ============================================================================
+// Component Props
+// ============================================================================
+
+/**
+ * Main UserGuideSection component props
+ */
+export interface UserGuideSectionProps {
+  /** Feature identifier */
+  featureId: FeatureId;
+
+  /** Feature display title */
+  title: string;
+
+  /** Icon identifier (Lucide icon name) */
+  icon: string;
+
+  /** Overview section content */
+  overview: OverviewSection;
+
+  /** Getting started section */
+  gettingStarted: GettingStartedSection;
+
+  /** Step-by-step tasks */
+  tasks: Task[];
+
+  /** Common tasks quick reference (optional) */
+  commonTasks?: QuickReference[];
+
+  /** Troubleshooting section (optional) */
+  troubleshooting?: TroubleshootingEntry[];
+
+  /** Related features (optional) */
+  relatedFeatures?: FeatureId[];
+
+  /** Metadata */
+  metadata: FeatureMetadata;
+
+  /** Initial section to display */
+  initialSection?: SectionType;
+
+  /** Callback when section changes */
+  onSectionChange?: (section: SectionType) => void;
+
+  /** Callback when task is expanded */
+  onTaskExpand?: (taskId: string) => void;
+}
+
+// ============================================================================
+// Section Content Types
+// ============================================================================
+
+/**
+ * Overview section content
+ */
+export interface OverviewSection {
+  /** What is this feature? (2-3 sentences) */
+  description: string;
+
+  /** Who should use it? */
+  targetUsers: string[];
+
+  /** Key benefits (3-5 bullet points) */
+  benefits: string[];
+
+  /** Prerequisites (optional) */
+  prerequisites?: string[];
+
+  /** Preview screenshot path (optional) */
+  previewScreenshot?: string;
+}
+
+/**
+ * Getting started section content
+ */
+export interface GettingStartedSection {
+  /** How to navigate to this feature */
+  navigation: {
+    /** Navigation steps */
+    steps: string[];
+    /** Screenshot showing navigation */
+    screenshot: string;
+  };
+
+  /** First-time setup (optional) */
+  setup?: {
+    /** Setup description */
+    description: string;
+    /** Setup steps */
+    steps: string[];
+    /** Screenshots for setup process */
+    screenshots: string[];
+  };
+
+  /** Interface overview */
+  interfaceOverview: {
+    /** Interface description */
+    description: string;
+    /** Screenshot of interface */
+    screenshot: string;
+    /** Key UI elements */
+    keyElements: Array<{
+      /** Element name */
+      name: string;
+      /** Element description */
+      description: string;
+    }>;
+  };
+}
+
+/**
+ * Task definition
+ */
+export interface Task {
+  /** Unique task identifier (within feature) */
+  id: string;
+
+  /** Task title */
+  title: string;
+
+  /** Difficulty level */
+  difficulty: DifficultyLevel;
+
+  /** Estimated completion time (minutes) */
+  estimatedTime: number;
+
+  /** Task description */
+  description: string;
+
+  /** Step-by-step instructions */
+  steps: TaskStep[];
+
+  /** Tips and best practices (optional) */
+  tips?: string[];
+
+  /** Common errors and solutions (optional) */
+  commonErrors?: CommonError[];
+
+  /** Related task IDs (optional) */
+  relatedTasks?: string[];
+}
+
+/**
+ * Individual step within a task
+ */
+export interface TaskStep {
+  /** Step number (1-indexed) */
+  stepNumber: number;
+
+  /** Step title */
+  title: string;
+
+  /** Detailed instructions */
+  instructions: string[];
+
+  /** Screenshots for this step */
+  screenshots: string[];
+
+  /** Warning message (optional) */
+  warning?: string;
+
+  /** Note message (optional) */
+  note?: string;
+
+  /** Expected result (optional) */
+  expectedResult?: string;
+}
+
+/**
+ * Common error entry
+ */
+export interface CommonError {
+  /** Error message or title */
+  error: string;
+
+  /** Solution description */
+  solution: string;
+}
+
+/**
+ * Quick reference entry
+ */
+export interface QuickReference {
+  /** Task name */
+  name: string;
+
+  /** Brief description */
+  description: string;
+
+  /** Quick steps (1-3 actions) */
+  quickSteps: string[];
+
+  /** Keyboard shortcut (optional) */
+  keyboardShortcut?: string;
+
+  /** Link to full task ID (optional) */
+  taskId?: string;
+}
+
+/**
+ * Troubleshooting entry
+ */
+export interface TroubleshootingEntry {
+  /** Issue title */
+  issue: string;
+
+  /** Symptoms */
+  symptoms: string[];
+
+  /** Possible causes (optional) */
+  causes?: string[];
+
+  /** Solution steps */
+  solution: string[];
+
+  /** Screenshots demonstrating fix (optional) */
+  screenshots?: string[];
+
+  /** When to contact support (optional) */
+  escalation?: string;
+}
+
+/**
+ * Feature metadata
+ */
+export interface FeatureMetadata {
+  /** Difficulty level */
+  difficulty: DifficultyLevel;
+
+  /** Estimated read time (minutes) */
+  estimatedReadTime: number;
+
+  /** Last updated date (ISO 8601) */
+  lastUpdated: string;
+
+  /** Version */
+  version: string;
+}
+
+// ============================================================================
+// Component State
+// ============================================================================
+
+/**
+ * UserGuideSection component state
+ */
+export interface UserGuideSectionState {
+  /** Currently active section */
+  activeSection: SectionType;
+
+  /** Currently expanded task ID */
+  expandedTaskId: string | null;
+
+  /** Search query */
+  searchQuery: string;
+
+  /** Filtered tasks based on search */
+  filteredTasks: Task[];
+
+  /** Loading state */
+  isLoading: boolean;
+
+  /** Error state */
+  error: string | null;
+}
+
+// ============================================================================
+// Sub-Component Props
+// ============================================================================
+
+/**
+ * OverviewTab component props
+ */
+export interface OverviewTabProps {
+  /** Overview content */
+  overview: OverviewSection;
+
+  /** Feature icon */
+  icon: string;
+
+  /** Feature title */
+  title: string;
+
+  /** Metadata */
+  metadata: FeatureMetadata;
+
+  /** Related features (optional) */
+  relatedFeatures?: FeatureId[];
+}
+
+/**
+ * TasksTab component props
+ */
+export interface TasksTabProps {
+  /** Tasks list */
+  tasks: Task[];
+
+  /** Expanded task ID */
+  expandedTaskId: string | null;
+
+  /** Callback when task is expanded */
+  onTaskExpand: (taskId: string) => void;
+
+  /** Search query (optional) */
+  searchQuery?: string;
+}
+
+/**
+ * TaskCard component props
+ */
+export interface TaskCardProps {
+  /** Task data */
+  task: Task;
+
+  /** Is this task expanded */
+  isExpanded: boolean;
+
+  /** Callback when expand toggle clicked */
+  onToggleExpand: () => void;
+}
+
+/**
+ * TaskStepItem component props
+ */
+export interface TaskStepItemProps {
+  /** Step data */
+  step: TaskStep;
+
+  /** Is this the last step */
+  isLastStep: boolean;
+}
+
+/**
+ * CommonTasksTab component props
+ */
+export interface CommonTasksTabProps {
+  /** Common tasks list */
+  commonTasks: QuickReference[];
+
+  /** Callback when task is clicked */
+  onTaskClick?: (taskId: string) => void;
+}
+
+/**
+ * TroubleshootingTab component props
+ */
+export interface TroubleshootingTabProps {
+  /** Troubleshooting entries */
+  entries: TroubleshootingEntry[];
+}
+
+/**
+ * TroubleshootingCard component props
+ */
+export interface TroubleshootingCardProps {
+  /** Troubleshooting entry */
+  entry: TroubleshootingEntry;
+
+  /** Is expanded */
+  isExpanded: boolean;
+
+  /** Callback when expand toggle clicked */
+  onToggleExpand: () => void;
+}
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/**
+ * Feature display information
+ */
+export interface FeatureInfo {
+  /** Feature ID */
+  id: FeatureId;
+
+  /** Display label */
+  label: string;
+
+  /** Icon name */
+  icon: string;
+
+  /** Difficulty level */
+  difficulty: DifficultyLevel;
+}
+
+/**
+ * Navigation breadcrumb
+ */
+export interface Breadcrumb {
+  /** Breadcrumb label */
+  label: string;
+
+  /** URL or fragment */
+  url: string;
+
+  /** Is current page */
+  isCurrent: boolean;
+}
+
+/**
+ * Section tab configuration
+ */
+export interface SectionTab {
+  /** Tab identifier */
+  id: SectionType;
+
+  /** Tab label */
+  label: string;
+
+  /** Icon (optional) */
+  icon?: string;
+
+  /** Badge count (optional) */
+  count?: number;
+}

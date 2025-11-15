@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Examine project structure and architecture",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Analyze Prisma database schema for task management capabilities",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Review backend API endpoints and middleware",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Examine frontend components and pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Identify integration points and workflow automation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Assess completeness of plan-do-review workflow",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Compile comprehensive analysis report",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "7"
+  }
+]

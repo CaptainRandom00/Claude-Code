@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Clean up unstaged changes and test artifacts before merge",
+    "status": "completed",
+    "priority": "high",
+    "id": "pre-merge-cleanup"
+  },
+  {
+    "content": "Safely merge vision-upgrade-task-os-v0.03 to main branch",
+    "status": "completed",
+    "priority": "high",
+    "id": "execute-merge"
+  },
+  {
+    "content": "Validate merge success and run smoke tests",
+    "status": "completed",
+    "priority": "high",
+    "id": "post-merge-validation"
+  },
+  {
+    "content": "Push merged changes to remote main branch",
+    "status": "completed",
+    "priority": "medium",
+    "id": "push-to-remote"
+  }
+]

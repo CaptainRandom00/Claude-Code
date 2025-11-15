@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Analyze current search implementation and site structure",
+    "status": "completed",
+    "activeForm": "Analyzing current search implementation and site structure"
+  },
+  {
+    "content": "Create missing jQuery page at /src/app/technology/jquery/page.tsx",
+    "status": "pending",
+    "activeForm": "Creating missing jQuery page"
+  },
+  {
+    "content": "Restore missing case study pages from backup files",
+    "status": "pending",
+    "activeForm": "Restoring missing case study pages from backup files"
+  },
+  {
+    "content": "Build automated content discovery script to scan all pages",
+    "status": "pending",
+    "activeForm": "Building automated content discovery script"
+  },
+  {
+    "content": "Create build-time search index generation system",
+    "status": "pending",
+    "activeForm": "Creating build-time search index generation system"
+  },
+  {
+    "content": "Update search.ts to use dynamically generated index",
+    "status": "pending",
+    "activeForm": "Updating search.ts to use dynamically generated index"
+  },
+  {
+    "content": "Test and verify complete search functionality end-to-end",
+    "status": "pending",
+    "activeForm": "Testing and verifying complete search functionality"
+  }
+]

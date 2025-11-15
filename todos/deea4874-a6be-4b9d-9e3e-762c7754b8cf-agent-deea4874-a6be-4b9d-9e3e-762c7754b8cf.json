@@ -1,0 +1,17 @@
+[
+  {
+    "content": "Create minimal waste management component to isolate black screen issue",
+    "status": "in_progress",
+    "activeForm": "Creating minimal waste management component to isolate black screen issue"
+  },
+  {
+    "content": "Test minimal component rendering",
+    "status": "pending",
+    "activeForm": "Testing minimal component rendering"
+  },
+  {
+    "content": "Gradually add features back to identify the failing component",
+    "status": "pending",
+    "activeForm": "Gradually adding features back to identify the failing component"
+  }
+]

@@ -1,0 +1,192 @@
+// Testimonials API - List and Create
+// GET /api/testimonials - List all testimonials (with filters)
+// POST /api/testimonials - Create new testimonial (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { query } from '@/lib/db';
+import { testimonialSchema } from '@/lib/validations';
+
+// GET /api/testimonials - List testimonials
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+
+    // Parse pagination and filters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const featured = searchParams.get('featured') === 'true' ? true : searchParams.get('featured') === 'false' ? false : undefined;
+    const published = searchParams.get('published') === 'true' ? true : searchParams.get('published') === 'false' ? false : undefined;
+    const industry = searchParams.get('industry');
+    const service_related = searchParams.get('service_related');
+    const min_rating = searchParams.get('min_rating');
+
+    const offset = (page - 1) * limit;
+
+    // Build query
+    let queryString = `
+      SELECT
+        id, client_name, client_company, client_role, client_photo,
+        quote, rating, industry, service_related, featured,
+        display_order, published, created_at, updated_at
+      FROM testimonials
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (featured !== undefined) {
+      queryString += ` AND featured = $${paramIndex}`;
+      params.push(featured);
+      paramIndex++;
+    }
+
+    if (published !== undefined) {
+      queryString += ` AND published = $${paramIndex}`;
+      params.push(published);
+      paramIndex++;
+    }
+
+    if (industry) {
+      queryString += ` AND industry = $${paramIndex}`;
+      params.push(industry);
+      paramIndex++;
+    }
+
+    if (service_related) {
+      queryString += ` AND service_related = $${paramIndex}`;
+      params.push(service_related);
+      paramIndex++;
+    }
+
+    if (min_rating) {
+      queryString += ` AND rating >= $${paramIndex}`;
+      params.push(parseInt(min_rating));
+      paramIndex++;
+    }
+
+    queryString += ` ORDER BY display_order ASC, created_at DESC`;
+    queryString += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) FROM testimonials WHERE 1=1';
+    const countParams: any[] = [];
+    let countParamIndex = 1;
+
+    if (featured !== undefined) {
+      countQuery += ` AND featured = $${countParamIndex}`;
+      countParams.push(featured);
+      countParamIndex++;
+    }
+
+    if (published !== undefined) {
+      countQuery += ` AND published = $${countParamIndex}`;
+      countParams.push(published);
+      countParamIndex++;
+    }
+
+    if (industry) {
+      countQuery += ` AND industry = $${countParamIndex}`;
+      countParams.push(industry);
+      countParamIndex++;
+    }
+
+    if (service_related) {
+      countQuery += ` AND service_related = $${countParamIndex}`;
+      countParams.push(service_related);
+      countParamIndex++;
+    }
+
+    if (min_rating) {
+      countQuery += ` AND rating >= $${countParamIndex}`;
+      countParams.push(parseInt(min_rating));
+    }
+
+    const [result, countResult] = await Promise.all([
+      query(queryString, params),
+      query(countQuery, countParams),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count);
+
+    return NextResponse.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching testimonials:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch testimonials' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/testimonials - Create testimonial (admin only)
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+
+    // Validate input
+    const validated = testimonialSchema.parse(body);
+
+    // Insert testimonial
+    const result = await query(
+      `
+      INSERT INTO testimonials (
+        client_name, client_company, client_role, client_photo,
+        quote, rating, industry, service_related, featured,
+        display_order, published
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+      `,
+      [
+        validated.client_name,
+        validated.client_company,
+        validated.client_role,
+        validated.client_photo,
+        validated.quote,
+        validated.rating,
+        validated.industry,
+        validated.service_related,
+        validated.featured,
+        validated.display_order,
+        validated.published,
+      ]
+    );
+
+    return NextResponse.json(result.rows[0], { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating testimonial:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create testimonial' },
+      { status: 500 }
+    );
+  }
+}

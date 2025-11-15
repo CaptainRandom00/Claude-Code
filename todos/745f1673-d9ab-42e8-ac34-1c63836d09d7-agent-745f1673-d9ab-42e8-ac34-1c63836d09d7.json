@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Create SEO Auditor Agent",
+    "status": "completed",
+    "activeForm": "Creating SEO Auditor Agent"
+  },
+  {
+    "content": "Create Keyword Research Agent",
+    "status": "completed",
+    "activeForm": "Creating Keyword Research Agent"
+  },
+  {
+    "content": "Create Sitemap Generator Agent",
+    "status": "completed",
+    "activeForm": "Creating Sitemap Generator Agent"
+  },
+  {
+    "content": "Create Meta Data Optimizer Agent",
+    "status": "completed",
+    "activeForm": "Creating Meta Data Optimizer Agent"
+  },
+  {
+    "content": "Create Schema Markup Agent",
+    "status": "completed",
+    "activeForm": "Creating Schema Markup Agent"
+  },
+  {
+    "content": "Run initial SEO audit across all pages",
+    "status": "completed",
+    "activeForm": "Running initial SEO audit across all pages"
+  },
+  {
+    "content": "Generate baseline keyword research report",
+    "status": "in_progress",
+    "activeForm": "Generating baseline keyword research report"
+  }
+]

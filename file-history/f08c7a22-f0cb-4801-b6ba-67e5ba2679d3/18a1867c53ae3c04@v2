@@ -1,0 +1,462 @@
+# Feature 029: Complete User Guide Documentation with Screenshots
+
+## Overview
+Transform the existing technical API documentation into a comprehensive, user-friendly guide with step-by-step instructions and screenshots for all 17 major system features. This will significantly improve user onboarding, reduce support requests, and provide self-service learning resources.
+
+## Problem Statement
+The current Documentation section (`client/src/components/dashboard/documentation.tsx`) focuses primarily on technical API reference material, which is useful for developers but not accessible for end users. Users need:
+
+1. **Visual guidance** - Screenshots showing what they should see at each step
+2. **Step-by-step instructions** - Clear, numbered steps for common tasks
+3. **Feature-specific guides** - Dedicated guides for each major feature
+4. **Troubleshooting help** - Common issues and solutions
+5. **Quick reference** - Fast access to frequently used workflows
+
+## Business Value
+- **Reduce onboarding time** from days to hours for new users
+- **Decrease support tickets** by 40-60% through self-service documentation
+- **Improve user adoption** of advanced features (widgets, analytics, ordering)
+- **Professional appearance** enhances system credibility and value
+- **Training resource** reduces training costs and time
+
+## Scope
+
+### In Scope
+1. **User Guide Section** - New "User Guides" navigation item in Documentation
+2. **17 Feature Guides** - Complete guides for all sidebar features:
+   - Dashboard
+   - Widget Dashboards
+   - Widget Builder
+   - Widget Templates
+   - Stock Control
+   - Stock Ordering
+   - Sales Analytics
+   - Case Size Management
+   - Stock Profiles
+   - Supplier Profiles
+   - Sales Aggregation
+   - Waste Management
+   - Expiry Management
+   - Tasks & Handover
+   - Reports
+   - Data Upload
+   - Settings
+
+3. **Screenshot Automation** - Playwright script to capture 50+ screenshots
+4. **Responsive Design** - Mobile-friendly documentation viewer
+5. **Search & Navigation** - Easy access to specific guides
+
+### Out of Scope
+- Video tutorials (future enhancement)
+- Interactive demos (future enhancement)
+- Multi-language support (future enhancement)
+- PDF export (future enhancement)
+- Printable versions (future enhancement)
+
+## User Stories
+
+### User Story 1: New User Onboarding
+**As a** new system user
+**I want** visual step-by-step guides for each feature
+**So that** I can learn the system independently without extensive training
+
+**Acceptance Criteria:**
+- [ ] Can access User Guides from Documentation sidebar
+- [ ] Each feature has a dedicated guide with screenshots
+- [ ] Step-by-step instructions are numbered and clear
+- [ ] Screenshots show actual system UI with annotations
+- [ ] Mobile-responsive layout works on tablets
+
+**Priority:** High
+
+### User Story 2: Quick Reference for Common Tasks
+**As an** existing user
+**I want** quick reference guides for common workflows
+**So that** I can refresh my memory without searching through documentation
+
+**Acceptance Criteria:**
+- [ ] "Common Tasks" section for each feature
+- [ ] Quick links to frequently used workflows
+- [ ] Keyboard shortcuts documented (where applicable)
+- [ ] Search functionality to find specific tasks
+- [ ] Bookmarkable URLs for specific guides
+
+**Priority:** Medium
+
+### User Story 3: Troubleshooting Self-Service
+**As a** user encountering an issue
+**I want** troubleshooting guides with screenshots
+**So that** I can resolve problems without contacting support
+
+**Acceptance Criteria:**
+- [ ] "Troubleshooting" section for each feature
+- [ ] Common error messages explained
+- [ ] Solution steps with screenshots
+- [ ] Links to related guides
+- [ ] Contact support option if unresolved
+
+**Priority:** Medium
+
+### User Story 4: Feature Discovery
+**As a** user looking to improve my workflow
+**I want** to browse available features with visual examples
+**So that** I can discover and adopt features I wasn't aware of
+
+**Acceptance Criteria:**
+- [ ] Overview page showing all 17 features
+- [ ] Feature cards with preview screenshots
+- [ ] "What you can do" descriptions
+- [ ] Difficulty indicators (Beginner/Intermediate/Advanced)
+- [ ] Related features linked together
+
+**Priority:** Low
+
+## Technical Requirements
+
+### Frontend Components
+
+#### 1. Documentation Structure Enhancement
+**File:** `client/src/components/dashboard/documentation.tsx`
+
+**Changes:**
+- Add "User Guides" to sections array
+- Create `renderUserGuides()` function
+- Add tabbed interface for feature selection
+- Integrate screenshot viewer component
+
+#### 2. Reusable Components (NEW)
+**Files to Create:**
+
+**`client/src/components/dashboard/UserGuideSection.tsx`**
+```typescript
+interface GuideStep {
+  title: string;
+  description: string;
+  screenshot: string;
+  tips?: string[];
+  warnings?: string[];
+}
+
+interface UserGuideSectionProps {
+  featureName: string;
+  overview: string;
+  gettingStarted: string[];
+  steps: GuideStep[];
+  commonTasks?: GuideStep[];
+  troubleshooting?: { issue: string; solution: string; }[];
+}
+```
+
+**`client/src/components/dashboard/ScreenshotViewer.tsx`**
+```typescript
+interface ScreenshotViewerProps {
+  src: string;
+  alt: string;
+  caption?: string;
+  annotations?: Annotation[];
+  zoomable?: boolean;
+}
+```
+
+### Screenshot Automation
+
+#### Playwright Script
+**File:** `scripts/capture-user-guide-screenshots.ts`
+
+**Requirements:**
+- Headless: false (for visual confirmation)
+- Viewport: 1920x1080 (desktop), 768x1024 (tablet)
+- Format: PNG with compression
+- Naming: `{feature}-{step}-{description}.png`
+- Annotations: Optional overlay markup
+
+**Screenshot Categories:**
+
+1. **Navigation Screenshots** (17 total)
+   - Each feature's sidebar navigation
+   - Active state indication
+   - Mobile menu state
+
+2. **Feature Overview Screenshots** (17 total)
+   - Initial landing page for each feature
+   - Key UI elements highlighted
+   - Empty state vs populated state
+
+3. **Workflow Screenshots** (100+ total)
+   - Step-by-step task completion
+   - Form interactions
+   - Success confirmations
+   - Error states
+
+4. **Detail Screenshots** (50+ total)
+   - Specific UI components
+   - Filter panels
+   - Modal dialogs
+   - Tooltips and help text
+
+### Screenshot Organization
+```
+public/
+  docs/
+    screenshots/
+      dashboard/
+        01-overview.png
+        02-metrics.png
+        03-activity.png
+      sales-analytics/
+        01-navigation.png
+        02-filters.png
+        03-table-sorting.png
+        04-chart-view.png
+        05-date-range.png
+        06-supplier-filter.png
+        07-export.png
+        08-mobile-view.png
+      stock-profiles/
+        01-grid-view.png
+        02-active-inactive-badges.png
+        03-pagination.png
+        04-search.png
+        05-edit-popup.png
+        06-image-upload.png
+        07-statistics.png
+      widget-builder/
+        01-landing.png
+        02-data-source-selection.png
+        03-calculation-builder.png
+        04-preview-panel.png
+        05-formatting-options.png
+        06-save-widget.png
+        07-success.png
+      ... (13 more feature directories)
+```
+
+## Content Structure
+
+### Each Feature Guide Contains:
+
+#### 1. Overview Section
+- **What is this feature?** - Clear 2-3 sentence description
+- **Who should use it?** - Target user roles
+- **Key benefits** - 3-5 bullet points
+- **Prerequisites** - Required permissions/data
+
+#### 2. Getting Started
+- **Navigation** - How to access the feature
+- **First time setup** - Any initial configuration
+- **Understanding the interface** - UI component overview
+
+#### 3. Step-by-Step Instructions
+**Format:**
+```markdown
+### Task: Upload BRN Stock Data
+
+**Difficulty:** Beginner
+**Estimated Time:** 5 minutes
+
+**Steps:**
+1. **Navigate to Data Upload**
+   - Click "Data Upload" in the sidebar
+   - ![Screenshot: Data Upload navigation](...)
+
+2. **Select BRN Upload**
+   - Click the "BRN Stock" tab
+   - ![Screenshot: BRN tab selection](...)
+
+3. **Choose your file**
+   - Click "Choose File" button
+   - Select your Excel file (.xlsx or .xls)
+   - ![Screenshot: File selection dialog](...)
+
+4. **Upload and confirm**
+   - Click "Upload" button
+   - Wait for processing (progress bar shown)
+   - Verify success message
+   - ![Screenshot: Success confirmation](...)
+
+**Tips:**
+- ✓ Files must be under 50MB
+- ✓ Ensure column headers match expected format
+- ✓ Use latest BRN export from system
+
+**Common Errors:**
+- ❌ "Invalid file format" - Ensure file is .xlsx or .xls
+- ❌ "File too large" - Split into multiple files or compress
+```
+
+#### 4. Common Tasks
+- Quick reference for frequent operations
+- Links to detailed step-by-step instructions
+- Keyboard shortcuts table
+
+#### 5. Troubleshooting
+- Error messages with explanations
+- Solution steps
+- When to contact support
+
+## Implementation Phases
+
+### Phase 1: Infrastructure (Week 1)
+- [ ] Create UserGuideSection component
+- [ ] Create ScreenshotViewer component
+- [ ] Add "User Guides" section to documentation.tsx
+- [ ] Set up screenshot directory structure
+- [ ] Create Playwright screenshot automation script
+
+### Phase 2: Screenshot Capture (Week 1-2)
+- [ ] Capture navigation screenshots (17 features)
+- [ ] Capture overview screenshots (17 features)
+- [ ] Capture workflow screenshots (priority features first)
+- [ ] Capture detail screenshots
+- [ ] Optimize and compress all images
+- [ ] Organize in directory structure
+
+### Phase 3: Content Creation - Priority Features (Week 2-3)
+**High Priority:**
+- [ ] Sales Analytics (most used)
+- [ ] Stock Profiles (core data)
+- [ ] Data Upload (critical workflow)
+- [ ] Widget Builder (complex feature)
+- [ ] Stock Ordering (business value)
+
+### Phase 4: Content Creation - Standard Features (Week 3-4)
+**Medium Priority:**
+- [ ] Dashboard
+- [ ] Widget Dashboards
+- [ ] Widget Templates
+- [ ] Stock Control
+- [ ] Sales Aggregation
+- [ ] Case Size Management
+
+### Phase 5: Content Creation - Additional Features (Week 4-5)
+**Lower Priority:**
+- [ ] Supplier Profiles
+- [ ] Waste Management
+- [ ] Expiry Management
+- [ ] Tasks & Handover
+- [ ] Reports
+- [ ] Settings
+
+### Phase 6: Polish & Testing (Week 5)
+- [ ] Add search functionality
+- [ ] Test mobile responsiveness
+- [ ] Verify all screenshot links
+- [ ] Proofread all content
+- [ ] User acceptance testing
+- [ ] Gather feedback and iterate
+
+## Success Metrics
+
+### Quantitative
+- **Screenshot Coverage:** 50+ screenshots across all features
+- **Feature Coverage:** All 17 features documented
+- **Page Load Performance:** <2s for guide pages
+- **Mobile Compatibility:** 100% responsive on tablets
+- **Screenshot Quality:** Min 1920x1080 resolution
+
+### Qualitative
+- **User Feedback:** 90%+ satisfaction rating
+- **Completeness:** Users can complete tasks independently
+- **Clarity:** Steps are clear without additional explanation
+- **Professionalism:** Documentation appears polished and complete
+
+## Non-Functional Requirements
+
+### Performance
+- Documentation page loads in <2 seconds
+- Screenshots lazy-load below the fold
+- Images compressed to <500KB each
+- Total page size <10MB
+
+### Accessibility
+- Alt text for all screenshots
+- Keyboard navigation support
+- Screen reader friendly structure
+- High contrast text on images
+
+### Maintainability
+- Screenshot naming convention documented
+- Update process defined
+- Version control for screenshots
+- Automated screenshot refresh capability
+
+## Dependencies
+- Playwright (already installed)
+- Current documentation.tsx structure
+- Existing UI components (Card, Tabs, Badge, etc.)
+- Public directory for static assets
+
+## Risks & Mitigation
+
+### Risk 1: Screenshot Maintenance Burden
+**Impact:** High
+**Mitigation:**
+- Automated screenshot capture script
+- Maintain script for easy re-capture
+- Version screenshots in git LFS if size becomes issue
+- Document update process
+
+### Risk 2: Content Creation Time
+**Impact:** Medium
+**Mitigation:**
+- Phased approach (priority features first)
+- Reusable content templates
+- Focus on most-used features initially
+- Can add features incrementally
+
+### Risk 3: UI Changes Breaking Screenshots
+**Impact:** Medium
+**Mitigation:**
+- Playwright script can quickly re-capture
+- Version control tracks changes
+- Annotate screenshots to remain relevant longer
+- Schedule quarterly screenshot reviews
+
+## Future Enhancements
+1. **Video Tutorials** - Short screen recordings for complex workflows
+2. **Interactive Demos** - Guided tours with highlight overlays
+3. **Multi-language Support** - Translations for key guides
+4. **PDF Export** - Downloadable documentation
+5. **Changelog Integration** - Link new features to guides
+6. **Usage Analytics** - Track which guides are most helpful
+7. **AI-Powered Search** - Semantic search across documentation
+
+## Acceptance Criteria (Feature Complete)
+
+### Must Have
+- [x] Feature specification created
+- [ ] All 17 features have user guides
+- [ ] Minimum 50 screenshots captured and organized
+- [ ] UserGuideSection component implemented
+- [ ] ScreenshotViewer component implemented
+- [ ] Documentation.tsx updated with User Guides section
+- [ ] Mobile responsive design verified
+- [ ] Search functionality working
+- [ ] All screenshots display correctly
+- [ ] Content reviewed and proofread
+
+### Should Have
+- [ ] Quick reference sections for common tasks
+- [ ] Troubleshooting sections for each feature
+- [ ] Keyboard shortcuts documented
+- [ ] Tips and warnings included
+- [ ] Difficulty indicators on tasks
+
+### Nice to Have
+- [ ] Animated GIFs for complex interactions
+- [ ] Related features cross-linking
+- [ ] Bookmarkable URLs for specific guides
+- [ ] Print-friendly CSS
+- [ ] Dark mode screenshot variants
+
+## Related Features
+- Feature 028: Widget Dashboard System (heavily documented)
+- Existing Documentation component (foundation)
+- All 17 sidebar features (content subjects)
+
+## Notes
+- This is a documentation-focused feature, not a functional feature
+- Primary value is user experience and onboarding
+- Screenshots must be captured from production-like environment
+- Consider creating a "Documentation Admin" role for future updates
+- May want to add "Last Updated" dates to each guide

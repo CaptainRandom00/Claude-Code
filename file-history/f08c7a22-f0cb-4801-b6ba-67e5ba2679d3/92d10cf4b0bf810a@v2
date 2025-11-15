@@ -1,0 +1,34 @@
+import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Playwright config for widget navigation tests
+ * Uses existing dev server instead of starting a new one
+ */
+export default defineConfig({
+  testDir: './tests',
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: 0,
+  workers: 1,
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'test-results/widget-nav-report' }],
+  ],
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+  timeout: 60 * 1000,
+  expect: {
+    timeout: 15 * 1000
+  },
+  testMatch: ['**/widget-navigation-integration.spec.ts'],
+});

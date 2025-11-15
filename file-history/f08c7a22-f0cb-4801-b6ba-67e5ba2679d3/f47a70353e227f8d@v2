@@ -1,0 +1,188 @@
+# Audit Trail: Widget-Based Dashboard Framework
+
+**Feature**: Widget-Based Dashboard Framework
+**Branch**: `028-build-a-widget`
+**Purpose**: Comprehensive E2E testing audit trail per Constitution Principle VI
+
+---
+
+## Audit Structure
+
+This directory contains the complete audit trail for widget framework E2E testing with Playwright browser automation.
+
+```
+audit/
+├── playwright-execution-logs/      # Test execution logs
+│   ├── widget-configuration.log
+│   ├── dashboard-builder.log
+│   ├── layout-persistence.log
+│   ├── responsive-behavior.log
+│   ├── accessibility.log
+│   └── cross-browser.log
+├── failure-analysis/               # Failure investigation
+│   ├── [test-name]-analysis.md    # Root cause analysis
+│   └── screenshots/                # Screenshot evidence
+├── remediation/                    # Fixes and re-tests
+│   ├── fixes-applied.md
+│   └── retest-results.md
+└── validation-report.md            # Final validation report
+```
+
+---
+
+## Testing Workflow (Principle VI)
+
+### 1. Initial Playwright E2E Test
+- Execute comprehensive browser automation tests
+- Document failures with screenshot evidence
+- Capture browser console errors and network issues
+
+### 2. Root Cause Analysis
+- Investigate each failure systematically
+- Document root cause in `failure-analysis/`
+- Link to relevant code and spec requirements
+
+### 3. Remediation
+- Implement fixes based on analysis
+- Document all changes in `remediation/fixes-applied.md`
+
+### 4. Re-test Validation
+- Re-run Playwright tests to verify fixes
+- Document resolution with screenshots
+- Update `remediation/retest-results.md`
+
+### 5. Final Validation
+- Complete `validation-report.md`
+- Confirm all tests passing
+- Verify audit trail completeness
+
+---
+
+## Test Coverage
+
+### Widget Configuration Workflow (test file: widget-configuration.spec.ts)
+- Add widget → select API → configure calculation → preview data
+- Browser automation: Form interactions, API selection, real-time preview
+
+### Dashboard Builder (test file: dashboard-builder.spec.ts)
+- Create dashboard → add widgets → arrange layout → save
+- Browser automation: Drag-drop, resize, save confirmation
+
+### Layout Persistence (test file: layout-persistence.spec.ts)
+- Save layout → reload page → verify layout restored
+- Browser automation: Layout state verification across sessions
+
+### Responsive Behavior (test file: responsive-behavior.spec.ts)
+- Test breakpoints: 320px, 768px, 1200px, 3840px
+- Browser automation: Viewport changes, layout reflow
+
+### Accessibility (test file: accessibility.spec.ts)
+- Keyboard navigation, screen reader compatibility
+- Browser automation: Keyboard events, ARIA attribute validation
+
+### Cross-Browser (test file: cross-browser.spec.ts)
+- Chrome, Firefox, Safari automation
+- Browser-specific behavior validation
+
+---
+
+## Audit Compliance Checklist
+
+- [ ] Initial Playwright test execution completed
+- [ ] All failures documented with screenshots
+- [ ] Root cause analysis complete for each failure
+- [ ] Remediation fixes implemented and documented
+- [ ] Re-test validation performed
+- [ ] Final validation report created
+- [ ] Audit trail traceable to spec requirements
+- [ ] All documentation complete and reviewed
+
+---
+
+## Evidence Files
+
+### Playwright Execution Logs
+Location: `playwright-execution-logs/`
+- Contains: Test run output, browser console logs, network traces
+- Format: Plain text logs with timestamps
+
+### Screenshot Evidence
+Location: `failure-analysis/screenshots/`
+- Contains: Visual evidence of failures and successful fixes
+- Format: PNG images with descriptive filenames
+
+### Analysis Documents
+Location: `failure-analysis/`
+- Contains: Markdown documents with root cause analysis
+- Format: Structured analysis with code references
+
+### Remediation Records
+Location: `remediation/`
+- Contains: List of fixes applied and re-test results
+- Format: Markdown with before/after comparisons
+
+---
+
+## Usage
+
+### Running Tests
+```bash
+# Run all Playwright tests
+npm run test:playwright
+
+# Run specific test file
+npx playwright test tests/playwright/widget-configuration.spec.ts
+
+# Run with UI (for debugging)
+npx playwright test --ui
+
+# Generate HTML report
+npx playwright show-report
+```
+
+### Capturing Evidence
+```bash
+# Tests automatically capture screenshots on failure
+# Screenshots saved to: test-results/[test-name]/
+
+# Copy to audit trail:
+cp test-results/*/test-failed-*.png audit/failure-analysis/screenshots/
+```
+
+### Creating Audit Documents
+```bash
+# After test run, document failures:
+echo "## Failure Analysis: [Test Name]" > audit/failure-analysis/[test-name]-analysis.md
+
+# After fixes, document remediation:
+echo "## Fixes Applied" > audit/remediation/fixes-applied.md
+
+# After re-test, document results:
+echo "## Re-test Results" > audit/remediation/retest-results.md
+
+# Finally, create validation report:
+echo "## Validation Report" > audit/validation-report.md
+```
+
+---
+
+## Traceability to Specification
+
+All audit items are traceable to spec requirements:
+
+- **Widget Configuration**: FR-002, FR-024, FR-025, FR-026, FR-031 (spec.md)
+- **Dashboard Builder**: FR-012, FR-013, FR-028, FR-029, FR-030 (spec.md)
+- **Layout Persistence**: FR-019, FR-020, FR-021, FR-023, FR-046 (spec.md)
+- **Responsive Behavior**: FR-022, User Story 1, User Story 4 (spec.md)
+- **Accessibility**: FR-041, FR-042, FR-043, FR-044, FR-045 (spec.md)
+- **Cross-Browser**: Assumption: Modern browsers (spec.md)
+
+---
+
+## Next Steps
+
+1. Implement feature per quickstart.md
+2. Write Playwright tests per test specifications
+3. Execute tests and populate audit trail
+4. Follow testing workflow (Initial → Analysis → Remediation → Validation)
+5. Complete validation report before feature acceptance

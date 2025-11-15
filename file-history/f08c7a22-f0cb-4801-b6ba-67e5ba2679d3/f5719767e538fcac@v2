@@ -1,0 +1,33 @@
+import { chromium } from 'playwright';
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  console.log('📍 Navigating to dashboard 2...');
+  await page.goto('http://localhost:3000/dashboards/2');
+  await page.waitForTimeout(3000);
+
+  console.log('📸 Taking screenshot...');
+  await page.screenshot({ path: 'test-screenshots/chart-widget/manual-inspection.png', fullPage: true });
+
+  console.log('🔍 Checking DOM structure...');
+  const widgetContainers = await page.$$('[class*="widget"]');
+  console.log(`Widget containers: ${widgetContainers.length}`);
+
+  const svgElements = await page.$$('svg');
+  console.log(`SVG elements: ${svgElements.length}`);
+
+  const rechartsSvgs = await page.$$('svg.recharts-surface');
+  console.log(`Recharts surfaces: ${rechartsSvgs.length}`);
+
+  const bodyHTML = await page.evaluate(() => document.body.innerHTML);
+  console.log(`HTML length: ${bodyHTML.length} characters`);
+  console.log(`Contains "Error": ${bodyHTML.includes('Error')}`);
+  console.log(`Contains "recharts": ${bodyHTML.includes('recharts')}`);
+
+  console.log('\n✅ Browser will stay open for 10 seconds for manual inspection...');
+  await page.waitForTimeout(10000);
+
+  await browser.close();
+})();

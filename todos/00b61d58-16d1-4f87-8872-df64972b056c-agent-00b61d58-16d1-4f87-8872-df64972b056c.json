@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Add debug logging to sales aggregation date filtering to understand exact issue",
+    "status": "completed",
+    "priority": "high",
+    "id": "130"
+  },
+  {
+    "content": "Test raw database query to see actual SQL being generated",
+    "status": "completed",
+    "priority": "high",
+    "id": "131"
+  },
+  {
+    "content": "Fix date comparison logic in getAggregatedSales method",
+    "status": "completed",
+    "priority": "high",
+    "id": "132"
+  },
+  {
+    "content": "Test fix with item 2091 to verify it shows sales data",
+    "status": "completed",
+    "priority": "high",
+    "id": "133"
+  },
+  {
+    "content": "Test fix across multiple items and date ranges",
+    "status": "completed",
+    "priority": "medium",
+    "id": "134"
+  },
+  {
+    "content": "Verify Stock Ordering now displays correct sales data",
+    "status": "completed",
+    "priority": "medium",
+    "id": "135"
+  },
+  {
+    "content": "Add proper error handling and fallback logic",
+    "status": "completed",
+    "priority": "low",
+    "id": "136"
+  }
+]

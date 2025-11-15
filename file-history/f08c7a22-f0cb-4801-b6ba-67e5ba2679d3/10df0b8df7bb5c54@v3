@@ -1,0 +1,63 @@
+/**
+ * Safari Debug Test - Investigate why React isn't mounting
+ */
+
+import { test, expect } from '@playwright/test';
+
+test('Debug Safari white screen issue', async ({ page }) => {
+  const consoleLogs: any[] = [];
+  const consoleErrors: any[] = [];
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push({ type: msg.type(), text: msg.text() });
+    } else {
+      consoleLogs.push({ type: msg.type(), text: msg.text() });
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    console.log(`❌ Page Error: ${error.message}`);
+  });
+
+  await page.goto('https://localhost:3000', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(3000);
+
+  console.log('\n=== ROOT ELEMENT INSPECTION ===');
+  const rootInfo = await page.evaluate(() => {
+    const root = document.getElementById('root');
+    return {
+      exists: !!root,
+      innerHTML: root?.innerHTML || '',
+      childCount: root?.childElementCount || 0,
+      display: root ? window.getComputedStyle(root).display : 'N/A',
+      visibility: root ? window.getComputedStyle(root).visibility : 'N/A',
+    };
+  });
+  console.log(JSON.stringify(rootInfo, null, 2));
+
+  console.log('\n=== DOM STATS ===');
+  const domStats = await page.evaluate(() => {
+    return {
+      totalElements: document.querySelectorAll('*').length,
+      scripts: document.querySelectorAll('script').length,
+      bodyHTML: document.body.innerHTML.substring(0, 500),
+    };
+  });
+  console.log(JSON.stringify(domStats, null, 2));
+
+  console.log('\n=== CONSOLE LOGS ===');
+  consoleLogs.forEach((log, i) => {
+    console.log(`${i + 1}. [${log.type}] ${log.text}`);
+  });
+
+  console.log('\n=== CONSOLE ERRORS ===');
+  consoleErrors.forEach((error, i) => {
+    console.log(`${i + 1}. ❌ ${error.text}`);
+  });
+
+  await page.screenshot({
+    path: 'specs/024-lets-root-cause/audit/debug-safari-white-screen.png',
+    fullPage: true,
+  });
+});

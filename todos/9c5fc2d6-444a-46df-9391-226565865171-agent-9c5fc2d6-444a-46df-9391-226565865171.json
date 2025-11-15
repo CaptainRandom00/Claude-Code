@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Fix NotificationProvider architecture in layout.tsx",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-notification-provider"
+  },
+  {
+    "content": "Fix Gantt page syntax error at line 81",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-gantt-syntax"
+  },
+  {
+    "content": "Test complete navigation flow",
+    "status": "completed",
+    "priority": "medium",
+    "id": "test-navigation"
+  },
+  {
+    "content": "Verify API integration and Task OS project data",
+    "status": "completed",
+    "priority": "medium",
+    "id": "verify-api-data"
+  },
+  {
+    "content": "Clean up unnecessary duplicate code",
+    "status": "completed",
+    "priority": "low",
+    "id": "cleanup-code"
+  }
+]

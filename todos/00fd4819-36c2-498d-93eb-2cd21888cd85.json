@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Check package.json for start scripts",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Start the application",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Verify the app is running correctly",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  }
+]

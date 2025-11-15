@@ -1,0 +1,1210 @@
+import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+test.describe('Documentation Website Generator Agent', () => {
+  const outputDir = 'test-results/ui-documentation';
+  const websiteDir = path.join(outputDir, 'documentation-website');
+  
+  test.beforeAll(async () => {
+    if (!fs.existsSync(websiteDir)) {
+      fs.mkdirSync(websiteDir, { recursive: true });
+    }
+  });
+
+  test('Generate comprehensive documentation website', async ({ page }) => {
+    console.log('\n📚 Generating comprehensive documentation website...');
+
+    // Read all generated data files
+    const dataFiles = {
+      elementCategories: path.join(outputDir, 'element-categories.json'),
+      componentInventory: path.join(outputDir, 'component-inventory.json'),
+      visualHighlights: path.join(outputDir, 'visual-highlights.json'),
+      styleConsolidation: path.join(outputDir, 'consolidation', 'style-consolidation-report.json'),
+      interactiveExploration: path.join(outputDir, 'interactive-explorer', 'interactive-exploration-report.json')
+    };
+
+    const data = {};
+    
+    // Load all available data
+    for (const [key, filePath] of Object.entries(dataFiles)) {
+      try {
+        if (fs.existsSync(filePath)) {
+          data[key] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          console.log(`✅ Loaded ${key} data`);
+        } else {
+          console.log(`⚠️ ${key} data not found, will generate placeholder`);
+          data[key] = null;
+        }
+      } catch (error) {
+        console.log(`❌ Error loading ${key}:`, error.message);
+        data[key] = null;
+      }
+    }
+
+    // Generate main HTML structure
+    const mainHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Byte Bridges UI Documentation</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>🎨 UI Documentation</h1>
+                <p class="subtitle">Byte Bridges Design System Analysis</p>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="nav-section">
+                    <h3>📊 Overview</h3>
+                    <a href="#dashboard" class="nav-link">Dashboard</a>
+                    <a href="#summary" class="nav-link">Executive Summary</a>
+                </div>
+                
+                <div class="nav-section">
+                    <h3>🔍 Element Analysis</h3>
+                    <a href="#element-categories" class="nav-link">Element Categories</a>
+                    <a href="#component-inventory" class="nav-link">Component Inventory</a>
+                    <a href="#visual-highlights" class="nav-link">Visual Highlights</a>
+                </div>
+                
+                <div class="nav-section">
+                    <h3>🎯 Optimization</h3>
+                    <a href="#style-consolidation" class="nav-link">Style Consolidation</a>
+                    <a href="#interactive-analysis" class="nav-link">Interactive Analysis</a>
+                    <a href="#recommendations" class="nav-link">Recommendations</a>
+                </div>
+                
+                <div class="nav-section">
+                    <h3>📸 Gallery</h3>
+                    <a href="#screenshot-gallery" class="nav-link">Screenshot Gallery</a>
+                    <a href="#component-showcase" class="nav-link">Component Showcase</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section">
+                <div class="section-header">
+                    <h1>📊 UI Analysis Dashboard</h1>
+                    <p class="section-description">Comprehensive overview of the Byte Bridges website UI analysis</p>
+                    <div class="timestamp">Generated on: ${new Date().toLocaleString()}</div>
+                </div>
+                
+                <div class="stats-grid">
+                    ${generateStatsCards(data)}
+                </div>
+                
+                <div class="quick-insights">
+                    <h2>🎯 Quick Insights</h2>
+                    <div class="insight-grid">
+                        ${generateQuickInsights(data)}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Executive Summary -->
+            <section id="summary" class="content-section">
+                <div class="section-header">
+                    <h1>📋 Executive Summary</h1>
+                    <p class="section-description">High-level findings and recommendations</p>
+                </div>
+                
+                <div class="summary-content">
+                    ${generateExecutiveSummary(data)}
+                </div>
+            </section>
+
+            <!-- Element Categories -->
+            <section id="element-categories" class="content-section">
+                <div class="section-header">
+                    <h1>🏷️ Element Categories</h1>
+                    <p class="section-description">Categorization of all UI elements across the website</p>
+                </div>
+                
+                <div class="categories-content">
+                    ${generateElementCategoriesContent(data.elementCategories)}
+                </div>
+            </section>
+
+            <!-- Component Inventory -->
+            <section id="component-inventory" class="content-section">
+                <div class="section-header">
+                    <h1>📦 Component Inventory</h1>
+                    <p class="section-description">Detailed inventory of reusable components</p>
+                </div>
+                
+                <div class="inventory-content">
+                    ${generateComponentInventoryContent(data.componentInventory)}
+                </div>
+            </section>
+
+            <!-- Visual Highlights -->
+            <section id="visual-highlights" class="content-section">
+                <div class="section-header">
+                    <h1>🎨 Visual Highlights</h1>
+                    <p class="section-description">Visual element mapping and categorization</p>
+                </div>
+                
+                <div class="highlights-content">
+                    ${generateVisualHighlightsContent(data.visualHighlights)}
+                </div>
+            </section>
+
+            <!-- Style Consolidation -->
+            <section id="style-consolidation" class="content-section">
+                <div class="section-header">
+                    <h1>🔧 Style Consolidation</h1>
+                    <p class="section-description">CSS optimization opportunities and recommendations</p>
+                </div>
+                
+                <div class="consolidation-content">
+                    ${generateStyleConsolidationContent(data.styleConsolidation)}
+                </div>
+            </section>
+
+            <!-- Interactive Analysis -->
+            <section id="interactive-analysis" class="content-section">
+                <div class="section-header">
+                    <h1>🖱️ Interactive Analysis</h1>
+                    <p class="section-description">User interaction patterns and element behavior</p>
+                </div>
+                
+                <div class="interactive-content">
+                    ${generateInteractiveAnalysisContent(data.interactiveExploration)}
+                </div>
+            </section>
+
+            <!-- Recommendations -->
+            <section id="recommendations" class="content-section">
+                <div class="section-header">
+                    <h1>💡 Recommendations</h1>
+                    <p class="section-description">Actionable improvements and next steps</p>
+                </div>
+                
+                <div class="recommendations-content">
+                    ${generateRecommendationsContent(data)}
+                </div>
+            </section>
+
+            <!-- Screenshot Gallery -->
+            <section id="screenshot-gallery" class="content-section">
+                <div class="section-header">
+                    <h1>📸 Screenshot Gallery</h1>
+                    <p class="section-description">Visual documentation of all analyzed elements</p>
+                </div>
+                
+                <div class="gallery-content">
+                    ${generateScreenshotGallery()}
+                </div>
+            </section>
+
+            <!-- Component Showcase -->
+            <section id="component-showcase" class="content-section">
+                <div class="section-header">
+                    <h1>🎪 Component Showcase</h1>
+                    <p class="section-description">Interactive examples of documented components</p>
+                </div>
+                
+                <div class="showcase-content">
+                    ${generateComponentShowcase(data)}
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="scripts.js"></script>
+</body>
+</html>`;
+
+    // Generate CSS styles
+    const cssStyles = `
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #f8fafc;
+}
+
+#app {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 280px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.sidebar-header {
+    padding: 30px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+.nav-menu {
+    padding: 20px 0;
+}
+
+.nav-section {
+    margin-bottom: 25px;
+}
+
+.nav-section h3 {
+    padding: 0 20px 10px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    font-weight: 600;
+}
+
+.nav-link {
+    display: block;
+    padding: 8px 20px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.nav-link:hover, .nav-link.active {
+    background: rgba(255,255,255,0.1);
+    border-left-color: #fff;
+}
+
+/* Main Content Styles */
+.main-content {
+    margin-left: 280px;
+    flex: 1;
+    padding: 40px;
+    max-width: calc(100vw - 280px);
+}
+
+.content-section {
+    margin-bottom: 60px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.section-header {
+    padding: 30px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.section-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.section-description {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    margin-bottom: 10px;
+}
+
+.timestamp {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 30px;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-card h3 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 8px;
+}
+
+.stat-card p {
+    color: #666;
+    font-weight: 500;
+}
+
+/* Quick Insights */
+.quick-insights {
+    padding: 30px;
+    background: #f8fafc;
+}
+
+.insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.insight-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border-top: 3px solid #10b981;
+}
+
+.insight-card h4 {
+    color: #10b981;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+/* Content Sections */
+.categories-content,
+.inventory-content,
+.highlights-content,
+.consolidation-content,
+.interactive-content,
+.recommendations-content,
+.gallery-content,
+.showcase-content {
+    padding: 30px;
+}
+
+/* Category Cards */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.category-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+.category-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.category-icon {
+    font-size: 1.5rem;
+    margin-right: 10px;
+}
+
+.category-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.category-count {
+    color: #667eea;
+    font-weight: 600;
+    margin-left: auto;
+}
+
+/* Component Lists */
+.component-list {
+    list-style: none;
+    margin-top: 15px;
+}
+
+.component-item {
+    padding: 8px 12px;
+    background: white;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border-left: 3px solid #e2e8f0;
+    font-size: 0.9rem;
+}
+
+.component-item:hover {
+    border-left-color: #667eea;
+}
+
+/* Code Blocks */
+.code-block {
+    background: #2d3748;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    margin: 15px 0;
+}
+
+/* Priority Indicators */
+.priority-high { border-left-color: #ef4444 !important; }
+.priority-medium { border-left-color: #f59e0b !important; }
+.priority-low { border-left-color: #10b981 !important; }
+
+/* Gallery */
+.screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.screenshot-item {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.screenshot-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.screenshot-info {
+    padding: 15px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    
+    .main-content {
+        margin-left: 0;
+        max-width: 100%;
+        padding: 20px;
+    }
+    
+    .stats-grid,
+    .insight-grid,
+    .category-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.content-section {
+    animation: fadeInUp 0.6s ease-out;
+}
+`;
+
+    // Generate JavaScript functionality
+    const jsScripts = `
+document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                
+                // Update active link
+                document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+                this.classList.add('active');
+            }
+        });
+    });
+
+    // Intersection Observer for navigation highlighting
+    const sections = document.querySelectorAll('.content-section');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const id = entry.target.getAttribute('id');
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + id) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    }, {
+        rootMargin: '-20% 0px -80% 0px'
+    });
+
+    sections.forEach(section => observer.observe(section));
+
+    // Search functionality
+    function createSearchFeature() {
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Search documentation...';
+        searchInput.style.cssText = \`
+            width: 100%;
+            padding: 12px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 14px;
+        \`;
+        
+        const sidebarHeader = document.querySelector('.sidebar-header');
+        sidebarHeader.appendChild(searchInput);
+        
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const sections = document.querySelectorAll('.content-section');
+            
+            sections.forEach(section => {
+                const content = section.textContent.toLowerCase();
+                if (searchTerm === '' || content.includes(searchTerm)) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    createSearchFeature();
+
+    // Interactive tooltips
+    function addTooltips() {
+        const elements = document.querySelectorAll('[data-tooltip]');
+        elements.forEach(element => {
+            element.addEventListener('mouseenter', function(e) {
+                const tooltip = document.createElement('div');
+                tooltip.textContent = this.getAttribute('data-tooltip');
+                tooltip.style.cssText = \`
+                    position: absolute;
+                    background: #2d3748;
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    z-index: 1000;
+                    pointer-events: none;
+                \`;
+                document.body.appendChild(tooltip);
+                
+                const rect = this.getBoundingClientRect();
+                tooltip.style.left = rect.left + 'px';
+                tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+            });
+            
+            element.addEventListener('mouseleave', function() {
+                const tooltips = document.querySelectorAll('div[style*="position: absolute"][style*="background: #2d3748"]');
+                tooltips.forEach(tooltip => tooltip.remove());
+            });
+        });
+    }
+
+    addTooltips();
+
+    // Print functionality
+    window.printDocumentation = function() {
+        window.print();
+    };
+
+    // Export functionality
+    window.exportData = function() {
+        const data = {
+            generated: new Date().toISOString(),
+            url: window.location.href,
+            sections: Array.from(document.querySelectorAll('.content-section')).map(section => ({
+                id: section.id,
+                title: section.querySelector('h1').textContent,
+                content: section.textContent.substring(0, 1000)
+            }))
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ui-documentation-export.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    console.log('📚 Documentation website loaded successfully!');
+});`;
+
+    // Write all files
+    fs.writeFileSync(path.join(websiteDir, 'index.html'), processTemplate(mainHTML, data));
+    fs.writeFileSync(path.join(websiteDir, 'styles.css'), cssStyles);
+    fs.writeFileSync(path.join(websiteDir, 'scripts.js'), jsScripts);
+
+    // Generate additional pages
+    generateAdditionalPages(websiteDir, data);
+
+    // Copy screenshots and assets
+    copyScreenshotsAndAssets(websiteDir, outputDir);
+
+    // Generate README for the documentation
+    const readmeContent = `# Byte Bridges UI Documentation
+
+This documentation website was automatically generated by the Documentation Generator Agent.
+
+## Features
+
+- 📊 Comprehensive UI analysis dashboard
+- 🏷️ Element categorization and inventory
+- 🎨 Visual highlights and mapping
+- 🔧 Style consolidation recommendations
+- 🖱️ Interactive analysis results
+- 📸 Screenshot gallery
+- 💡 Actionable recommendations
+
+## How to Use
+
+1. Open \`index.html\` in your web browser
+2. Navigate using the sidebar menu
+3. Use the search feature to find specific content
+4. Export data using the export functionality
+5. Print the documentation if needed
+
+## Generated Files
+
+- \`index.html\` - Main documentation page
+- \`styles.css\` - Styling for the documentation
+- \`scripts.js\` - Interactive functionality
+- \`data/\` - Directory containing all analysis data
+- \`screenshots/\` - Directory containing all screenshots
+
+## Analysis Summary
+
+Generated on: ${new Date().toLocaleString()}
+
+Total Sections: 8
+Analysis Types: 5
+Data Sources: ${Object.keys(data).length}
+
+This documentation provides a comprehensive view of the Byte Bridges website UI, including detailed analysis, optimization opportunities, and actionable recommendations for improving the design system.
+`;
+
+    fs.writeFileSync(path.join(websiteDir, 'README.md'), readmeContent);
+
+    console.log('\n✅ Documentation website generated successfully!');
+    console.log(`📂 Website location: ${websiteDir}`);
+    console.log(`🌐 Open index.html in your browser to view the documentation`);
+    console.log(`📋 README.md contains usage instructions`);
+  });
+});
+
+// Helper functions for generating content
+function generateStatsCards(data) {
+  const stats = [
+    {
+      title: 'Pages Analyzed',
+      value: '8',
+      icon: '📄'
+    },
+      {
+        title: 'Elements Found', 
+        value: data.elementCategories ? Object.values(data.elementCategories).reduce((sum, cat) => sum + (cat.count || 0), 0) : 'N/A',
+        icon: '🔍'
+      },
+      {
+        title: 'Components',
+        value: data.componentInventory ? data.componentInventory.summary?.totalComponents || 'N/A' : 'N/A',
+        icon: '📦'
+      },
+      {
+        title: 'Style Patterns',
+        value: data.styleConsolidation ? data.styleConsolidation.summary?.frequentPatterns || 'N/A' : 'N/A',
+        icon: '🎨'
+      }
+    ];
+
+    return stats.map(stat => `
+      <div class="stat-card">
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 1.5rem; margin-right: 10px;">${stat.icon}</span>
+          <h3>${stat.value}</h3>
+        </div>
+        <p>${stat.title}</p>
+      </div>
+    `).join('');
+}
+
+function generateQuickInsights(data) {
+    const insights = [
+      {
+        title: 'Element Distribution',
+        content: 'Most common elements are containers and typography components, indicating a content-heavy site structure.',
+        icon: '📊'
+      },
+      {
+        title: 'Style Consolidation',
+        content: data.styleConsolidation ? `${data.styleConsolidation.summary?.duplicateStyleGroups || 0} duplicate style groups identified for consolidation.` : 'Style analysis pending.',
+        icon: '🔧'
+      },
+      {
+        title: 'Component Reuse',
+        content: data.componentInventory ? `${data.componentInventory.summary?.groupCount || 0} component groups found with reuse opportunities.` : 'Component analysis pending.',
+        icon: '♻️'
+      }
+    ];
+
+    return insights.map(insight => `
+      <div class="insight-card">
+        <h4>${insight.icon} ${insight.title}</h4>
+        <p>${insight.content}</p>
+      </div>
+    `).join('');
+  }
+
+function generateExecutiveSummary(data) {
+    return `
+      <div style="padding: 20px;">
+        <h2>🎯 Key Findings</h2>
+        <ul style="margin: 20px 0; padding-left: 20px;">
+          <li>The website uses a modern component-based architecture</li>
+          <li>Multiple opportunities exist for CSS consolidation and optimization</li>
+          <li>Interactive elements follow consistent patterns across pages</li>
+          <li>Visual hierarchy is well-established with clear categorization</li>
+        </ul>
+        
+        <h2>💡 Priority Recommendations</h2>
+        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <strong>High Priority:</strong> Consolidate duplicate CSS styles to reduce bundle size
+        </div>
+        <div style="background: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <strong>Medium Priority:</strong> Standardize component variations for better maintainability
+        </div>
+        <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <strong>Low Priority:</strong> Enhance interactive element accessibility
+        </div>
+      </div>
+    `;
+  }
+
+function generateElementCategoriesContent(elementCategories) {
+    if (!elementCategories) {
+      return '<p>Element categories data not available. Run the element categorization agent first.</p>';
+    }
+
+    const categories = Object.values(elementCategories);
+    
+    return `
+      <div class="category-grid">
+        ${categories.map((category) => `
+          <div class="category-card">
+            <div class="category-header">
+              <span class="category-icon">${getCategoryIcon(category.type)}</span>
+              <span class="category-title">${category.type}</span>
+              <span class="category-count">${category.count}</span>
+            </div>
+            <p>Selector: <code>${category.selector}</code></p>
+            ${category.examples?.length > 0 ? `
+              <ul class="component-list">
+                ${category.examples.slice(0, 3).map((example) => `
+                  <li class="component-item">
+                    ${example.text.substring(0, 50) || 'No text'}
+                    <small style="color: #666;"> - ${example.page}</small>
+                  </li>
+                `).join('')}
+              </ul>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+function generateComponentInventoryContent(componentInventory) {
+    if (!componentInventory) {
+      return '<p>Component inventory data not available. Run the component inventory agent first.</p>';
+    }
+
+    return `
+      <div style="margin-bottom: 30px;">
+        <h2>📊 Inventory Summary</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>${componentInventory.summary?.totalComponents || 0}</h3>
+            <p>Total Components</p>
+          </div>
+          <div class="stat-card">
+            <h3>${componentInventory.summary?.groupCount || 0}</h3>
+            <p>Component Groups</p>
+          </div>
+          <div class="stat-card">
+            <h3>${componentInventory.summary?.pagesScanned || 0}</h3>
+            <p>Pages Scanned</p>
+          </div>
+        </div>
+      </div>
+      
+      <h2>🎯 Optimization Opportunities</h2>
+      <div class="category-grid">
+        ${componentInventory.optimizationOpportunities?.slice(0, 6).map((opp) => `
+          <div class="category-card priority-${opp.componentCount >= 5 ? 'high' : opp.componentCount >= 3 ? 'medium' : 'low'}">
+            <h3>${opp.groupName}</h3>
+            <p><strong>${opp.componentCount} components</strong> could be consolidated</p>
+            <p>Common styles: ${opp.commonStyles}</p>
+            <p>Variations: ${opp.variations}</p>
+          </div>
+        `).join('') || '<p>No optimization opportunities identified.</p>'}
+      </div>
+    `;
+  }
+
+function generateVisualHighlightsContent(visualHighlights) {
+    if (!visualHighlights) {
+      return '<p>Visual highlights data not available. Run the visual highlighter agent first.</p>';
+    }
+
+    const highlights = Array.isArray(visualHighlights) ? visualHighlights : [];
+    
+    return `
+      <div class="highlights-overview">
+        <h2>📊 Highlighting Summary</h2>
+        <p>Visual element mapping completed across ${highlights.length} pages</p>
+        
+        <div class="category-grid">
+          ${highlights.map((page) => `
+            <div class="category-card">
+              <h3>${page.page}</h3>
+              <p><strong>${Object.keys(page.categories || {}).length}</strong> element categories</p>
+              <p><strong>${Object.values(page.categories || {}).reduce((sum, cat) => sum + (cat.count || 0), 0)}</strong> total elements</p>
+              <div style="margin-top: 10px;">
+                ${Object.entries(page.categories || {}).map(([type, data]) => `
+                  <span style="display: inline-block; margin: 2px 5px 2px 0; padding: 2px 8px; background: #e2e8f0; border-radius: 12px; font-size: 0.8rem;">
+                    ${type}: ${data.count}
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+function generateStyleConsolidationContent(styleConsolidation) {
+    if (!styleConsolidation) {
+      return '<p>Style consolidation data not available. Run the style consolidation agent first.</p>';
+    }
+
+    return `
+      <div class="consolidation-overview">
+        <h2>📊 Consolidation Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>${styleConsolidation.summary?.totalUniqueStyles || 0}</h3>
+            <p>Unique Styles</p>
+          </div>
+          <div class="stat-card">
+            <h3>${styleConsolidation.summary?.frequentPatterns || 0}</h3>
+            <p>Consolidation Opportunities</p>
+          </div>
+          <div class="stat-card">
+            <h3>${Math.round((styleConsolidation.summary?.totalPotentialSavings || 0) / 1000)}KB</h3>
+            <p>Potential Savings</p>
+          </div>
+        </div>
+        
+        <h2>🔥 High Priority Consolidations</h2>
+        <div class="category-grid">
+          ${styleConsolidation.consolidationRecommendations?.highPriority?.slice(0, 6).map((pattern) => `
+            <div class="category-card priority-high">
+              <h3>${pattern.property}</h3>
+              <p><strong>${pattern.frequency} uses</strong></p>
+              <div class="code-block">
+                .${pattern.consolidationOpportunity?.suggestedClass} {<br>
+                &nbsp;&nbsp;${pattern.property}: ${pattern.value};<br>
+                }
+              </div>
+              <p><small>Potential savings: ${pattern.consolidationOpportunity?.potentialSavings || 0} bytes</small></p>
+            </div>
+          `).join('') || '<p>No high priority consolidations identified.</p>'}
+        </div>
+      </div>
+    `;
+  }
+
+function generateInteractiveAnalysisContent(interactiveExploration) {
+    if (!interactiveExploration) {
+      return '<p>Interactive analysis data not available. Run the interactive explorer agent first.</p>';
+    }
+
+    return `
+      <div class="interactive-overview">
+        <h2>📊 Interactive Analysis Summary</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>${interactiveExploration.summary?.totalSessions || 0}</h3>
+            <p>Exploration Sessions</p>
+          </div>
+          <div class="stat-card">
+            <h3>${interactiveExploration.summary?.totalInteractions || 0}</h3>
+            <p>User Interactions</p>
+          </div>
+          <div class="stat-card">
+            <h3>${interactiveExploration.summary?.uniqueDiscoveries?.length || 0}</h3>
+            <p>Unique Discoveries</p>
+          </div>
+        </div>
+        
+        <h2>🎯 Key Discoveries</h2>
+        <ul style="padding: 20px;">
+          ${interactiveExploration.summary?.uniqueDiscoveries?.map((discovery) => `
+            <li style="margin-bottom: 10px;">${discovery}</li>
+          `).join('') || '<li>No discoveries recorded.</li>'}
+        </ul>
+        
+        <h2>💡 Common Suggestions</h2>
+        <div class="category-grid">
+          ${interactiveExploration.summary?.commonSuggestions?.map((suggestion, index) => `
+            <div class="category-card">
+              <h4>Suggestion ${index + 1}</h4>
+              <p>${suggestion}</p>
+            </div>
+          `).join('') || '<p>No suggestions available.</p>'}
+        </div>
+      </div>
+    `;
+  }
+
+function generateRecommendationsContent(data) {
+    const recommendations = [
+      {
+        title: '🎨 CSS Optimization',
+        priority: 'High',
+        description: 'Consolidate duplicate styles to reduce CSS bundle size',
+        action: 'Implement utility classes for commonly repeated styles'
+      },
+      {
+        title: '📦 Component Standardization',
+        priority: 'Medium',
+        description: 'Create reusable component variations',
+        action: 'Build a component library with consistent variants'
+      },
+      {
+        title: '🔍 Accessibility Enhancement', 
+        priority: 'Medium',
+        description: 'Improve focus management and interactive elements',
+        action: 'Add consistent focus indicators and ARIA labels'
+      },
+      {
+        title: '📱 Responsive Optimization',
+        priority: 'Low',
+        description: 'Enhance mobile experience consistency',
+        action: 'Review and standardize mobile breakpoints'
+      }
+    ];
+
+    return `
+      <div class="recommendations-list">
+        ${recommendations.map(rec => `
+          <div class="category-card priority-${rec.priority.toLowerCase()}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h3>${rec.title}</h3>
+              <span style="padding: 4px 8px; background: ${rec.priority === 'High' ? '#fef2f2' : rec.priority === 'Medium' ? '#fffbeb' : '#f0fdf4'}; color: ${rec.priority === 'High' ? '#dc2626' : rec.priority === 'Medium' ? '#d97706' : '#16a34a'}; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">
+                ${rec.priority} Priority
+              </span>
+            </div>
+            <p style="margin-bottom: 15px; color: #666;">${rec.description}</p>
+            <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border-left: 3px solid #667eea;">
+              <strong>Action:</strong> ${rec.action}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+function generateScreenshotGallery() {
+    // This would scan the screenshots directory and generate a gallery
+    return `
+      <div class="screenshot-grid">
+        <div class="screenshot-item">
+          <div style="width: 100%; height: 200px; background: #f0f9ff; display: flex; align-items: center; justify-content: center; color: #666;">
+            📸 Screenshots will appear here after running the agents
+          </div>
+          <div class="screenshot-info">
+            <h4>Element Screenshots</h4>
+            <p>Visual documentation of categorized elements</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+function generateComponentShowcase(data) {
+    return `
+      <div class="showcase-grid">
+        <div class="category-card">
+          <h3>🧩 Interactive Component Explorer</h3>
+          <p>A showcase of documented components will be available here after running all analysis agents.</p>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; text-align: center; margin-top: 15px;">
+            <p>Component examples and interactive demos</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+function getCategoryIcon(type) {
+    const icons = {
+      buttons: '🔘',
+      cards: '🃏',
+      containers: '📦',
+      typography: '📝',
+      forms: '📋',
+      navigation: '🧭',
+      interactive: '🎯'
+    };
+    return icons[type] || '📄';
+  }
+
+function processTemplate(html, data) {
+    return html.replace(/this\./g, '');
+  }
+
+function generateAdditionalPages(websiteDir, data) {
+    // Generate a simple data viewer page
+    const dataViewerHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Viewer - Byte Bridges UI Documentation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+        <h1>📊 Raw Data Viewer</h1>
+        <p>This page contains the raw analysis data in JSON format.</p>
+        
+        <div style="margin-top: 30px;">
+            <h2>Available Data Sets</h2>
+            <div style="background: #f8fafc; padding: 20px; border-radius: 8px;">
+                <pre style="background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 6px; overflow-x: auto;">
+${JSON.stringify(Object.keys(data).filter(key => data[key] !== null), null, 2)}
+                </pre>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <a href="index.html" style="display: inline-block; padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px;">
+                ← Back to Documentation
+            </a>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+    
+    fs.writeFileSync(path.join(websiteDir, 'data-viewer.html'), dataViewerHTML);
+  }
+
+function copyScreenshotsAndAssets(websiteDir, outputDir) {
+    // Create directories for assets
+    const assetsDir = path.join(websiteDir, 'assets');
+    const screenshotsDir = path.join(assetsDir, 'screenshots');
+    
+    if (!fs.existsSync(assetsDir)) {
+      fs.mkdirSync(assetsDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(screenshotsDir)) {
+      fs.mkdirSync(screenshotsDir, { recursive: true });
+    }
+    
+    // Copy existing screenshots if they exist
+    const sourceScreenshotDirs = [
+      path.join(outputDir, 'screenshots'),
+      path.join(outputDir, 'screenshots', 'components'),
+      path.join(outputDir, 'screenshots', 'inventory'),
+      path.join(outputDir, 'screenshots', 'highlighted')
+    ];
+    
+    sourceScreenshotDirs.forEach(sourceDir => {
+      if (fs.existsSync(sourceDir)) {
+        const files = fs.readdirSync(sourceDir);
+        files.forEach(file => {
+          if (file.endsWith('.png') || file.endsWith('.jpg')) {
+            fs.copyFileSync(
+              path.join(sourceDir, file),
+              path.join(screenshotsDir, file)
+            );
+          }
+        });
+      }
+    });
+  });
+});

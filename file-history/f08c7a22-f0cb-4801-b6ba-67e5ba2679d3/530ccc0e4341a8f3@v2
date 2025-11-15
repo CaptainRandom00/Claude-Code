@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "",
+  "screenshots": [],
+  "screenshotsByFeature": {
+    "dashboard": [],
+    "widget-dashboards": [],
+    "widget-builder": [],
+    "widget-templates": [],
+    "stock-control": [],
+    "stock-ordering": [],
+    "sales-analytics": [],
+    "case-sizes": [],
+    "stock-profiles": [],
+    "supplier-profiles": [],
+    "sales-aggregation": [],
+    "waste": [],
+    "expiry-management": [],
+    "tasks": [],
+    "reports": [],
+    "data-upload": [],
+    "settings": []
+  },
+  "statistics": {
+    "totalScreenshots": 0,
+    "totalSize": 0,
+    "byFormat": {
+      "png": 0,
+      "webp": 0,
+      "avif": 0
+    },
+    "byViewport": {
+      "desktop": 0,
+      "desktopHD": 0,
+      "tablet": 0,
+      "mobile": 0
+    },
+    "byFeature": {
+      "dashboard": 0,
+      "widget-dashboards": 0,
+      "widget-builder": 0,
+      "widget-templates": 0,
+      "stock-control": 0,
+      "stock-ordering": 0,
+      "sales-analytics": 0,
+      "case-sizes": 0,
+      "stock-profiles": 0,
+      "supplier-profiles": 0,
+      "sales-aggregation": 0,
+      "waste": 0,
+      "expiry-management": 0,
+      "tasks": 0,
+      "reports": 0,
+      "data-upload": 0,
+      "settings": 0
+    },
+    "averageSize": 0,
+    "largestSize": 0,
+    "smallestSize": 0
+  }
+}

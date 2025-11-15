@@ -1,0 +1,35 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import fs from "fs";
+
+export default defineConfig({
+  plugins: [
+    react(),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
+  },
+  server: {
+    port: 3000,
+    hmr: {
+      server: undefined,
+    },
+    // HTTPS configuration for Safari compatibility (Feature 024)
+    // Always use HTTPS in development for cross-browser testing
+    https: fs.existsSync('./localhost-key.pem') && fs.existsSync('./localhost.pem') ? {
+      key: fs.readFileSync('./localhost-key.pem'),
+      cert: fs.readFileSync('./localhost.pem'),
+    } : undefined,
+    host: true, // Allow external connections for testing
+  },
+});

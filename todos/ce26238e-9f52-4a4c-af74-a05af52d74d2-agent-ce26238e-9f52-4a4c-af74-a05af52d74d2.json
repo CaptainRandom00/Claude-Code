@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Remove sampleTasks.ts and all its imports",
+    "status": "completed",
+    "priority": "high",
+    "id": "remove-sample-tasks"
+  },
+  {
+    "content": "Fix dashboard to use live API data only",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-dashboard-api"
+  },
+  {
+    "content": "Update tasks page to use live API data",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-tasks-page"
+  },
+  {
+    "content": "Update projects page to use live API data",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-projects-page"
+  },
+  {
+    "content": "Update Gantt chart to use live API data",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-gantt-page"
+  },
+  {
+    "content": "Update backend routes to use real database data",
+    "status": "completed",
+    "priority": "high",
+    "id": "update-backend-routes"
+  },
+  {
+    "content": "Ensure all API calls work correctly",
+    "status": "completed",
+    "priority": "medium",
+    "id": "fix-api-integration"
+  },
+  {
+    "content": "Run comprehensive test to verify live data integration",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-live-data"
+  }
+]

@@ -1,0 +1,91 @@
+/**
+ * Widget Size Configuration
+ * Feature: 028-build-a-widget
+ *
+ * Defines default, minimum, and maximum dimensions for each widget type
+ * to ensure optimal display and enforce layout constraints.
+ *
+ * Grid units: 1 unit = 100px height (rowHeight), width varies by breakpoint
+ *
+ * Design Rationale:
+ * - Metric: Compact single value display (1×2 default)
+ * - Chart: Needs space for axes, legend, data visualization (2×3 default)
+ * - Table: Requires columns + multiple rows of data (3×4 default)
+ * - Alert: List of notifications with details (2×3 default)
+ * - Progress: Gauge/bar indicator (1×2 default)
+ */
+
+import type { WidgetType } from '@/types/widget-types';
+
+export interface WidgetSizeConfig {
+  default: { w: number; h: number };
+  min: { w: number; h: number };
+  max: { w: number; h: number };
+}
+
+export const WIDGET_SIZE_CONFIG: Record<WidgetType, WidgetSizeConfig> = {
+  metric: {
+    default: { w: 1, h: 2 },
+    min: { w: 1, h: 2 },
+    max: { w: 3, h: 3 },
+  },
+  chart: {
+    default: { w: 2, h: 3 },
+    min: { w: 2, h: 2 },
+    max: { w: 6, h: 4 },
+  },
+  table: {
+    default: { w: 3, h: 4 },
+    min: { w: 2, h: 3 },
+    max: { w: 12, h: 6 },
+  },
+  alert: {
+    default: { w: 2, h: 3 },
+    min: { w: 2, h: 2 },
+    max: { w: 4, h: 5 },
+  },
+  progress: {
+    default: { w: 1, h: 2 },
+    min: { w: 1, h: 2 },
+    max: { w: 3, h: 3 },
+  },
+};
+
+/**
+ * Get size configuration for a specific widget type
+ */
+export function getWidgetSizeConfig(widgetType: WidgetType): WidgetSizeConfig {
+  return WIDGET_SIZE_CONFIG[widgetType] || WIDGET_SIZE_CONFIG.metric;
+}
+
+/**
+ * Validate if given dimensions are within constraints for widget type
+ */
+export function validateWidgetDimensions(
+  widgetType: WidgetType,
+  w: number,
+  h: number
+): boolean {
+  const config = getWidgetSizeConfig(widgetType);
+  return (
+    w >= config.min.w &&
+    w <= config.max.w &&
+    h >= config.min.h &&
+    h <= config.max.h
+  );
+}
+
+/**
+ * Clamp dimensions to valid range for widget type
+ */
+export function clampWidgetDimensions(
+  widgetType: WidgetType,
+  w: number,
+  h: number
+): { w: number; h: number } {
+  const config = getWidgetSizeConfig(widgetType);
+  return {
+    w: Math.max(config.min.w, Math.min(config.max.w, w)),
+    h: Math.max(config.min.h, Math.min(config.max.h, h)),
+  };
+}

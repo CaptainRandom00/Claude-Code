@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Check current running status of frontend and backend services",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Identify compilation errors or runtime issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check database connection and schema",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Verify authentication flow and JWT token handling",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Test skill tree API endpoints",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Check for missing dependencies or configuration issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Analyze frontend components for errors",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Check network connectivity between frontend and backend",
+    "status": "completed",
+    "priority": "medium",
+    "id": "8"
+  }
+]

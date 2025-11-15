@@ -1,0 +1,64 @@
+/**
+ * API Metadata Hook
+ * Feature: 028-build-a-widget (User Story 3 - T066)
+ *
+ * Fetches available API endpoints for widget configuration
+ */
+
+import { useQuery } from '@tanstack/react-query';
+
+interface ApiEndpoint {
+  id: number;
+  endpointPath: string;
+  httpMethod: string;
+  description: string;
+  responseSchema: any;
+  availableFields: string[];
+  isActive: boolean;
+}
+
+interface ApiMetadataResponse {
+  success: boolean;
+  endpoints: ApiEndpoint[];
+  count: number;
+}
+
+/**
+ * Fetch all available API endpoints for widgets
+ */
+export function useApiEndpoints() {
+  return useQuery<ApiEndpoint[]>({
+    queryKey: ['api-endpoints'],
+    queryFn: async () => {
+      const response = await fetch('/api/widgets/metadata/endpoints');
+      if (!response.ok) {
+        throw new Error('Failed to fetch API endpoints');
+      }
+      const data: ApiMetadataResponse = await response.json();
+      return data.endpoints || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - endpoints don't change often
+  });
+}
+
+/**
+ * Fetch specific endpoint schema details
+ */
+export function useEndpointSchema(endpointId: number | null) {
+  return useQuery({
+    queryKey: ['endpoint-schema', endpointId],
+    queryFn: async () => {
+      if (!endpointId) return null;
+
+      const response = await fetch(`/api/widgets/metadata/endpoints/${endpointId}/schema`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch endpoint schema');
+      }
+      return response.json();
+    },
+    enabled: !!endpointId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export type { ApiEndpoint, ApiMetadataResponse };

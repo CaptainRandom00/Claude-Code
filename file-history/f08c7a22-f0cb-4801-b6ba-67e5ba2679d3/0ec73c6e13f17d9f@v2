@@ -1,0 +1,213 @@
+/**
+ * Chart Widget Component
+ * Feature: 028-build-a-widget
+ *
+ * Renders data visualizations using Recharts library
+ * Supports: Bar, Line, Area, Pie chart types
+ */
+
+import React from 'react';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import type { VisualizationConfig } from '@/types/widget-types';
+
+interface ChartWidgetProps {
+  data: any[];
+  visualizationConfig: VisualizationConfig & {
+    chartType?: 'bar' | 'line' | 'area' | 'pie';
+    xAxisKey?: string;
+    yAxisKey?: string;
+    color?: string;
+  };
+}
+
+const CHART_COLORS = [
+  '#3b82f6', // blue-500
+  '#10b981', // green-500
+  '#f59e0b', // amber-500
+  '#ef4444', // red-500
+  '#8b5cf6', // violet-500
+  '#ec4899', // pink-500
+];
+
+export function ChartWidget({ data, visualizationConfig }: ChartWidgetProps) {
+  const chartType = visualizationConfig.chartType || 'bar';
+  const xAxisKey = visualizationConfig.xAxisKey || Object.keys(data[0] || {})[0];
+  const yAxisKey = visualizationConfig.yAxisKey || Object.keys(data[0] || {})[1];
+  const color = visualizationConfig.color || CHART_COLORS[0];
+
+  // Handle empty data
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[200px]">
+        <p className="text-muted-foreground">No data available</p>
+      </div>
+    );
+  }
+
+  // Format data for charts
+  const chartData = data.map((item, index) => ({
+    ...item,
+    name: item[xAxisKey] || item.name || `Item ${index + 1}`,
+    value: Number(item[yAxisKey] || item.value || item.amount || 0),
+  }));
+
+  const renderChart = () => {
+    switch (chartType) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis
+                dataKey="name"
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <YAxis
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px'
+                }}
+              />
+              <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+              <Bar
+                dataKey="value"
+                fill={color}
+                name={visualizationConfig.label || 'Value'}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis
+                dataKey="name"
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <YAxis
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px'
+                }}
+              />
+              <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2}
+                name={visualizationConfig.label || 'Value'}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+
+      case 'area':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis
+                dataKey="name"
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <YAxis
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)' }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px'
+                }}
+              />
+              <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                fill={color}
+                fillOpacity={0.6}
+                name={visualizationConfig.label || 'Value'}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+
+      case 'pie':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={(entry) => `${entry.name}: ${entry.value}`}
+                outerRadius={80}
+                fill={color}
+                dataKey="value"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px'
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        );
+
+      default:
+        return (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-destructive">Unknown chart type: {chartType}</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="h-full min-h-[300px] p-4">
+      {renderChart()}
+    </div>
+  );
+}

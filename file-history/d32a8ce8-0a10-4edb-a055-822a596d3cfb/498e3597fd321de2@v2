@@ -1,0 +1,210 @@
+// Testimonials API - Single testimonial operations
+// GET /api/testimonials/[id] - Get single testimonial
+// PUT /api/testimonials/[id] - Update testimonial (admin only)
+// DELETE /api/testimonials/[id] - Delete testimonial (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { testimonialUpdateSchema } from '@/lib/validations';
+
+type RouteParams = {
+  params: {
+    id: string;
+  };
+};
+
+// GET /api/testimonials/[id] - Get single testimonial
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = params;
+
+    const result = await db.query(
+      'SELECT * FROM testimonials WHERE id = $1',
+      [parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Testimonial not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching testimonial:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch testimonial' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/testimonials/[id] - Update testimonial (admin only)
+export async function PUT(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+    const body = await request.json();
+
+    // Validate input
+    const validated = testimonialUpdateSchema.parse({ ...body, id: parseInt(id) });
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (validated.client_name !== undefined) {
+      updates.push(`client_name = $${paramIndex}`);
+      values.push(validated.client_name);
+      paramIndex++;
+    }
+    if (validated.client_company !== undefined) {
+      updates.push(`client_company = $${paramIndex}`);
+      values.push(validated.client_company);
+      paramIndex++;
+    }
+    if (validated.client_role !== undefined) {
+      updates.push(`client_role = $${paramIndex}`);
+      values.push(validated.client_role);
+      paramIndex++;
+    }
+    if (validated.client_photo !== undefined) {
+      updates.push(`client_photo = $${paramIndex}`);
+      values.push(validated.client_photo);
+      paramIndex++;
+    }
+    if (validated.quote !== undefined) {
+      updates.push(`quote = $${paramIndex}`);
+      values.push(validated.quote);
+      paramIndex++;
+    }
+    if (validated.rating !== undefined) {
+      updates.push(`rating = $${paramIndex}`);
+      values.push(validated.rating);
+      paramIndex++;
+    }
+    if (validated.industry !== undefined) {
+      updates.push(`industry = $${paramIndex}`);
+      values.push(validated.industry);
+      paramIndex++;
+    }
+    if (validated.service_related !== undefined) {
+      updates.push(`service_related = $${paramIndex}`);
+      values.push(validated.service_related);
+      paramIndex++;
+    }
+    if (validated.featured !== undefined) {
+      updates.push(`featured = $${paramIndex}`);
+      values.push(validated.featured);
+      paramIndex++;
+    }
+    if (validated.display_order !== undefined) {
+      updates.push(`display_order = $${paramIndex}`);
+      values.push(validated.display_order);
+      paramIndex++;
+    }
+    if (validated.published !== undefined) {
+      updates.push(`published = $${paramIndex}`);
+      values.push(validated.published);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    values.push(parseInt(id));
+
+    const query = `
+      UPDATE testimonials
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Testimonial not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error updating testimonial:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update testimonial' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/testimonials/[id] - Delete testimonial (admin only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+
+    const result = await db.query(
+      'DELETE FROM testimonials WHERE id = $1 RETURNING id',
+      [parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Testimonial not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error deleting testimonial:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete testimonial' },
+      { status: 500 }
+    );
+  }
+}

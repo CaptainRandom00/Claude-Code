@@ -1,0 +1,162 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/config';
+import { query } from '@/lib/db';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get the current user's session
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Get recent activity from multiple sources
+    const activityResult = await query(
+      `WITH recent_activity AS (
+        -- Project updates
+        SELECT 
+          'project_update' as type,
+          p.name as title,
+          CASE 
+            WHEN p.status = 'completed' THEN 'Project completed'
+            WHEN p.status = 'in_progress' THEN 'Project updated'
+            ELSE 'Project status changed'
+          END as action,
+          p.status as detail,
+          p.updated_at as timestamp,
+          'folder' as icon
+        FROM projects p
+        WHERE p.customer_id = $1
+        AND p.updated_at > NOW() - INTERVAL '30 days'
+        
+        UNION ALL
+        
+        -- Invoice updates
+        SELECT 
+          'invoice_update' as type,
+          i.invoice_number as title,
+          CASE 
+            WHEN i.status = 'paid' THEN 'Invoice paid'
+            WHEN i.status = 'sent' THEN 'Invoice sent'
+            WHEN i.status = 'overdue' THEN 'Invoice overdue'
+            ELSE 'Invoice updated'
+          END as action,
+          CONCAT('£', i.total_amount) as detail,
+          i.updated_at as timestamp,
+          'credit-card' as icon
+        FROM invoices i
+        WHERE i.customer_id = $1
+        AND i.updated_at > NOW() - INTERVAL '30 days'
+        
+        UNION ALL
+        
+        -- Support tickets
+        SELECT 
+          'ticket_update' as type,
+          CONCAT('Ticket #', t.id) as title,
+          CASE 
+            WHEN t.status = 'resolved' THEN 'Ticket resolved'
+            WHEN t.status = 'open' THEN 'Ticket opened'
+            WHEN t.status = 'in_progress' THEN 'Ticket in progress'
+            ELSE 'Ticket updated'
+          END as action,
+          t.subject as detail,
+          t.updated_at as timestamp,
+          'help-circle' as icon
+        FROM support_tickets t
+        WHERE t.customer_id = $1
+        AND t.updated_at > NOW() - INTERVAL '30 days'
+        
+        UNION ALL
+        
+        -- Login activity
+        SELECT 
+          'login' as type,
+          'Account' as title,
+          'Signed in' as action,
+          CASE 
+            WHEN metadata->>'method' = 'credentials' THEN 'Password login'
+            ELSE 'Login'
+          END as detail,
+          created_at as timestamp,
+          'user' as icon
+        FROM audit_logs
+        WHERE user_id = $1
+        AND action = 'login'
+        AND created_at > NOW() - INTERVAL '7 days'
+      )
+      SELECT * FROM recent_activity
+      ORDER BY timestamp DESC
+      LIMIT 20`,
+      [userId]
+    );
+
+    // Format the activity data with relative time
+    const activities = activityResult.rows.map(activity => {
+      const timestamp = new Date(activity.timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - timestamp.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      let relativeTime;
+      if (diffMins < 1) {
+        relativeTime = 'just now';
+      } else if (diffMins < 60) {
+        relativeTime = `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+      } else if (diffHours < 24) {
+        relativeTime = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      } else if (diffDays < 30) {
+        relativeTime = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      } else {
+        relativeTime = timestamp.toLocaleDateString();
+      }
+
+      return {
+        type: activity.type,
+        title: activity.title,
+        action: activity.action,
+        detail: activity.detail,
+        timestamp: activity.timestamp,
+        relativeTime,
+        icon: activity.icon
+      };
+    });
+
+    // Get activity summary
+    const summaryResult = await query(
+      `SELECT 
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as today_count,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as week_count,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as month_count
+       FROM audit_logs
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    const summary = {
+      todayCount: parseInt(summaryResult.rows[0]?.today_count) || 0,
+      weekCount: parseInt(summaryResult.rows[0]?.week_count) || 0,
+      monthCount: parseInt(summaryResult.rows[0]?.month_count) || 0
+    };
+
+    return NextResponse.json({
+      activities,
+      summary
+    });
+  } catch (error) {
+    console.error('Dashboard activity error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch activity' },
+      { status: 500 }
+    );
+  }
+}

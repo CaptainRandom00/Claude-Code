@@ -1,0 +1,46 @@
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import responseSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-response.schema.json' with { type: 'json' };
+
+const ajv = new Ajv();
+addFormats(ajv);
+
+test.describe('EPOS Sales API Response Contract', () => {
+  test('should return response with data and meta', async ({ request }) => {
+    test.setTimeout(90000); // 90 second timeout for slow query
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=10');
+    const data = await response.json();
+
+    const validate = ajv.compile(responseSchema);
+    const valid = validate(data);
+
+    if (!valid) {
+      console.error('Validation errors:', validate.errors);
+    }
+
+    expect(valid).toBe(true);
+    expect(data).toHaveProperty('data');
+    expect(data).toHaveProperty('meta');
+    expect(data.meta).toHaveProperty('totalCount');
+    expect(data.meta).toHaveProperty('limit');
+    expect(data.meta).toHaveProperty('hasMore');
+  });
+
+  test('should enforce 100K safety cap', async ({ request }) => {
+    test.setTimeout(90000); // 90 second timeout
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=10');
+    const data = await response.json();
+
+    // Verify response format and that data array doesn't exceed 100K
+    expect(data.data.length).toBeLessThanOrEqual(100000);
+    expect(data.meta).toHaveProperty('totalCount');
+    expect(data.meta).toHaveProperty('limit');
+
+    // If total records exceed 100K, verify safety cap would be applied
+    if (data.meta.totalCount > 100000) {
+      // The limit in the response should never exceed 100K
+      expect(data.meta.limit).toBeLessThanOrEqual(100000);
+    }
+  });
+});

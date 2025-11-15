@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Create comprehensive JSDoc parser unit tests with doctrine mocks",
+    "status": "completed",
+    "activeForm": "Creating comprehensive JSDoc parser unit tests with doctrine mocks"
+  },
+  {
+    "content": "Implement tag parsing tests for custom BB System tags",
+    "status": "completed",
+    "activeForm": "Implementing tag parsing tests for custom BB System tags"
+  },
+  {
+    "content": "Add metadata validation and extraction accuracy tests",
+    "status": "completed",
+    "activeForm": "Adding metadata validation and extraction accuracy tests"
+  },
+  {
+    "content": "Create error handling tests for malformed JSDoc comments",
+    "status": "completed",
+    "activeForm": "Creating error handling tests for malformed JSDoc comments"
+  },
+  {
+    "content": "Add complex tag combinations and nested structures tests",
+    "status": "completed",
+    "activeForm": "Adding complex tag combinations and nested structures tests"
+  },
+  {
+    "content": "Implement service method signature extraction tests",
+    "status": "completed",
+    "activeForm": "Implementing service method signature extraction tests"
+  },
+  {
+    "content": "Add performance testing for large service files",
+    "status": "completed",
+    "activeForm": "Adding performance testing for large service files"
+  },
+  {
+    "content": "Validate test coverage targets >95%",
+    "status": "in_progress",
+    "activeForm": "Validating test coverage targets >95%"
+  }
+]

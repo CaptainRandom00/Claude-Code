@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+import { chromium } from 'playwright';
+
+async function test() {
+  const browser = await chromium.launch({ headless: false }); // Non-headless to see what happens
+  const page = await browser.newPage();
+
+  page.on('console', msg => console.log(`[${msg.type()}]`, msg.text()));
+  page.on('pageerror', error => console.log(`[Page Error]`, error.message));
+
+  console.log('Loading builder page...');
+  await page.goto('http://localhost:3000/dashboards/builder');
+  await page.waitForSelector('[data-testid="dashboard-builder"]', { timeout: 10000 });
+  console.log('✅ Builder loaded');
+
+  console.log('Clicking Add Widget...');
+  await page.click('[data-testid="add-widget-button"]');
+  await page.waitForTimeout(1000);
+  console.log('✅ Widget selector opened');
+
+  console.log('Clicking Metric widget...');
+  await page.click('[data-testid="widget-type-metric"]');
+
+  console.log('Waiting 3 seconds...');
+  await page.waitForTimeout(3000);
+
+  console.log('Current URL:', page.url());
+  console.log('Looking for configurator...');
+
+  const html = await page.content();
+  console.log('Page has', html.length, 'characters');
+  console.log('Contains "data-testid":', html.includes('data-testid'));
+  console.log('Contains "data-source-configurator":', html.includes('data-source-configurator'));
+
+  await page.screenshot({ path: 'debug-screenshot.png', fullPage: true });
+  console.log('Screenshot saved');
+
+  await page.waitForTimeout(5000); // Keep browser open to inspect
+  await browser.close();
+}
+
+test().catch(console.error);

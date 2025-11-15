@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Fix date filtering logic - debug why wrong dates are returned",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "104"
+  },
+  {
+    "content": "Fix JOIN operations to prevent record duplication",
+    "status": "pending",
+    "priority": "high",
+    "id": "105"
+  },
+  {
+    "content": "Test and validate single-day filtering works correctly",
+    "status": "pending",
+    "priority": "medium",
+    "id": "106"
+  },
+  {
+    "content": "Verify metrics calculations are accurate after fixes",
+    "status": "pending",
+    "priority": "medium",
+    "id": "107"
+  }
+]

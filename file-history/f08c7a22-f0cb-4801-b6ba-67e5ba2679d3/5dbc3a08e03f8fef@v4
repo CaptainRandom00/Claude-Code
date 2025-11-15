@@ -1,0 +1,463 @@
+# Tasks: Product Image Management for Stock Profiles
+
+**Feature**: 025-product-image-management
+**Branch**: `025-product-image-management`
+**Input**: Design documents from `/specs/025-product-image-management/`
+**Prerequisites**: ✅ plan.md, research.md, data-model.md, contracts/, quickstart.md
+
+---
+
+## Execution Summary
+
+**Total Tasks**: 27
+**Estimated Time**: ~6.5 hours
+**Parallel Opportunities**: 15 tasks marked [P]
+**Critical Path**: Setup → Schema → Backend → Frontend → Testing → Documentation
+
+---
+
+## Tech Stack (from plan.md)
+- **Language**: TypeScript 5.7.2, Node.js 18+ (ES modules)
+- **Backend**: Express 4.21.1, Sharp 0.33.5, Multer 1.4.5, Drizzle ORM 0.36.4
+- **Frontend**: React 18.3.1, TanStack Query 5.69.2, shadcn/ui
+- **Database**: MySQL 8.0+ (JSON fields for metadata)
+- **Testing**: Playwright 1.55.0, Jest 29.7.0, @testing-library/react 16.1.0
+- **Storage**: File system (`/uploads/product-images/{itemCode}/`)
+- **Structure**: web (backend: `server/`, frontend: `client/src/`)
+
+---
+
+## Phase 3.1: Setup & Prerequisites
+
+- [x] **T001** [P] Create database migration script `db/migrations/001_add_product_images.sql`
+  - Add 4 columns to product_profiles: primary_image_path, image_metadata, image_count, last_image_updated
+  - Add check constraint: image_count between 0 and 5
+  - Add index: idx_product_profiles_has_images on image_count
+  - Reference: data-model.md section "Database Migration Plan"
+
+- [x] **T002** [P] Create TypeScript types in `shared/types/product-images.ts`
+  - Export ProductImage interface (id, originalName, storedName, path, thumbnailPath, size, width, height, format, isPrimary, uploadedAt)
+  - Export UploadImageRequest, UploadImageResponse, SetPrimaryImageRequest, DeleteImageRequest interfaces
+  - Reference: data-model.md section "Product Image (Virtual Entity)"
+
+- [x] **T003** [P] Update Drizzle schema in `shared/schema.ts`
+  - Add primaryImagePath: varchar(500)
+  - Add imageMetadata: json().$type<ProductImage[]>()
+  - Add imageCount: int().default(0)
+  - Add lastImageUpdated: timestamp()
+  - Reference: data-model.md section "Schema Extensions"
+
+- [x] **T004** Create upload directories structure
+  - Create `/public/uploads/product-images/` directory
+  - Create `/public/uploads/product-images-archive/` directory
+  - Add `.gitkeep` files to both directories
+  - Update `.gitignore` to exclude image files but keep directory structure
+  - Reference: research.md section "Image Storage Architecture"
+
+---
+
+## Phase 3.2: Contract Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
+
+**CRITICAL: These tests MUST be written and MUST FAIL before ANY backend implementation**
+
+- [ ] **T005** [P] Contract test POST /:itemCode/images in `tests/contract/product-image-upload.test.ts`
+  - Test multipart/form-data upload with 1-5 images
+  - Assert 200 response with ProductImage[] array
+  - Assert compression stats included
+  - Test 400 for invalid file types (PDF, TXT)
+  - Test 413 for files >10MB
+  - Test 429 for rate limit exceeded
+  - Reference: contracts/product-images-api.yaml POST endpoint
+
+- [ ] **T006** [P] Contract test GET /:itemCode/images in `tests/contract/product-image-list.test.ts`
+  - Test 200 response with images array and count
+  - Assert ProductImage schema compliance
+  - Test 404 for non-existent product
+  - Test empty array for products with no images
+  - Reference: contracts/product-images-api.yaml GET endpoint
+
+- [ ] **T007** [P] Contract test DELETE /:itemCode/images/:imageId in `tests/contract/product-image-delete.test.ts`
+  - Test 200 response with remainingCount
+  - Test 404 for non-existent image
+  - Assert image removed from metadata array
+  - Assert files deleted from filesystem
+  - Reference: contracts/product-images-api.yaml DELETE endpoint
+
+- [ ] **T008** [P] Contract test PUT /:itemCode/images/:imageId/primary in `tests/contract/product-image-primary.test.ts`
+  - Test 200 response with new primaryImagePath
+  - Test 404 for non-existent image
+  - Assert only one image has isPrimary: true
+  - Assert primaryImagePath matches designated image
+  - Reference: contracts/product-images-api.yaml PUT endpoint
+
+---
+
+## Phase 3.3: Backend Core Implementation (ONLY after tests T005-T008 are failing)
+
+- [x] **T009** Create ProductImageService in `server/services/product-image-service.ts`
+  - Implement compressImage(buffer: Buffer): Promise<{ original: Buffer, thumbnail: Buffer, stats: CompressionStats }>
+    - Use Sharp to compress to WebP at 85% quality
+    - Resize to max 1200x1200 maintaining aspect ratio
+    - Generate 300x300 center-cropped thumbnail
+    - Strip EXIF metadata
+    - Return compression statistics
+  - Implement generateFilename(itemCode: string, description: string): string
+    - MD5 hash of itemCode + description + timestamp
+    - Return hash + '.webp' extension
+  - Implement validateImage(file: Express.Multer.File): ValidationResult
+    - Check magic number (not just MIME type)
+    - Validate dimensions ≥100x100px
+    - Validate file size ≤10MB
+  - Implement saveImage(itemCode: string, filename: string, original: Buffer, thumbnail: Buffer): Promise<{ path: string, thumbnailPath: string }>
+    - Create directory `/uploads/product-images/{itemCode}/` if not exists
+    - Write original to `{filename}.webp`
+    - Write thumbnail to `{filename}_thumb.webp`
+    - Return relative paths
+  - Implement deleteImage(path: string, thumbnailPath: string): Promise<void>
+    - Delete both files from filesystem
+    - Handle missing files gracefully
+  - Reference: research.md sections "Image Processing Library", "Thumbnail Generation Strategy"
+
+- [x] **T010** Configure Multer middleware in `server/middleware/upload-config.ts`
+  - Export uploadImages = multer({ storage: memoryStorage(), limits: { fileSize: 10MB, files: 5 }, fileFilter: validateFileType })
+  - Implement validateFileType(req, file, cb) with magic number validation
+  - Add rate limiting: rateLimit({ windowMs: 60000, max: 10 })
+  - Reference: research.md section "File Upload Handling"
+
+- [x] **T011** Extend routes-product-profiles.ts with POST /:itemCode/images endpoint
+  - Add route: `router.post('/:itemCode/images', requireAuth, uploadImages, asyncHandler(async (req, res) => {...}))`
+  - Validate product exists in database
+  - Check current image_count < 5
+  - Process each file with ProductImageService.compressImage()
+  - Generate unique filenames with ProductImageService.generateFilename()
+  - Save images with ProductImageService.saveImage()
+  - Build ProductImage objects with metadata
+  - Set first image as primary if imageCount === 0
+  - Update product_profiles: imageMetadata, imageCount, primaryImagePath, lastImageUpdated
+  - Return { success: true, images, compressionStats }
+  - Reference: contracts/product-images-api.yaml POST endpoint, data-model.md "Business Rules - Upload"
+
+- [x] **T012** Extend routes-product-profiles.ts with GET /:itemCode/images endpoint
+  - Add route: `router.get('/:itemCode/images', requireAuth, asyncHandler(async (req, res) => {...}))`
+  - Query product_profiles for imageMetadata and imageCount
+  - Return { success: true, images: imageMetadata, count: imageCount }
+  - Handle 404 if product not found
+  - Reference: contracts/product-images-api.yaml GET endpoint
+
+- [x] **T013** Extend routes-product-profiles.ts with DELETE /:itemCode/images/:imageId endpoint
+  - Add route: `router.delete('/:itemCode/images/:imageId', requireAuth, asyncHandler(async (req, res) => {...}))`
+  - Load product imageMetadata array
+  - Find image by imageId, return 404 if not found
+  - Call ProductImageService.deleteImage(path, thumbnailPath)
+  - Remove image from imageMetadata array
+  - If deleted image was primary, set first remaining image as primary
+  - If no images remain, set primaryImagePath to NULL
+  - Update product_profiles: imageMetadata, imageCount, primaryImagePath, lastImageUpdated
+  - Return { success: true, message: "Image deleted successfully", remainingCount }
+  - Reference: contracts/product-images-api.yaml DELETE endpoint, data-model.md "Business Rules - Delete"
+
+- [x] **T014** Extend routes-product-profiles.ts with PUT /:itemCode/images/:imageId/primary endpoint
+  - Add route: `router.put('/:itemCode/images/:imageId/primary', requireAuth, asyncHandler(async (req, res) => {...}))`
+  - Load product imageMetadata array
+  - Find image by imageId, return 404 if not found
+  - Set all images' isPrimary to false
+  - Set selected image's isPrimary to true
+  - Update primaryImagePath to selected image's path
+  - Update product_profiles: imageMetadata, primaryImagePath, lastImageUpdated
+  - Return { success: true, message: "Image set as primary", primaryImagePath }
+  - Reference: contracts/product-images-api.yaml PUT endpoint, data-model.md "Business Rules - Set Primary"
+
+---
+
+## Phase 3.4: Frontend Components (Parallel after T009-T014 complete)
+
+- [ ] **T015** [P] Create ProductImageManager component in `client/src/components/product-profiles/ProductImageManager.tsx`
+  - Accept props: { itemCode: string, images: ProductImage[], imageCount: number, onUpdate: () => void }
+  - Render empty state when imageCount === 0: "No images yet. Drag images here or click to browse"
+  - Render image count badge: "{imageCount}/5" or "{imageCount}/5 (max)"
+  - Render 4-column thumbnail grid (150x150px display size)
+  - Display gold star badge on primary image (isPrimary === true)
+  - Handle thumbnail click → open ImageCarousel
+  - Disable upload when imageCount >= 5
+  - Use TanStack Query for optimistic updates
+  - Reference: quickstart.md "Test Scenario 1", data-model.md "State Transitions"
+
+- [ ] **T016** [P] Create ImageCarousel component in `client/src/components/product-profiles/ImageCarousel.tsx`
+  - Accept props: { images: ProductImage[], initialIndex: number, itemCode: string, onClose: () => void, onDelete: (imageId: string) => void, onSetPrimary: (imageId: string) => void }
+  - Render full-screen modal with Dialog component (shadcn/ui)
+  - Display image at max 800x800px
+  - Show image counter: "Image {currentIndex + 1} of {images.length}"
+  - Implement prev/next arrow buttons
+  - Implement keyboard navigation: Left/Right arrow keys, ESC to close
+  - Render "Set as Primary" button (disabled if already primary)
+  - Render "Delete" button → show confirmation dialog
+  - Handle carousel wrap-around (last → first, first → last)
+  - Reference: quickstart.md "Test Scenario 3", spec.md "Functional Requirements FR-025.21-032"
+
+- [ ] **T017** [P] Create ImageUploadZone component in `client/src/components/product-profiles/ImageUploadZone.tsx`
+  - Accept props: { itemCode: string, currentCount: number, onUploadSuccess: (images: ProductImage[]) => void }
+  - Implement drag-and-drop with drop zone highlighting
+  - Implement file browser fallback button
+  - Show upload progress indicator with percentage
+  - Display compression stats after successful upload: "Original: 5MB → Compressed: 800KB"
+  - Validate file types client-side (JPG, JPEG, PNG, WEBP)
+  - Disable upload when currentCount >= 5
+  - Show error toast for validation failures
+  - Use fetch/axios for multipart/form-data upload to POST /:itemCode/images
+  - Reference: quickstart.md "Test Scenario 1", spec.md "Functional Requirements FR-025.1-010"
+
+- [ ] **T018** [P] Create useProductImages hook in `client/src/hooks/useProductImages.ts`
+  - Export useProductImages(itemCode: string) hook
+  - Use TanStack Query's useQuery for fetching images: GET /:itemCode/images
+  - Use useMutation for upload: POST /:itemCode/images
+  - Use useMutation for delete: DELETE /:itemCode/images/:imageId
+  - Use useMutation for setPrimary: PUT /:itemCode/images/:imageId/primary
+  - Implement optimistic updates for delete and setPrimary actions
+  - Implement 5-minute stale time for caching (NFR-025.69)
+  - Handle error states with toast notifications
+  - Return { images, imageCount, isLoading, upload, deleteImage, setPrimary, refetch }
+  - Reference: research.md "Performance Optimization Strategies - Caching Strategy"
+
+- [ ] **T019** Integrate ProductImageManager into EditProductPopup in `client/src/components/product-profiles/EditProductPopup.tsx`
+  - Import ProductImageManager component
+  - Add after Packaging & Units section (after line 467)
+  - Render Card with title "Product Images (Max 5)"
+  - Pass itemCode from product data
+  - Use useProductImages hook for data and mutations
+  - Handle product save: persist imageMetadata changes
+  - Reference: spec.md "Integration Points - Product Profile Edit Modal"
+
+---
+
+## Phase 3.5: Unit Tests (Parallel after implementation complete)
+
+- [ ] **T020** [P] Unit test ProductImageService compression in `tests/unit/product-image-service.test.ts`
+  - Test compressImage() achieves 60-80% reduction
+  - Test max dimensions 1200x1200 with aspect ratio preservation
+  - Test thumbnail 300x300 center-cropped
+  - Test EXIF stripping
+  - Test compression completes within 5 seconds (NFR-025.5)
+  - Test thumbnail generation completes within 2 seconds (NFR-025.6)
+  - Reference: research.md "WebP Compression Strategy", spec.md "Non-Functional Requirements NFR-025.5-6"
+
+- [ ] **T021** [P] Unit test ProductImageService validation in `tests/unit/product-image-validation.test.ts`
+  - Test validateImage() rejects non-image files (PDF, TXT)
+  - Test validateImage() rejects files >10MB
+  - Test validateImage() rejects images <100x100px
+  - Test validateImage() accepts JPG, JPEG, PNG, WEBP
+  - Test magic number validation (not just MIME type)
+  - Reference: spec.md "Functional Requirements FR-025.51-058", research.md "Security Best Practices"
+
+---
+
+## Phase 3.6: Integration Tests (Sequential after T020-T021)
+
+- [ ] **T022** Integration test upload flow in `tests/integration/product-image-upload.test.ts`
+  - Test complete flow: multipart upload → compression → thumbnail → database save → file write
+  - Test first upload sets isPrimary automatically
+  - Test 5-image limit enforcement
+  - Test concurrent uploads (5 images at once)
+  - Test database imageMetadata and imageCount updated correctly
+  - Test filesystem files created at correct paths
+  - Test atomic operation (all-or-nothing on failure)
+  - Reference: quickstart.md "Test Scenario 1", spec.md "Functional Requirements FR-025.1-010"
+
+- [ ] **T023** Integration test delete flow in `tests/integration/product-image-delete.test.ts`
+  - Test image removed from database imageMetadata array
+  - Test files deleted from filesystem (original + thumbnail)
+  - Test primary image reassignment when primary deleted
+  - Test imageCount decremented correctly
+  - Test primaryImagePath set to NULL when last image deleted
+  - Test orphaned file cleanup
+  - Reference: quickstart.md "Test Scenario 5", spec.md "Functional Requirements FR-025.33-040"
+
+---
+
+## Phase 3.7: Playwright E2E Tests (Sequential after T022-T023)
+
+- [ ] **T024** Playwright E2E test all 8 quickstart scenarios in `tests/playwright/product-image-management.spec.ts`
+  - **Scenario 1**: First-time image upload (drag-drop, progress, compression stats, empty state)
+  - **Scenario 2**: Image limit enforcement (5-image max, upload button disabled)
+  - **Scenario 3**: Carousel viewer navigation (keyboard arrows, click navigation, ESC to close)
+  - **Scenario 4**: Primary image management (gold star indicator, set primary action)
+  - **Scenario 5**: Image deletion (confirmation dialog, optimistic UI, reordering)
+  - **Scenario 6**: File validation (invalid types, size limits, dimension checks)
+  - **Scenario 7**: Performance validation (API <200ms, compression <5s, thumbnails <2s)
+  - **Scenario 8**: Edge cases (network failure, close during upload, rapid clicks)
+  - Capture screenshots for each scenario
+  - Test across Chrome, Firefox, Safari (WebKit)
+  - Save test logs to `specs/025-product-image-management/audit/playwright-logs/`
+  - Reference: quickstart.md all scenarios, spec.md "Acceptance Scenarios"
+
+---
+
+## Phase 3.8: Documentation & Finalization
+
+- [ ] **T025** Create audit folder structure
+  - Create `specs/025-product-image-management/audit/` directory
+  - Create subdirectories: `playwright-logs/`, `failure-analysis/`, `screenshots/`
+  - Add `.gitkeep` files to maintain structure
+  - Create `final-validation-report.md` template
+  - Reference: plan.md "Post-Design Constitution Check - Principle VI"
+
+- [ ] **T026** Update route registry
+  - Run `npm run routes:update` to register 4 new endpoints
+  - Verify routes.registry.json includes:
+    - POST /api/product-profiles/:itemCode/images
+    - GET /api/product-profiles/:itemCode/images
+    - DELETE /api/product-profiles/:itemCode/images/:imageId
+    - PUT /api/product-profiles/:itemCode/images/:imageId/primary
+  - Capture output to `.specify/memory/route-update.log`
+  - Reference: plan.md "Constitution Check - Principle X"
+
+- [ ] **T027** Run quickstart.md validation
+  - Execute all 8 test scenarios from quickstart.md manually
+  - Verify database integrity with SQL queries
+  - Verify filesystem integrity (no orphaned files)
+  - Test regression: existing product profile functionality unchanged
+  - Document results in `specs/025-product-image-management/audit/final-validation-report.md`
+  - Reference: quickstart.md "Success Criteria"
+
+---
+
+## Dependencies
+
+### Critical Path
+```
+T001-T004 (Setup)
+  → T005-T008 (Contract Tests - MUST FAIL)
+    → T009-T014 (Backend Implementation - Tests should now PASS)
+      → T015-T019 (Frontend Components)
+        → T020-T023 (Unit & Integration Tests)
+          → T024 (Playwright E2E)
+            → T025-T027 (Documentation & Finalization)
+```
+
+### Blocking Relationships
+- **T001, T002, T003** must complete before **T009** (service needs types and schema)
+- **T004** must complete before **T011** (upload endpoint needs directories)
+- **T005-T008** must complete and FAIL before **T009-T014** (TDD requirement)
+- **T009** blocks **T010, T011, T013, T014** (service used by routes)
+- **T011-T014** block **T015-T019** (frontend needs working APIs)
+- **T015-T018** block **T019** (components must exist before integration)
+- **T020-T023** should complete before **T024** (unit/integration before E2E)
+- **T024** blocks **T027** (E2E tests must pass before final validation)
+
+### Independent (Can Run in Parallel)
+- **T001, T002, T003, T004** [P] - All setup tasks
+- **T005, T006, T007, T008** [P] - Contract tests (different files)
+- **T015, T016, T017, T018** [P] - Frontend components (different files)
+- **T020, T021** [P] - Unit tests (different files)
+
+---
+
+## Parallel Execution Examples
+
+### Batch 1: Setup Tasks (T001-T004)
+```bash
+# Run all setup tasks concurrently
+Task: "Create database migration script db/migrations/001_add_product_images.sql"
+Task: "Create TypeScript types in shared/types/product-images.ts"
+Task: "Update Drizzle schema in shared/schema.ts"
+Task: "Create upload directories structure"
+```
+
+### Batch 2: Contract Tests (T005-T008)
+```bash
+# Write all contract tests in parallel (they should all FAIL initially)
+Task: "Contract test POST /:itemCode/images in tests/contract/product-image-upload.test.ts"
+Task: "Contract test GET /:itemCode/images in tests/contract/product-image-list.test.ts"
+Task: "Contract test DELETE /:itemCode/images/:imageId in tests/contract/product-image-delete.test.ts"
+Task: "Contract test PUT /:itemCode/images/:imageId/primary in tests/contract/product-image-primary.test.ts"
+```
+
+### Batch 3: Frontend Components (T015-T018)
+```bash
+# Build all frontend components concurrently after backend is complete
+Task: "Create ProductImageManager component in client/src/components/product-profiles/ProductImageManager.tsx"
+Task: "Create ImageCarousel component in client/src/components/product-profiles/ImageCarousel.tsx"
+Task: "Create ImageUploadZone component in client/src/components/product-profiles/ImageUploadZone.tsx"
+Task: "Create useProductImages hook in client/src/hooks/useProductImages.ts"
+```
+
+### Batch 4: Unit Tests (T020-T021)
+```bash
+# Run unit tests in parallel
+Task: "Unit test ProductImageService compression in tests/unit/product-image-service.test.ts"
+Task: "Unit test ProductImageService validation in tests/unit/product-image-validation.test.ts"
+```
+
+---
+
+## Quality Gates
+
+### After Phase 3.1 (Setup - T001-T004)
+- ✅ Migration script runs without SQL errors
+- ✅ TypeScript compilation succeeds
+- ✅ Upload directories exist with correct permissions
+
+### After Phase 3.2 (Contract Tests - T005-T008)
+- ✅ All 4 contract tests written
+- ✅ All 4 contract tests FAIL (expected - no implementation yet)
+- ✅ Test assertions cover happy path and error cases
+
+### After Phase 3.3 (Backend - T009-T014)
+- ✅ All 4 contract tests now PASS
+- ✅ API responds within <200ms (constitutional requirement)
+- ✅ Image compression achieves 60-80% reduction
+- ✅ No TypeScript compilation errors
+- ✅ Server starts without errors
+
+### After Phase 3.4 (Frontend - T015-T019)
+- ✅ All components render without errors
+- ✅ TypeScript compilation succeeds
+- ✅ Dev server starts successfully
+- ✅ No console errors in browser
+
+### After Phase 3.5-3.6 (Unit & Integration Tests - T020-T023)
+- ✅ All unit tests pass
+- ✅ All integration tests pass
+- ✅ Code coverage >80% for new code
+- ✅ No flaky tests
+
+### After Phase 3.7 (Playwright E2E - T024)
+- ✅ All 8 quickstart scenarios pass
+- ✅ Tests pass in Chrome, Firefox, Safari
+- ✅ Screenshots captured for each scenario
+- ✅ Test logs saved to audit folder
+
+### After Phase 3.8 (Documentation - T025-T027)
+- ✅ Route registry updated with 4 new endpoints
+- ✅ Audit folder structure created
+- ✅ Final validation report completed
+- ✅ No regressions in existing features
+
+---
+
+## Validation Checklist
+*GATE: Verified before marking feature complete*
+
+- [x] All contracts have corresponding tests (T005-T008 cover all 4 endpoints)
+- [x] All entities have model tasks (T002 creates ProductImage interface)
+- [x] All tests come before implementation (T005-T008 before T009-T014)
+- [x] Parallel tasks truly independent (verified no file conflicts)
+- [x] Each task specifies exact file path (all tasks include full paths)
+- [x] No task modifies same file as another [P] task (verified)
+
+---
+
+## Notes
+
+- **[P] tasks** = Different files, no dependencies, safe for concurrent execution
+- **TDD Critical**: T005-T008 MUST fail before implementing T009-T014
+- **Commit frequently**: Commit after completing each task
+- **Test in isolation**: Verify each task works before moving to next
+- **Avoid**: Vague task descriptions, same-file conflicts in parallel tasks
+- **Performance**: Monitor API response times (must stay <200ms)
+- **Security**: All image operations require authentication (requireAuth middleware)
+
+---
+
+**Tasks Status**: ✅ Ready for Execution
+**Generated**: 2025-10-07
+**Next Command**: `/implement` (when ready to execute tasks)

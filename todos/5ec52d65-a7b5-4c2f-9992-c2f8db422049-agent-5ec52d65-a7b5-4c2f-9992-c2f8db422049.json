@@ -1,0 +1,67 @@
+[
+  {
+    "content": "Create the output directory structure manually",
+    "status": "completed",
+    "activeForm": "Creating the output directory structure manually"
+  },
+  {
+    "content": "Kill running test processes",
+    "status": "completed",
+    "activeForm": "Killing running test processes"
+  },
+  {
+    "content": "Run element categorizer test directly to generate data",
+    "status": "completed",
+    "activeForm": "Running element categorizer test directly to generate data"
+  },
+  {
+    "content": "Fix test navigation to ensure CSS is fully loaded",
+    "status": "completed",
+    "activeForm": "Fixing test navigation to ensure CSS is fully loaded"
+  },
+  {
+    "content": "Run component inventory test with fixed styling",
+    "status": "completed",
+    "activeForm": "Running component inventory test with fixed styling"
+  },
+  {
+    "content": "Generate documentation website with collected data",
+    "status": "completed",
+    "activeForm": "Generating documentation website with collected data"
+  },
+  {
+    "content": "Verify the documentation is properly populated",
+    "status": "completed",
+    "activeForm": "Verifying the documentation is properly populated"
+  },
+  {
+    "content": "Check if JSON data files exist in test-results directory",
+    "status": "completed",
+    "activeForm": "Checking if JSON data files exist in test-results directory"
+  },
+  {
+    "content": "Kill all background processes and restart server cleanly",
+    "status": "completed",
+    "activeForm": "Killing all background processes and restarting server cleanly"
+  },
+  {
+    "content": "Wait for server to start and test site accessibility",
+    "status": "completed",
+    "activeForm": "Waiting for server to start and testing site accessibility"
+  },
+  {
+    "content": "Run a single test to verify data collection works",
+    "status": "completed",
+    "activeForm": "Running a single test to verify data collection works"
+  },
+  {
+    "content": "Run component inventory test to collect more data",
+    "status": "completed",
+    "activeForm": "Running component inventory test to collect more data"
+  },
+  {
+    "content": "Regenerate documentation website with all collected data",
+    "status": "in_progress",
+    "activeForm": "Regenerating documentation website with all collected data"
+  }
+]

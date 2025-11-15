@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Research WordPress 6.8.1 and save to wordpress.md",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "research-wordpress"
+  },
+  {
+    "content": "Research PHP 8.0+ and save to php.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-php"
+  },
+  {
+    "content": "Research MySQL 8.0 and save to mysql.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-mysql"
+  },
+  {
+    "content": "Research Puppeteer 24.12.0 and save to puppeteer.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-puppeteer"
+  },
+  {
+    "content": "Research Playwright and save to playwright.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-playwright"
+  },
+  {
+    "content": "Research Docker and save to docker.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-docker"
+  },
+  {
+    "content": "Research JavaScript ES6+ and save to javascript.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-javascript"
+  },
+  {
+    "content": "Research CSS3 and save to css.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-css"
+  }
+]

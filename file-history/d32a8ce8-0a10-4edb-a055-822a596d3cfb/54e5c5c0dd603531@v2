@@ -1,0 +1,73 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('CMS Visual Check', () => {
+  // Login first
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:3000/signin');
+    await page.fill('input[name="email"]', 'cmukolonga@icloud.com');
+    await page.fill('input[name="password"]', 'your-password-here');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/dashboard');
+  });
+
+  test('Blog CMS page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/admin/blog');
+    await page.waitForLoadState('networkidle');
+
+    // Take screenshot
+    await page.screenshot({
+      path: 'screenshots/admin-blog-page.png',
+      fullPage: true
+    });
+
+    console.log('✅ Blog CMS screenshot saved to: screenshots/admin-blog-page.png');
+  });
+
+  test('Blog creation page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/admin/blog/new');
+    await page.waitForLoadState('networkidle');
+
+    await page.screenshot({
+      path: 'screenshots/admin-blog-new.png',
+      fullPage: true
+    });
+
+    console.log('✅ Blog creation screenshot saved to: screenshots/admin-blog-new.png');
+  });
+
+  test('Case Studies CMS page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/admin/case-studies');
+    await page.waitForLoadState('networkidle');
+
+    await page.screenshot({
+      path: 'screenshots/admin-case-studies-page.png',
+      fullPage: true
+    });
+
+    console.log('✅ Case Studies CMS screenshot saved to: screenshots/admin-case-studies-page.png');
+  });
+
+  test('Case Study creation page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/admin/case-studies/new');
+    await page.waitForLoadState('networkidle');
+
+    await page.screenshot({
+      path: 'screenshots/admin-case-studies-new.png',
+      fullPage: true
+    });
+
+    console.log('✅ Case Study creation screenshot saved to: screenshots/admin-case-studies-new.png');
+  });
+
+  test('Homepage screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+    await page.waitForLoadState('networkidle');
+
+    await page.screenshot({
+      path: 'screenshots/homepage.png',
+      fullPage: true
+    });
+
+    console.log('✅ Homepage screenshot saved to: screenshots/homepage.png');
+  });
+});

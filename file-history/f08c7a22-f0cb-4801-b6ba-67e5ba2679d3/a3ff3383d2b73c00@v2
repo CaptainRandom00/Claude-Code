@@ -1,0 +1,1469 @@
+# Tasks: Sales Analytics Data Access Enhancement
+
+**Feature**: 027-fix-sales-analytics
+**Input**: Design documents from `/specs/027-fix-sales-analytics/`
+**Prerequisites**: plan.md, research.md, data-model.md, contracts/, quickstart.md
+
+---
+
+## Execution Flow (main)
+```
+1. ✅ Load plan.md from feature directory
+   → Tech stack: TypeScript 5.x, React 18+, Express 4.x, TanStack Query 5.x
+   → Structure: Web app (client/ + server/)
+2. ✅ Load optional design documents:
+   → data-model.md: 3 TypeScript interfaces identified
+   → contracts/: 2 JSON schemas found (request + response)
+   → research.md: 5 technical decisions loaded
+   → quickstart.md: 10 test scenarios identified
+3. ✅ Generate tasks by category:
+   → Setup: Database index, dependencies
+   → Tests: 2 contract tests + 8 E2E Playwright tests
+   → Core: Backend (6 tasks) + Frontend (8 tasks)
+   → Integration: Audit trail structure
+   → Polish: Documentation, route registry
+4. ✅ Apply task rules:
+   → Contract tests marked [P]
+   → Playwright tests in same file = sequential
+   → Backend/Frontend on different files = [P] where applicable
+5. ✅ Number tasks sequentially (T001-T033)
+6. ✅ Generate dependency graph
+7. ✅ Create parallel execution guidance
+8. ✅ Validate task completeness
+9. ✅ SUCCESS (33 tasks ready for execution)
+```
+
+---
+
+## Format: `[ID] [P?] Description`
+- **[P]**: Can run in parallel (different files, no dependencies)
+- All tasks include exact file paths
+- TDD approach: Tests before implementation
+
+---
+
+## Phase 3.1: Setup & Database (T001-T002)
+
+### T001: Create Database Composite Index [P]
+**File**: N/A (direct SQL execution)
+**Description**: Create performance optimization index on epos_sales_summaries table
+
+**SQL**:
+```sql
+CREATE INDEX idx_epos_filters
+ON epos_sales_summaries (report_date, supplier, category, item_code, total_net);
+```
+
+**Validation**:
+```sql
+SHOW INDEX FROM epos_sales_summaries WHERE Key_name = 'idx_epos_filters';
+EXPLAIN SELECT COUNT(*) FROM epos_sales_summaries WHERE report_date BETWEEN '2024-01-01' AND '2024-12-31';
+```
+
+**Expected**: Index created, EXPLAIN shows "Using index" for WHERE clauses
+
+**Dependencies**: None (can run in parallel with T002)
+
+---
+
+### T002: Install Additional Dependencies [P]
+**File**: `package.json`
+**Description**: Add Ajv library for JSON schema validation in contract tests
+
+**Commands**:
+```bash
+npm install --save-dev ajv
+```
+
+**Validation**: Check package.json contains ajv in devDependencies
+
+**Dependencies**: None (can run in parallel with T001)
+
+---
+
+## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
+**CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
+
+### T003: Contract Test - API Request Schema [P]
+**File**: `tests/contract/epos-sales-api-request.contract.test.ts`
+**Description**: Create contract test validating /api/epos-sales request parameters against JSON schema
+
+**Test Content**:
+```typescript
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import requestSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-request.schema.json';
+
+const ajv = new Ajv();
+
+test.describe('EPOS Sales API Request Contract', () => {
+  test('should validate request with limit parameter', () => {
+    const params = {
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
+      limit: 5000,
+      offset: 0
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(true);
+  });
+
+  test('should validate request with "all" limit', () => {
+    const params = {
+      limit: 'all',
+      offset: 0,
+      sortBy: 'totalNet',
+      sortOrder: 'desc'
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(true);
+  });
+
+  test('should reject invalid limit values', () => {
+    const params = {
+      limit: 150000, // Exceeds 100K max
+      offset: 0
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(false);
+  });
+});
+```
+
+**Expected**: All tests FAIL initially (endpoint not yet modified)
+
+**Dependencies**: T002 (Ajv library)
+
+---
+
+### T004: Contract Test - API Response Schema [P]
+**File**: `tests/contract/epos-sales-api-response.contract.test.ts`
+**Description**: Create contract test validating /api/epos-sales response format with metadata
+
+**Test Content**:
+```typescript
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import responseSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-response.schema.json';
+
+const ajv = new Ajv();
+
+test.describe('EPOS Sales API Response Contract', () => {
+  test('should return response with data and meta', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=1000');
+    const data = await response.json();
+
+    const validate = ajv.compile(responseSchema);
+    const valid = validate(data);
+
+    if (!valid) {
+      console.error('Validation errors:', validate.errors);
+    }
+
+    expect(valid).toBe(true);
+    expect(data).toHaveProperty('data');
+    expect(data).toHaveProperty('meta');
+    expect(data.meta).toHaveProperty('totalCount');
+    expect(data.meta).toHaveProperty('limit');
+    expect(data.meta).toHaveProperty('hasMore');
+  });
+
+  test('should enforce 100K safety cap', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/epos-sales?limit=all');
+    const data = await response.json();
+
+    expect(data.data.length).toBeLessThanOrEqual(100000);
+    if (data.meta.totalCount > 100000) {
+      expect(data.meta.limit).toBe(100000);
+    }
+  });
+});
+```
+
+**Expected**: All tests FAIL initially (response format not yet changed)
+
+**Dependencies**: T002 (Ajv library)
+
+---
+
+### T005: Create Playwright E2E Test Scaffolding
+**File**: `tests/playwright/sales-analytics-limits.spec.ts`
+**Description**: Create comprehensive E2E test suite for record limit selection functionality
+
+**Test Content**:
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Sales Analytics - Record Limit Selection', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:3000/dashboard');
+    await page.click('text=Sales Aggregation');
+    await page.waitForSelector('[data-testid="sales-analytics-grid"]', { timeout: 10000 });
+  });
+
+  test('T005-1: Change limit to 1,000 records', async ({ page }) => {
+    // Find and click limit dropdown
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=1,000 records');
+
+    // Wait for API call and data reload
+    await page.waitForResponse(resp => resp.url().includes('/api/epos-sales') && resp.url().includes('limit=1000'));
+
+    // Verify display
+    const indicator = await page.textContent('[data-testid="record-count-indicator"]');
+    expect(indicator).toContain('Showing');
+    expect(indicator).toContain('1,000');
+  });
+
+  test('T005-2: Change limit to 25,000 with warning', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=25,000 records');
+
+    // Verify warning appears
+    const warning = await page.waitForSelector('text=Loading large datasets may impact browser performance');
+    expect(warning).toBeTruthy();
+
+    // Verify data loads
+    await page.waitForResponse(resp => resp.url().includes('limit=25000'));
+  });
+
+  test('T005-3: All Records confirmation dialog', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=All Records');
+
+    // Verify confirmation dialog
+    const dialog = await page.waitForSelector('text=This may load');
+    expect(dialog).toBeTruthy();
+
+    // Test cancel
+    await page.click('text=Cancel');
+    // Verify no API call made
+
+    // Test confirm
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=All Records');
+    await page.click('text=Confirm');
+    await page.waitForResponse(resp => resp.url().includes('limit=all'));
+  });
+
+  test('T005-4: Verify loaded count matches limit', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=5,000 records');
+
+    await page.waitForResponse(resp => resp.url().includes('limit=5000'));
+
+    // Count actual rows in table
+    const rows = await page.locator('[data-testid="sales-data-row"]').count();
+    expect(rows).toBeLessThanOrEqual(5000);
+  });
+});
+```
+
+**Expected**: All tests FAIL initially (UI not yet implemented)
+
+**Dependencies**: None (can write tests before implementation)
+
+---
+
+### T006: Create Playwright Server-Side Filtering Tests
+**File**: `tests/playwright/sales-analytics-filtering.spec.ts`
+**Description**: Create E2E tests verifying server-side filtering queries full database
+
+**Test Content**:
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Sales Analytics - Server-Side Filtering', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:3000/dashboard');
+    await page.click('text=Sales Aggregation');
+    await page.waitForSelector('[data-testid="sales-analytics-grid"]');
+  });
+
+  test('T006-1: Filter queries database not client data', async ({ page, request }) => {
+    // Set small limit
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=1,000 records');
+    await page.waitForResponse(resp => resp.url().includes('limit=1000'));
+
+    // Apply filter
+    await page.fill('[data-testid="item-code-filter"]', '12345');
+    await page.click('[data-testid="apply-filters"]');
+
+    // Wait for API call
+    const apiResponse = await page.waitForResponse(resp =>
+      resp.url().includes('/api/epos-sales') && resp.url().includes('itemCode=12345')
+    );
+    const data = await apiResponse.json();
+
+    // Verify totalCount reflects database, not loaded 1000
+    expect(data.meta.totalCount).toBeDefined();
+    // If only 5 records match in DB, totalCount should be 5, not 1000
+    expect(data.meta.filtered).toBe(true);
+  });
+
+  test('T006-2: Multi-filter combination (server-side AND)', async ({ page }) => {
+    await page.fill('[data-testid="start-date-filter"]', '2024-01-01');
+    await page.fill('[data-testid="end-date-filter"]', '2024-12-31');
+    await page.selectOption('[data-testid="supplier-filter"]', 'ABC Distributors');
+    await page.selectOption('[data-testid="category-filter"]', 'Beverages');
+    await page.click('[data-testid="apply-filters"]');
+
+    const apiResponse = await page.waitForResponse(resp => resp.url().includes('/api/epos-sales'));
+    const url = apiResponse.url();
+
+    // Verify all filters in query string
+    expect(url).toContain('startDate=2024-01-01');
+    expect(url).toContain('endDate=2024-12-31');
+    expect(url).toContain('supplier=ABC');
+    expect(url).toContain('category=Beverages');
+
+    const data = await apiResponse.json();
+    expect(data.meta.filtered).toBe(true);
+  });
+
+  test('T006-3: Display shows filtered indicator', async ({ page }) => {
+    await page.fill('[data-testid="item-code-filter"]', 'TEST');
+    await page.click('[data-testid="apply-filters"]');
+
+    await page.waitForResponse(resp => resp.url().includes('itemCode=TEST'));
+
+    const indicator = await page.textContent('[data-testid="record-count-indicator"]');
+    expect(indicator).toContain('(filtered)');
+  });
+});
+```
+
+**Expected**: All tests FAIL initially
+
+**Dependencies**: None
+
+---
+
+### T007: Create Playwright Performance Warning Tests
+**File**: `tests/playwright/sales-analytics-performance.spec.ts`
+**Description**: Create E2E tests for performance warnings and safety caps
+
+**Test Content**:
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Sales Analytics - Performance Warnings', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:3000/dashboard');
+    await page.click('text=Sales Aggregation');
+    await page.waitForSelector('[data-testid="sales-analytics-grid"]');
+  });
+
+  test('T007-1: Warning appears for >25K limit', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=50,000 records');
+
+    const warning = await page.waitForSelector('text=may impact browser performance');
+    expect(warning).toBeTruthy();
+  });
+
+  test('T007-2: No warning for <=25K limit', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=10,000 records');
+
+    // Should not see warning
+    const warning = page.locator('text=may impact browser performance');
+    await expect(warning).toHaveCount(0);
+  });
+
+  test('T007-3: Safety cap enforced at 100K', async ({ page, request }) => {
+    // Ensure database has >100K records
+    await page.click('[data-testid="record-limit-selector"]');
+    await page.click('text=All Records');
+    await page.click('text=Confirm');
+
+    const apiResponse = await page.waitForResponse(resp => resp.url().includes('limit=all'));
+    const data = await apiResponse.json();
+
+    expect(data.data.length).toBeLessThanOrEqual(100000);
+    expect(data.meta.limit).toBeLessThanOrEqual(100000);
+  });
+
+  test('T007-4: Loading spinner displays during fetch', async ({ page }) => {
+    await page.click('[data-testid="record-limit-selector"]');
+
+    // Start loading large dataset
+    const responsePromise = page.waitForResponse(resp => resp.url().includes('limit=50000'));
+    await page.click('text=50,000 records');
+
+    // Verify spinner appears
+    const spinner = await page.waitForSelector('[data-testid="loading-spinner"]', { timeout: 1000 });
+    expect(spinner).toBeTruthy();
+
+    await responsePromise;
+    // Spinner should disappear after load
+    await expect(page.locator('[data-testid="loading-spinner"]')).toHaveCount(0);
+  });
+});
+```
+
+**Expected**: All tests FAIL initially
+
+**Dependencies**: None
+
+---
+
+## Phase 3.3: Backend Implementation (T008-T015)
+
+### T008: Create TypeScript Type Definitions [P]
+**File**: `shared/types/sales-analytics.ts`
+**Description**: Create TypeScript interfaces for API request/response with metadata
+
+**Code**:
+```typescript
+/**
+ * Metadata about query results
+ * Returned with all /api/epos-sales responses
+ */
+export interface QueryMetadata {
+  totalCount: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  filtered: boolean;
+}
+
+/**
+ * Enhanced EPOS sales API response with metadata
+ */
+export interface EposSalesResponse {
+  data: EposSalesRecord[];
+  meta: QueryMetadata;
+}
+
+/**
+ * Individual EPOS sales record (existing type)
+ */
+export interface EposSalesRecord {
+  id: number;
+  reportDate: string;
+  itemCode: string;
+  unit?: string;
+  description?: string;
+  totalQty?: number;
+  totalNet: number;
+  totalGross?: number;
+  fileName?: string;
+  uploadBatch?: string;
+  uploadedBy?: string;
+  uploadedAt?: string;
+  supplierName?: string;
+  categoryName?: string;
+}
+
+/**
+ * Supported record limit values
+ */
+export type RecordLimit = 1000 | 5000 | 10000 | 25000 | 50000 | 'all';
+
+/**
+ * Record limit option for UI dropdown
+ */
+export interface LimitOption {
+  value: RecordLimit;
+  label: string;
+  requiresWarning: boolean;
+  requiresConfirmation: boolean;
+}
+
+export const LIMIT_OPTIONS: LimitOption[] = [
+  { value: 1000, label: '1,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 5000, label: '5,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 10000, label: '10,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 25000, label: '25,000 records', requiresWarning: true, requiresConfirmation: false },
+  { value: 50000, label: '50,000 records', requiresWarning: true, requiresConfirmation: false },
+  { value: 'all', label: 'All Records', requiresWarning: true, requiresConfirmation: true }
+];
+
+export const MAX_SAFE_RECORDS = 100000;
+```
+
+**Validation**: TypeScript compilation succeeds, types exported
+
+**Dependencies**: None (can run in parallel)
+
+---
+
+### T009: Create Zod Validation Schema [P]
+**File**: `server/validation/epos-sales-query.ts`
+**Description**: Create Zod schema for /api/epos-sales query parameter validation
+
+**Code**:
+```typescript
+import { z } from 'zod';
+
+export const EposSalesQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  supplier: z.string().min(1).max(255).optional(),
+  category: z.string().min(1).max(255).optional(),
+  itemCode: z.string().min(1).max(50).optional(),
+  sortBy: z.enum(['totalNet', 'totalQty', 'reportDate']).default('totalNet'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  limit: z.union([
+    z.coerce.number().int().min(1).max(100000),
+    z.literal('all')
+  ]).transform(val => val === 'all' ? 100000 : val).default(10000),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+
+export type EposSalesQuery = z.infer<typeof EposSalesQuerySchema>;
+```
+
+**Validation**: TypeScript compilation succeeds
+
+**Dependencies**: None (can run in parallel with T008)
+
+---
+
+### T010: Extract Query Logic to Service Layer
+**File**: `server/services/epos-analytics-service.ts`
+**Description**: Create service class to handle EPOS sales query logic (COUNT + data queries)
+
+**Code Outline**:
+```typescript
+import type { EposSalesQuery } from '../validation/epos-sales-query';
+import type { QueryMetadata, EposSalesRecord } from '../../shared/types/sales-analytics';
+
+interface QueryResult {
+  records: EposSalesRecord[];
+  totalCount: number;
+  appliedLimit: number;
+  appliedOffset: number;
+}
+
+export class EposAnalyticsService {
+  /**
+   * Query EPOS sales data with filtering, counting, and pagination
+   */
+  async querySalesData(params: EposSalesQuery): Promise<QueryResult> {
+    const { limit, offset, ...filters } = params;
+
+    // Build WHERE clause from filters
+    const { whereClause, whereParams } = this.buildWhereClause(filters);
+
+    // COUNT query (same filters, no LIMIT)
+    const countQuery = `SELECT COUNT(*) as total FROM epos_sales_summaries ${whereClause}`;
+    const [countResult] = await this.executeQuery(countQuery, whereParams);
+    const totalCount = countResult[0].total;
+
+    // Apply safety cap
+    const MAX_SAFE_RECORDS = 100000;
+    const effectiveLimit = Math.min(limit, MAX_SAFE_RECORDS);
+
+    // Data query with LIMIT and OFFSET
+    const dataQuery = `
+      SELECT * FROM epos_sales_summaries
+      ${whereClause}
+      ORDER BY ${params.sortBy} ${params.sortOrder}
+      LIMIT ? OFFSET ?
+    `;
+    const dataParams = [...whereParams, effectiveLimit, offset];
+    const records = await this.executeQuery(dataQuery, dataParams);
+
+    return {
+      records,
+      totalCount,
+      appliedLimit: effectiveLimit,
+      appliedOffset: offset
+    };
+  }
+
+  private buildWhereClause(filters: any): { whereClause: string; whereParams: any[] } {
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters.reportDate) {
+      conditions.push('DATE(report_date) = ?');
+      params.push(filters.reportDate);
+    }
+    if (filters.startDate && filters.endDate) {
+      conditions.push('report_date BETWEEN ? AND ?');
+      params.push(filters.startDate, filters.endDate);
+    }
+    if (filters.supplier) {
+      conditions.push('supplier = ?');
+      params.push(filters.supplier);
+    }
+    if (filters.category) {
+      conditions.push('category = ?');
+      params.push(filters.category);
+    }
+    if (filters.itemCode) {
+      conditions.push('item_code LIKE ?');
+      params.push(filters.itemCode.length < 5 ? `${filters.itemCode}%` : filters.itemCode);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { whereClause, whereParams: params };
+  }
+
+  private async executeQuery(query: string, params: any[]): Promise<any> {
+    // MySQL connection logic here
+    // Return query results
+  }
+}
+```
+
+**Validation**: TypeScript compilation succeeds, service instantiates
+
+**Dependencies**: T008 (types), T009 (validation schema)
+
+---
+
+### T011: Modify /api/epos-sales Endpoint - Add Validation
+**File**: `server/routes-epos.ts`
+**Description**: Update GET /api/epos-sales to validate request with Zod schema
+
+**Changes** (line ~390):
+```typescript
+import { EposSalesQuerySchema } from './validation/epos-sales-query';
+import { EposAnalyticsService } from './services/epos-analytics-service';
+
+// Get EPOS sales data
+app.get('/api/epos-sales', async (req, res) => {
+  try {
+    // Validate query parameters
+    const validatedQuery = EposSalesQuerySchema.parse(req.query);
+
+    logger.app.info('Fetching EPOS sales data', validatedQuery);
+
+    // ... rest of implementation
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Invalid query parameters',
+        errors: error.errors
+      });
+    }
+    // ... other error handling
+  }
+});
+```
+
+**Validation**: API returns 400 for invalid params
+
+**Dependencies**: T009 (Zod schema)
+
+---
+
+### T012: Modify /api/epos-sales Endpoint - Use Service Layer
+**File**: `server/routes-epos.ts`
+**Description**: Replace direct SQL with EposAnalyticsService.querySalesData()
+
+**Changes**:
+```typescript
+app.get('/api/epos-sales', async (req, res) => {
+  try {
+    const validatedQuery = EposSalesQuerySchema.parse(req.query);
+
+    // Use service layer instead of direct SQL
+    const analyticsService = new EposAnalyticsService();
+    const result = await analyticsService.querySalesData(validatedQuery);
+
+    // Format response with metadata
+    const response: EposSalesResponse = {
+      data: result.records,
+      meta: {
+        totalCount: result.totalCount,
+        limit: result.appliedLimit,
+        offset: result.appliedOffset,
+        hasMore: (result.appliedOffset + result.records.length) < result.totalCount,
+        filtered: this.hasActiveFilters(validatedQuery)
+      }
+    };
+
+    res.json(response);
+  } catch (error) {
+    // ... error handling
+  }
+});
+
+function hasActiveFilters(query: EposSalesQuery): boolean {
+  return !!(query.startDate || query.endDate || query.reportDate ||
+            query.supplier || query.category || query.itemCode);
+}
+```
+
+**Validation**: API returns data with meta object
+
+**Dependencies**: T010 (service layer), T011 (validation)
+
+---
+
+### T013: Update Route Manifest Documentation
+**File**: `server/routes-epos.ts`
+**Description**: Update JSDoc comments at top of file with new parameters
+
+**Changes** (line ~1-30):
+```typescript
+/**
+ * @file routes-epos.ts
+ * @description EPOS sales data routes and file upload endpoints
+ *
+ * @routes
+ * GET /api/epos-sales
+ *   @param {string} [startDate] - Start of date range (YYYY-MM-DD)
+ *   @param {string} [endDate] - End of date range (YYYY-MM-DD)
+ *   @param {string} [reportDate] - Exact report date (YYYY-MM-DD)
+ *   @param {string} [supplier] - Filter by supplier name
+ *   @param {string} [category] - Filter by product category
+ *   @param {string} [itemCode] - Filter by item code (prefix or exact)
+ *   @param {string} [sortBy=totalNet] - Sort field (totalNet|totalQty|reportDate)
+ *   @param {string} [sortOrder=desc] - Sort direction (asc|desc)
+ *   @param {number|string} [limit=10000] - Max records to return (1-100000 or "all")
+ *   @param {number} [offset=0] - Starting position for pagination
+ *   @returns {EposSalesResponse} { data: EposSalesRecord[], meta: QueryMetadata }
+ *   @rateLimit standard
+ *   @auth session-based
+ */
+```
+
+**Validation**: JSDoc complete and accurate
+
+**Dependencies**: T012 (endpoint changes)
+
+---
+
+### T014: Add Performance Logging for Slow Queries
+**File**: `server/services/epos-analytics-service.ts`
+**Description**: Add Winston logging for queries exceeding 200ms threshold
+
+**Changes**:
+```typescript
+import { logger } from '../logger';
+
+async querySalesData(params: EposSalesQuery): Promise<QueryResult> {
+  const startTime = Date.now();
+
+  // ... existing query logic ...
+
+  const duration = Date.now() - startTime;
+
+  if (duration > 200) {
+    logger.warn('Slow EPOS sales query detected', {
+      duration,
+      filters: params,
+      totalCount,
+      limit: effectiveLimit
+    });
+  }
+
+  logger.info('EPOS sales query completed', {
+    duration,
+    totalCount,
+    returnedCount: records.length,
+    limit: effectiveLimit
+  });
+
+  return { records, totalCount, appliedLimit: effectiveLimit, appliedOffset: offset };
+}
+```
+
+**Validation**: Logs appear for queries >200ms
+
+**Dependencies**: T010 (service layer)
+
+---
+
+### T015: Execute Route Registry Update Command
+**File**: N/A (command execution)
+**Description**: Update route registry with modified /api/epos-sales endpoint
+
+**Command**:
+```bash
+npm run routes:update
+```
+
+**Expected Output**: Route registry updated with new limit/offset parameters
+
+**Validation**:
+```bash
+npm run routes:search "epos-sales limit"
+```
+Should show updated endpoint documentation
+
+**Dependencies**: T012 (endpoint modified), T013 (docs updated)
+
+---
+
+## Phase 3.4: Frontend Implementation (T016-T023)
+
+### T016: Create useRecordLimit Custom Hook [P]
+**File**: `client/src/hooks/use-record-limit.ts`
+**Description**: Create React hook for managing record limit state and warnings
+
+**Code**:
+```typescript
+import { useState, useCallback } from 'react';
+import { RecordLimit, LIMIT_OPTIONS } from '../../../shared/types/sales-analytics';
+
+interface UseRecordLimitReturn {
+  limit: RecordLimit;
+  setLimit: (newLimit: RecordLimit) => Promise<boolean>;
+  requiresWarning: boolean;
+  requiresConfirmation: boolean;
+}
+
+export function useRecordLimit(defaultLimit: RecordLimit = 10000): UseRecordLimitReturn {
+  const [limit, setLimitState] = useState<RecordLimit>(defaultLimit);
+
+  const setLimit = useCallback(async (newLimit: RecordLimit): Promise<boolean> => {
+    const option = LIMIT_OPTIONS.find(opt => opt.value === newLimit);
+    if (!option) return false;
+
+    // Show warning for large datasets
+    if (option.requiresWarning) {
+      const confirmed = await showPerformanceWarning();
+      if (!confirmed) return false;
+    }
+
+    // Show confirmation dialog for "All Records"
+    if (option.requiresConfirmation) {
+      const confirmed = await showConfirmationDialog();
+      if (!confirmed) return false;
+    }
+
+    setLimitState(newLimit);
+    return true;
+  }, []);
+
+  const currentOption = LIMIT_OPTIONS.find(opt => opt.value === limit)!;
+
+  return {
+    limit,
+    setLimit,
+    requiresWarning: currentOption.requiresWarning,
+    requiresConfirmation: currentOption.requiresConfirmation
+  };
+}
+
+// Helper functions for dialogs (to be implemented)
+async function showPerformanceWarning(): Promise<boolean> {
+  // TODO: Implement with toast notification
+  return true;
+}
+
+async function showConfirmationDialog(): Promise<boolean> {
+  // TODO: Implement with dialog component
+  return true;
+}
+```
+
+**Validation**: Hook compiles and exports correctly
+
+**Dependencies**: T008 (types)
+
+---
+
+### T017: Add Record Limit Dropdown to UI
+**File**: `client/src/components/dashboard/sales-analytics.tsx`
+**Description**: Add limit selector dropdown to Sales Filters section
+
+**Changes** (insert after existing filter controls, ~line 850):
+```typescript
+import { useRecordLimit } from '../../hooks/use-record-limit';
+import { LIMIT_OPTIONS } from '../../../shared/types/sales-analytics';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// Inside component:
+const { limit, setLimit } = useRecordLimit(10000);
+
+// In JSX (Sales Filters section):
+<div className="space-y-2">
+  <Label htmlFor="record-limit">Records to Load</Label>
+  <Select
+    value={limit.toString()}
+    onValueChange={(value) => {
+      const newLimit = value === 'all' ? 'all' : parseInt(value);
+      setLimit(newLimit as RecordLimit);
+    }}
+  >
+    <SelectTrigger data-testid="record-limit-selector">
+      <SelectValue placeholder="Select limit" />
+    </SelectTrigger>
+    <SelectContent>
+      {LIMIT_OPTIONS.map(option => (
+        <SelectItem key={option.value} value={option.value.toString()}>
+          {option.label}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+```
+
+**Validation**: Dropdown renders, shows 6 options
+
+**Dependencies**: T016 (hook), T008 (types)
+
+---
+
+### T018: Update TanStack Query to Include Limit Parameter
+**File**: `client/src/components/dashboard/sales-analytics.tsx`
+**Description**: Modify useQuery to pass limit/offset to API
+
+**Changes** (line ~247):
+```typescript
+const { data: eposSalesData, refetch: refetchEposData, isLoading: isEposLoading } = useQuery({
+  queryKey: ["/api/epos-sales", queryParams.toString(), limit, offset],
+  queryFn: async () => {
+    const fullParams = new URLSearchParams(queryParams);
+    fullParams.append('limit', limit.toString());
+    fullParams.append('offset', offset.toString());
+    const response = await fetch(`/api/epos-sales?${fullParams.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch EPOS sales data');
+    return response.json() as Promise<EposSalesResponse>;
+  },
+  staleTime: 60000,
+  gcTime: 300000,
+  refetchOnWindowFocus: false,
+});
+```
+
+**Validation**: API calls include limit parameter
+
+**Dependencies**: T017 (limit state), T008 (types)
+
+---
+
+### T019: Update Record Count Display with Metadata
+**File**: `client/src/components/dashboard/sales-analytics.tsx`
+**Description**: Replace simple count with "Showing X of Y records (filtered)" format
+
+**Changes** (line ~894):
+```typescript
+// OLD:
+<span className="text-xs">
+  {eposSalesData?.length || 0} records loaded
+</span>
+
+// NEW:
+<span className="text-xs" data-testid="record-count-indicator">
+  {eposSalesData && eposSalesData.meta ? (
+    <>
+      Showing {eposSalesData.data.length.toLocaleString()} of{' '}
+      {eposSalesData.meta.totalCount.toLocaleString()} records
+      {eposSalesData.meta.filtered && <span className="text-blue-600"> (filtered)</span>}
+    </>
+  ) : (
+    'Loading...'
+  )}
+</span>
+```
+
+**Validation**: Display shows "Showing X of Y records"
+
+**Dependencies**: T018 (API returns metadata)
+
+---
+
+### T020: Add Performance Warning Toast
+**File**: `client/src/hooks/use-record-limit.ts`
+**Description**: Implement showPerformanceWarning() with toast notification
+
+**Changes**:
+```typescript
+import { useToast } from '@/components/ui/use-toast';
+
+async function showPerformanceWarning(): Promise<boolean> {
+  const { toast } = useToast();
+
+  toast({
+    title: '⚠️ Large Dataset Warning',
+    description: 'Loading large datasets may impact browser performance. Continue?',
+    variant: 'warning',
+    duration: 5000
+  });
+
+  // For now, auto-continue after showing warning
+  // In production, could require explicit confirmation
+  return true;
+}
+```
+
+**Validation**: Toast appears for >25K limit
+
+**Dependencies**: T016 (hook skeleton)
+
+---
+
+### T021: Add Confirmation Dialog for "All Records"
+**File**: `client/src/hooks/use-record-limit.ts`
+**Description**: Implement showConfirmationDialog() with AlertDialog component
+
+**Changes**:
+```typescript
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+async function showConfirmationDialog(estimatedCount?: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Render confirmation dialog
+    // (In React, this would typically use a state-driven dialog)
+    // For now, use window.confirm as placeholder
+
+    const message = estimatedCount
+      ? `This may load ${estimatedCount.toLocaleString()} records. Continue?`
+      : 'This will load all available records. Continue?';
+
+    const confirmed = window.confirm(message);
+    resolve(confirmed);
+  });
+}
+```
+
+**Validation**: Dialog appears when selecting "All Records"
+
+**Dependencies**: T016 (hook skeleton)
+
+---
+
+### T022: Implement "Load More" Button
+**File**: `client/src/components/dashboard/sales-analytics.tsx`
+**Description**: Add "Load More" button for incremental pagination
+
+**Changes** (insert after data table, ~line 1100):
+```typescript
+const [offset, setOffset] = useState(0);
+
+// After table:
+{eposSalesData?.meta.hasMore && (
+  <div className="flex justify-center mt-4">
+    <Button
+      onClick={() => {
+        const newOffset = offset + limit;
+        setOffset(newOffset);
+        refetchEposData();
+      }}
+      disabled={isEposLoading}
+      data-testid="load-more-button"
+    >
+      {isEposLoading ? 'Loading...' : 'Load More'}
+    </Button>
+  </div>
+)}
+```
+
+**Validation**: Button appears when hasMore=true, loads next batch
+
+**Dependencies**: T019 (metadata display)
+
+---
+
+### T023: Add Loading Spinner During Data Fetch
+**File**: `client/src/components/dashboard/sales-analytics.tsx`
+**Description**: Show loading spinner overlay during API calls
+
+**Changes**:
+```typescript
+{isEposLoading && (
+  <div className="absolute inset-0 bg-white/50 flex items-center justify-center" data-testid="loading-spinner">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  </div>
+)}
+```
+
+**Validation**: Spinner appears during fetch, disappears on complete
+
+**Dependencies**: T018 (isLoading state)
+
+---
+
+## Phase 3.5: E2E Test Execution & Audit Trail (T024-T027)
+
+### T024: Execute All Playwright Tests - Initial Run
+**File**: N/A (test execution)
+**Description**: Run complete Playwright E2E test suite and document results
+
+**Commands**:
+```bash
+npm run test:playwright -- sales-analytics-limits.spec.ts --project=chromium
+npm run test:playwright -- sales-analytics-filtering.spec.ts --project=chromium
+npm run test:playwright -- sales-analytics-performance.spec.ts --project=chromium
+```
+
+**Expected**: Tests should now PASS (implementation complete)
+
+**Documentation**: Save results to `specs/027-fix-sales-analytics/audit/test-runs/initial-run-2025-10-10.md`
+
+**Dependencies**: T003-T007 (tests created), T008-T023 (implementation complete)
+
+---
+
+### T025: Document Test Failures (If Any)
+**File**: `specs/027-fix-sales-analytics/audit/failures/issue-NNN-description.md`
+**Description**: For each failing test, create issue document with root cause analysis
+
+**Template**:
+```markdown
+# Issue NNN: [Short Description]
+
+**Test**: [Test file and name]
+**Status**: FAILED
+**Date**: 2025-10-10
+
+## Failure Details
+- **Expected**: [What should happen]
+- **Actual**: [What actually happened]
+- **Screenshot**: ![](../screenshots/issue-NNN.png)
+
+## Root Cause
+[Analysis of why test failed]
+
+## Proposed Fix
+[How to resolve the issue]
+
+## Code Changes
+[Files and changes needed]
+
+## Re-Test Results
+[After fix, document resolution]
+```
+
+**Dependencies**: T024 (test execution)
+
+---
+
+### T026: Cross-Browser Validation
+**File**: N/A (test execution)
+**Description**: Run Playwright tests across Chrome, Firefox, Safari
+
+**Commands**:
+```bash
+npm run test:playwright -- sales-analytics-*.spec.ts --project=chromium
+npm run test:playwright -- sales-analytics-*.spec.ts --project=firefox
+npm run test:playwright -- sales-analytics-*.spec.ts --project=webkit
+```
+
+**Documentation**: Save results to `specs/027-fix-sales-analytics/audit/test-runs/cross-browser-2025-10-10.md`
+
+**Expected**: All tests pass across all 3 browsers
+
+**Dependencies**: T024 (initial tests passing)
+
+---
+
+### T027: Generate Final Validation Report
+**File**: `specs/027-fix-sales-analytics/audit/validation/final-report.md`
+**Description**: Create comprehensive report confirming all requirements validated
+
+**Template**:
+```markdown
+# Final Validation Report: Feature 027
+
+**Date**: 2025-10-10
+**Status**: [PASS/FAIL]
+
+## Test Execution Summary
+- Total Tests: [count]
+- Passed: [count]
+- Failed: [count]
+- Test Coverage: [percentage]
+
+## Functional Requirements Validation
+- ✅ FR-001: Record limit selector (1K, 5K, 10K, 25K, 50K, All)
+- ✅ FR-006: Server-side filtering queries full database
+- ... (all 36 FRs)
+
+## Performance Metrics
+- API Response Time: [avg ms]
+- Browser Memory Usage (50K records): [MB]
+- Safety Cap Enforcement: ✅ Verified
+
+## Cross-Browser Results
+- Chrome: ✅ All tests passed
+- Firefox: ✅ All tests passed
+- Safari: ✅ All tests passed
+
+## Constitutional Compliance
+- Principle VI (E2E Testing): ✅ Complete
+- Principle V (Performance): ✅ <200ms API
+- ... (all applicable principles)
+
+## Recommendations
+[Any post-implementation recommendations]
+
+## Sign-Off
+Feature ready for production deployment: [YES/NO]
+```
+
+**Dependencies**: T026 (cross-browser validation)
+
+---
+
+## Phase 3.6: Documentation & Cleanup (T028-T033)
+
+### T028: Execute Manual Quickstart Scenarios [P]
+**File**: N/A (manual testing)
+**Description**: Execute all 10 scenarios from quickstart.md and document results
+
+**Process**:
+1. Follow `specs/027-fix-sales-analytics/quickstart.md` step-by-step
+2. Capture screenshots for each scenario
+3. Save screenshots to `audit/screenshots/`
+4. Mark each scenario PASS/FAIL
+
+**Validation**: All 10 scenarios pass
+
+**Dependencies**: T024-T027 (automated tests complete)
+
+---
+
+### T029: Update CLAUDE.md with Implementation Status [P]
+**File**: `CLAUDE.md`
+**Description**: Update Recent Changes section with Feature 027 completion
+
+**Changes**:
+```markdown
+### Recent Changes (2025-10-10)
+- **Feature 027 Complete**: Sales Analytics record limit and server-side filtering
+  - Added configurable limit dropdown (1K-100K, All Records)
+  - Implemented server-side filtering (queries full database)
+  - Added performance warnings (>25K) and confirmation dialogs
+  - Created comprehensive Playwright E2E test suite
+  - Modified: server/routes-epos.ts, client/src/components/dashboard/sales-analytics.tsx
+  - New: server/services/epos-analytics-service.ts, shared/types/sales-analytics.ts
+```
+
+**Dependencies**: None (can run in parallel)
+
+---
+
+### T030: Run Type Checking and Linting [P]
+**File**: N/A (command execution)
+**Description**: Verify no TypeScript errors or linting issues
+
+**Commands**:
+```bash
+npm run type-check
+npm run lint
+```
+
+**Expected**: No errors
+
+**Dependencies**: None (can run in parallel)
+
+---
+
+### T031: Verify Database Index Performance
+**File**: N/A (SQL verification)
+**Description**: Run EXPLAIN ANALYZE to confirm index is being used
+
+**SQL**:
+```sql
+EXPLAIN ANALYZE
+SELECT COUNT(*) FROM epos_sales_summaries
+WHERE report_date BETWEEN '2024-01-01' AND '2024-12-31'
+  AND supplier = 'ABC Distributors'
+  AND category = 'Beverages';
+```
+
+**Expected Output**: "Using index idx_epos_filters" in execution plan
+
+**Dependencies**: T001 (index created)
+
+---
+
+### T032: Remove Temporary Test Files [P]
+**File**: N/A (file cleanup)
+**Description**: Remove any temporary test files created during development
+
+**Commands**:
+```bash
+rm -f tests/playwright/*.temp.ts
+rm -f calendar-*.png  # Old test screenshots
+rm -f playwright.config.calendar.ts  # Temporary config from Feature 026
+```
+
+**Dependencies**: None (can run in parallel)
+
+---
+
+### T033: Final Commit and Branch Cleanup
+**File**: N/A (git operations)
+**Description**: Create final commit for Feature 027 with complete changeset
+
+**Commands**:
+```bash
+git add .
+git commit -m "feat: implement sales analytics configurable record limits and server-side filtering (Feature 027)
+
+- Add configurable record limit dropdown (1K, 5K, 10K, 25K, 50K, All Records)
+- Implement true server-side filtering (queries full database, not just loaded records)
+- Add COUNT query to return total matching records with metadata response format
+- Create performance safeguards: warnings >25K, confirmation for All, 100K safety cap
+- Add composite database index on (report_date, supplier, category, item_code, total_net)
+- Extract query logic to EposAnalyticsService for testability
+- Implement Zod validation for API parameters
+- Add \"Load More\" incremental pagination functionality
+- Create comprehensive Playwright E2E test suite (10+ tests)
+- Maintain backward compatibility with existing filters and caching
+
+Modified:
+- server/routes-epos.ts
+- client/src/components/dashboard/sales-analytics.tsx
+
+Added:
+- server/services/epos-analytics-service.ts
+- server/validation/epos-sales-query.ts
+- client/src/hooks/use-record-limit.ts
+- shared/types/sales-analytics.ts
+- tests/playwright/sales-analytics-limits.spec.ts
+- tests/playwright/sales-analytics-filtering.spec.ts
+- tests/playwright/sales-analytics-performance.spec.ts
+- tests/contract/epos-sales-api-*.contract.test.ts
+
+All 36 functional requirements validated via Playwright E2E tests.
+Constitutional Principle VI (E2E Testing & Audit Trail) compliance complete.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+**Dependencies**: T024-T032 (all previous tasks complete)
+
+---
+
+## Dependencies Visualization
+
+```
+Setup Phase:
+T001 [P] Database Index ────┐
+T002 [P] Install Ajv ────────┤
+                             ├──> Tests Phase
+Tests Phase:                 │
+T003 [P] Request Contract ───┤
+T004 [P] Response Contract ──┤
+T005 Playwright Limits ──────┤
+T006 Playwright Filtering ───┤
+T007 Playwright Performance ─┘
+         │
+         ├──> Backend Phase
+         │
+T008 [P] TypeScript Types ───┐
+T009 [P] Zod Schema ─────────┤
+                             ├──> T010 Service Layer ──> T011 Validation ──> T012 Service Usage ──> T013 Docs ──> T014 Logging ──> T015 Registry
+                             │
+                             └──> Frontend Phase
+
+T016 [P] useRecordLimit Hook ──> T017 Limit Dropdown ──> T018 TanStack Query ──> T019 Display ──> T020 Warning ──> T021 Confirmation ──> T022 Load More ──> T023 Spinner
+         │
+         └──> E2E Execution Phase
+
+T024 Initial Test Run ──> T025 Document Failures ──> T026 Cross-Browser ──> T027 Final Report
+         │
+         └──> Cleanup Phase
+
+T028 [P] Manual Quickstart
+T029 [P] Update CLAUDE.md
+T030 [P] Type Check / Lint
+T031 Database Index Verify
+T032 [P] Cleanup Temp Files
+T033 Final Commit
+```
+
+---
+
+## Parallel Execution Opportunities
+
+### Setup (Run Together):
+```bash
+# Terminal 1
+Task: "T001 - Create composite database index on epos_sales_summaries"
+
+# Terminal 2
+Task: "T002 - Install Ajv library for JSON schema validation"
+```
+
+### Contract Tests (Run Together):
+```bash
+# Terminal 1
+Task: "T003 - Create contract test for API request schema validation"
+
+# Terminal 2
+Task: "T004 - Create contract test for API response schema validation"
+```
+
+### Backend Types (Run Together):
+```bash
+# Terminal 1
+Task: "T008 - Create TypeScript type definitions in shared/types/sales-analytics.ts"
+
+# Terminal 2
+Task: "T009 - Create Zod validation schema in server/validation/epos-sales-query.ts"
+```
+
+### Cleanup (Run Together):
+```bash
+# Terminal 1
+Task: "T028 - Execute manual quickstart scenarios from quickstart.md"
+
+# Terminal 2
+Task: "T029 - Update CLAUDE.md with Feature 027 completion status"
+
+# Terminal 3
+Task: "T030 - Run type checking and linting commands"
+
+# Terminal 4
+Task: "T032 - Remove temporary test files and cleanup artifacts"
+```
+
+---
+
+## Task Execution Notes
+
+**TDD Workflow**:
+1. Write tests first (T003-T007) - they MUST fail
+2. Implement backend (T008-T015)
+3. Implement frontend (T016-T023)
+4. Run tests again (T024) - they should now PASS
+5. Cross-browser validation (T026)
+6. Final report (T027)
+
+**Parallel Execution**:
+- Tasks marked [P] can run simultaneously
+- Different files = safe to parallelize
+- Same file = must run sequentially
+
+**Commit Strategy**:
+- Commit after each completed task
+- Use conventional commit format: `feat(task-NNN): description`
+- Final commit (T033) includes all changes with comprehensive message
+
+**Constitutional Compliance**:
+- Principle VI: Audit trail maintained throughout (audit/ folder)
+- Principle V: Performance verified (<200ms API, database index)
+- Principle VIII: E2E testing with Playwright (8+ comprehensive tests)
+
+---
+
+## Total Task Count: 33 Tasks
+
+**Breakdown**:
+- Setup: 2 tasks
+- Tests: 5 tasks (contract + E2E scaffolding)
+- Backend: 8 tasks
+- Frontend: 8 tasks
+- E2E Execution: 4 tasks
+- Documentation/Cleanup: 6 tasks
+
+**Estimated Completion Time**: 12-16 hours (spread across multiple sessions)
+
+**Critical Path**: T001 → T002 → T003-T007 → T008-T015 → T016-T023 → T024-T027 → T028-T033
+
+---
+
+**Tasks Ready for Execution**: All 33 tasks are immediately actionable with specific file paths and code examples.
+
+**Next Action**: Begin with T001 (Database Index) and T002 (Install Ajv) in parallel.

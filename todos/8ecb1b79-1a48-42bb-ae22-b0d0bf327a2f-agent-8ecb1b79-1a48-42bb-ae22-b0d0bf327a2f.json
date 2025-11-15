@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Check git status and diff",
+    "status": "completed",
+    "priority": "high",
+    "id": "git-status-check"
+  },
+  {
+    "content": "Stage changes for commit",
+    "status": "completed",
+    "priority": "high",
+    "id": "git-stage-changes"
+  },
+  {
+    "content": "Create commit with descriptive message",
+    "status": "completed",
+    "priority": "high",
+    "id": "git-commit-changes"
+  },
+  {
+    "content": "Push changes to remote repository",
+    "status": "completed",
+    "priority": "high",
+    "id": "git-push-changes"
+  }
+]

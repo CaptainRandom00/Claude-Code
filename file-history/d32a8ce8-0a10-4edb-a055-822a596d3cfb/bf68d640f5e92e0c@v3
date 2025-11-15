@@ -1,0 +1,236 @@
+// Case Studies API - Single case study operations
+// GET /api/case-studies/[id] - Get single case study
+// PUT /api/case-studies/[id] - Update case study (admin only)
+// DELETE /api/case-studies/[id] - Delete case study (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { query } from '@/lib/db';
+import { caseStudyUpdateSchema } from '@/lib/validations';
+
+type RouteParams = {
+  params: {
+    id: string;
+  };
+};
+
+// GET /api/case-studies/[id] - Get single case study
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = params;
+
+    // Support both numeric ID and slug
+    const isNumeric = /^\d+$/.test(id);
+
+    const queryString = isNumeric
+      ? 'SELECT * FROM case_studies WHERE id = $1'
+      : 'SELECT * FROM case_studies WHERE slug = $1';
+
+    const result = await query(queryString, [isNumeric ? parseInt(id) : id]);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Case study not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching case study:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch case study' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/case-studies/[id] - Update case study (admin only)
+export async function PUT(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+    const body = await request.json();
+
+    // Validate input
+    const validated = caseStudyUpdateSchema.parse({ ...body, id: parseInt(id) });
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (validated.slug !== undefined) {
+      updates.push(`slug = $${paramIndex}`);
+      values.push(validated.slug);
+      paramIndex++;
+    }
+    if (validated.title !== undefined) {
+      updates.push(`title = $${paramIndex}`);
+      values.push(validated.title);
+      paramIndex++;
+    }
+    if (validated.client_name !== undefined) {
+      updates.push(`client_name = $${paramIndex}`);
+      values.push(validated.client_name);
+      paramIndex++;
+    }
+    if (validated.industry !== undefined) {
+      updates.push(`industry = $${paramIndex}`);
+      values.push(validated.industry);
+      paramIndex++;
+    }
+    if (validated.services_used !== undefined) {
+      updates.push(`services_used = $${paramIndex}`);
+      values.push(validated.services_used);
+      paramIndex++;
+    }
+    if (validated.challenge !== undefined) {
+      updates.push(`challenge = $${paramIndex}`);
+      values.push(validated.challenge);
+      paramIndex++;
+    }
+    if (validated.solution !== undefined) {
+      updates.push(`solution = $${paramIndex}`);
+      values.push(validated.solution);
+      paramIndex++;
+    }
+    if (validated.results !== undefined) {
+      updates.push(`results = $${paramIndex}`);
+      values.push(validated.results);
+      paramIndex++;
+    }
+    if (validated.technologies !== undefined) {
+      updates.push(`technologies = $${paramIndex}`);
+      values.push(validated.technologies);
+      paramIndex++;
+    }
+    if (validated.featured_image !== undefined) {
+      updates.push(`featured_image = $${paramIndex}`);
+      values.push(validated.featured_image);
+      paramIndex++;
+    }
+    if (validated.metrics !== undefined) {
+      updates.push(`metrics = $${paramIndex}`);
+      values.push(validated.metrics ? JSON.stringify(validated.metrics) : null);
+      paramIndex++;
+    }
+    if (validated.published !== undefined) {
+      updates.push(`published = $${paramIndex}`);
+      values.push(validated.published);
+      paramIndex++;
+
+      // Auto-set published_at when publishing
+      if (validated.published && validated.published_at === undefined) {
+        updates.push(`published_at = CURRENT_TIMESTAMP`);
+      }
+    }
+    if (validated.published_at !== undefined) {
+      updates.push(`published_at = $${paramIndex}`);
+      values.push(validated.published_at);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    values.push(parseInt(id));
+
+    const queryString = `
+      UPDATE case_studies
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await query(queryString, values);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Case study not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error updating case study:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error.code === '23505') { // Unique violation
+      return NextResponse.json(
+        { error: 'A case study with this slug already exists' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update case study' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/case-studies/[id] - Delete case study (admin only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+
+    const result = await query(
+      'DELETE FROM case_studies WHERE id = $1 RETURNING id',
+      [parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Case study not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error deleting case study:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete case study' },
+      { status: 500 }
+    );
+  }
+}

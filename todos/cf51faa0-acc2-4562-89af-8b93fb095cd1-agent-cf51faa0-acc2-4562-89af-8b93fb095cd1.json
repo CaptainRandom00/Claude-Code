@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Set up Puppeteer test script for site review",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Review homepage layout and functionality",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test navigation and key interactive elements",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check responsive design and mobile view",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Generate screenshots and report findings",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

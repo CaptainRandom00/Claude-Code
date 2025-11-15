@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Examine database configuration to understand connection details",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Check if user 'cmukolonga@icloud.com' exists in the database",
+    "status": "pending",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Verify password hash exists for the user (without exposing it)",
+    "status": "pending",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check user account verification status",
+    "status": "pending",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Look at recent login attempts for this user",
+    "status": "pending",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Check analytics events table for login attempts",
+    "status": "pending",
+    "priority": "medium",
+    "id": "6"
+  }
+]

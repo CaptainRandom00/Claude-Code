@@ -1,0 +1,68 @@
+[
+  {
+    "content": "Create new git branch 'matrix-design' for the redesign",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Implement terminal/matrix-inspired dark theme with green/amber colors",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create code rain animation component for hero section",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Build interactive bridge metaphor with animated particles",
+    "status": "pending",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Replace Services section with terminal-style file tree navigation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Add mini code editor showcase component",
+    "status": "pending",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Implement terminal boot sequence on page load",
+    "status": "pending",
+    "priority": "low",
+    "id": "7"
+  },
+  {
+    "content": "Add command palette (Cmd+K) navigation",
+    "status": "pending",
+    "priority": "low",
+    "id": "8"
+  },
+  {
+    "content": "Update Hero component with matrix theme and terminal styling",
+    "status": "completed",
+    "priority": "high",
+    "id": "9"
+  },
+  {
+    "content": "Update Header component to match matrix theme",
+    "status": "completed",
+    "priority": "high",
+    "id": "10"
+  },
+  {
+    "content": "Test the updated design and fix any issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "11"
+  }
+]

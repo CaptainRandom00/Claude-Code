@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Optimize Docker build files and contexts",
+    "status": "completed",
+    "priority": "high",
+    "id": "optimize-docker-files"
+  },
+  {
+    "content": "Clean rebuild all containers with optimizations",
+    "status": "completed",
+    "priority": "high",
+    "id": "rebuild-containers"
+  },
+  {
+    "content": "Start and test frontend web container",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "start-web-container"
+  },
+  {
+    "content": "Verify end-to-end comment system",
+    "status": "pending",
+    "priority": "high",
+    "id": "verify-e2e-comments"
+  }
+]

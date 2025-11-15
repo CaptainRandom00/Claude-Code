@@ -1,0 +1,106 @@
+/**
+ * @file ProductImageGallery.tsx
+ * @description Compact image gallery for displaying product images at the top of edit modal
+ * Feature: 025-product-image-management
+ */
+
+import React, { useState, useCallback } from 'react';
+import { Star, ImageIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ImageCarousel } from './ImageCarousel';
+import type { ProductImage } from '../../../../shared/types/product-images';
+
+interface ProductImageGalleryProps {
+  itemCode: string;
+  images: ProductImage[];
+  onDelete: (imageId: string) => Promise<void>;
+  onSetPrimary: (imageId: string) => Promise<void>;
+}
+
+/**
+ * Compact image gallery component for modal header
+ */
+export function ProductImageGallery({
+  itemCode,
+  images,
+  onDelete,
+  onSetPrimary,
+}: ProductImageGalleryProps) {
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+
+  /**
+   * Handle thumbnail click
+   */
+  const handleThumbnailClick = useCallback((index: number) => {
+    setSelectedImageIndex(index);
+  }, []);
+
+  /**
+   * Handle carousel close
+   */
+  const handleCarouselClose = useCallback(() => {
+    setSelectedImageIndex(null);
+  }, []);
+
+  // Don't render anything if no images
+  if (images.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* Compact horizontal gallery */}
+      <div className="border-b pb-4 mb-4">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {images.map((image, index) => (
+            <div
+              key={image.id}
+              className="relative flex-shrink-0 group cursor-pointer rounded-md overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-all"
+              onClick={() => handleThumbnailClick(index)}
+            >
+              {/* Thumbnail */}
+              <div className="w-20 h-20 bg-gray-100">
+                <img
+                  src={image.thumbnailPath}
+                  alt={image.originalName}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* Primary badge */}
+              {image.isPrimary && (
+                <div className="absolute top-1 right-1">
+                  <Badge
+                    variant="secondary"
+                    className="gap-0.5 px-1 py-0 text-[10px] bg-yellow-100 text-yellow-800 border-yellow-300"
+                  >
+                    <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                  </Badge>
+                </div>
+              )}
+
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                <p className="text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">
+                  View
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Image carousel */}
+      {selectedImageIndex !== null && images.length > 0 && (
+        <ImageCarousel
+          images={images}
+          initialIndex={selectedImageIndex}
+          itemCode={itemCode}
+          onClose={handleCarouselClose}
+          onDelete={onDelete}
+          onSetPrimary={onSetPrimary}
+        />
+      )}
+    </>
+  );
+}

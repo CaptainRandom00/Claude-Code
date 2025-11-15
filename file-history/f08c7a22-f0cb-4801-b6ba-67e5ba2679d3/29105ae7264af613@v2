@@ -1,0 +1,195 @@
+# Implementation Plan: Complete User Guide Documentation with Screenshots
+
+**Branch**: `029-complete-user-guide` | **Date**: 2025-10-19 | **Spec**: [specs/029-complete-user-guide/spec.md](./spec.md)
+**Input**: Feature specification from `/specs/029-complete-user-guide/spec.md`
+
+**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
+
+## Summary
+
+Create comprehensive, user-friendly documentation with visual step-by-step guides and 50+ screenshots for all 17 major system features. This frontend-focused enhancement transforms technical API documentation into accessible learning resources using React components (UserGuideSection, ScreenshotViewer) and Playwright automation for screenshot capture. Target: <2s page load, 90%+ user satisfaction, 40-60% reduction in support requests.
+
+## Technical Context
+
+**Language/Version**: TypeScript 5.x, React 18+, Node.js 18+
+**Primary Dependencies**: React, shadcn/ui (Card, Tabs, Dialog, Accordion), TanStack Query, Playwright, Sharp (image optimization), Fuse.js (search)
+**Storage**: Static files (public/docs/screenshots/), manifest.json (screenshot metadata)
+**Testing**: Playwright (screenshot automation, E2E testing), React Testing Library (component tests)
+**Target Platform**: Web browsers (Chrome, Firefox, Safari), responsive (desktop 1280x800, tablet 768x1024, mobile 375x667)
+**Project Type**: Web - frontend enhancement to existing documentation.tsx component
+**Performance Goals**: <2s page load, LCP <2.5s, 90% Lighthouse score, lazy loading for 50+ images
+**Constraints**: <10MB total page size, <500KB per PNG screenshot, <200ms search response, accessibility WCAG 2.1 AA
+**Scale/Scope**: 17 feature guides, 50+ screenshots, 100+ tasks documented, search index 500+ entries
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+### ✅ Principle I: Data-First Architecture
+- **Compliance**: PASS
+- **Evidence**: Defined data model in `data-model.md` with complete schema for ScreenshotMetadata, FeatureGuide, SearchIndex
+- **Location**: `specs/029-complete-user-guide/data-model.md`
+
+### ✅ Principle II: Modular Route Organization
+- **Compliance**: NOT APPLICABLE (Frontend-only feature)
+- **Evidence**: No new API routes created - purely React component work
+- **Justification**: See `.specify/memory/route-skip-reason.txt`
+
+### ✅ Principle III: Component-Based UI Development
+- **Compliance**: PASS
+- **Evidence**:
+  - UserGuideSection.tsx - main guide display component
+  - ScreenshotViewer.tsx - image viewer with zoom/annotations
+  - TypeScript interfaces defined in `contracts/` directory
+  - Uses shadcn/ui components (Card, Tabs, Accordion, Dialog)
+- **Location**: `specs/029-complete-user-guide/contracts/`
+
+### ✅ Principle IV: File Processing Excellence
+- **Compliance**: NOT APPLICABLE
+- **Evidence**: No Excel import or file processing required
+- **Note**: Screenshot files are static assets, not processed uploads
+
+### ✅ Principle V: Performance & Monitoring
+- **Compliance**: PASS
+- **Evidence**:
+  - AVIF/WebP compression: 60-70% size reduction
+  - Lazy loading: Intersection Observer with 50px rootMargin
+  - Code splitting: Documentation separate bundle
+  - Service worker caching: <500ms second visit
+  - Performance targets: <2s page load, LCP <2.5s, CLS <0.1
+- **Location**: `specs/029-complete-user-guide/research.md` (Performance Optimization section)
+
+### ✅ Principle VI: End-to-End Testing & Audit Trail
+- **Compliance**: PASS
+- **Evidence**:
+  - Playwright automation for screenshot capture AND E2E testing
+  - Audit structure created: `specs/029-complete-user-guide/audit/`
+  - Test scenarios defined for all 17 features
+  - Screenshot validation and comparison tests
+  - TDD workflow: capture → optimize → validate → document
+- **Audit Structure**: `specs/029-complete-user-guide/audit/` (to be populated during implementation)
+- **Platform**: Web interfaces - Playwright for browser automation across Chrome, Firefox, Safari
+- **Test Coverage**: Complete user workflows for all 17 features
+
+### ✅ Principle VII: Security & Authentication
+- **Compliance**: PASS
+- **Evidence**: Read-only documentation feature, inherits session-based auth from existing documentation.tsx component
+- **Note**: No new authentication or input handling required
+
+### ✅ Principle VIII: Testing & Verification
+- **Compliance**: PASS
+- **Evidence**:
+  - Playwright tests for screenshot capture automation
+  - Visual regression testing with screenshot comparison
+  - Component tests with React Testing Library
+  - Screenshot quality validation (dimensions, file size, format)
+- **Location**: `specs/029-complete-user-guide/research.md` (Screenshot Automation section)
+
+### ✅ Principle IX: API Documentation and Route Mapping System
+- **Compliance**: NOT APPLICABLE
+- **Evidence**: Frontend-only feature, no API routes created
+- **Justification**: See `.specify/memory/route-skip-reason.txt`
+
+### ✅ Principle X: Intelligent API Development & Reuse
+- **Compliance**: NOT APPLICABLE (Skip conditions met)
+- **Evidence**: Frontend-only changes - styling, UI components, static content
+- **Skip Documentation**: `.specify/memory/route-skip-reason.txt`
+- **Detection**: No API keywords (endpoint, route, REST, HTTP, webhook, service, backend, server)
+- **File Patterns**: Only affects `client/src/components/`, `public/docs/screenshots/`, no `server/` changes
+
+### Constitution Check Summary
+- **Pass**: 6/6 applicable principles
+- **Not Applicable**: 4 principles (backend/API focused)
+- **Overall**: ✅ PASS - Ready for implementation
+
+## Project Structure
+
+### Documentation (this feature)
+
+```
+specs/029-complete-user-guide/
+├── spec.md              # Feature specification
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command output)
+├── data-model.md        # Phase 1 output (/speckit.plan command output)
+├── quickstart.md        # Phase 1 output (/speckit.plan command output)
+├── contracts/           # Phase 1 output (/speckit.plan command output)
+│   ├── UserGuideSection.ts        # UserGuideSection component interfaces
+│   ├── ScreenshotViewer.ts        # ScreenshotViewer component interfaces
+│   ├── DocumentationSearch.ts     # Search functionality interfaces
+│   └── ScreenshotMetadata.ts      # Screenshot metadata and capture interfaces
+├── audit/               # Phase 2 E2E testing and audit trail (created during implementation)
+│   ├── screenshot-capture-results.md
+│   ├── component-test-results.md
+│   └── e2e-test-results.md
+└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+```
+
+### Source Code (repository root)
+
+**Web Application Structure** (frontend enhancement to existing documentation component):
+
+```
+client/
+├── src/
+│   ├── components/
+│   │   ├── dashboard/
+│   │   │   ├── documentation.tsx              # EXISTING - to be enhanced with User Guides section
+│   │   │   ├── UserGuideSection.tsx           # NEW - main user guide display component
+│   │   │   └── ScreenshotViewer.tsx           # NEW - screenshot viewer with zoom/annotations
+│   │   └── ui/                                # EXISTING - shadcn/ui components (reused)
+│   │       ├── card.tsx
+│   │       ├── tabs.tsx
+│   │       ├── accordion.tsx
+│   │       └── dialog.tsx
+│   └── lib/
+│       └── search.ts                          # NEW - Fuse.js search implementation
+└── tests/
+    ├── playwright/
+    │   ├── user-guide-navigation.spec.ts      # NEW - E2E tests for guide navigation
+    │   ├── screenshot-viewer.spec.ts          # NEW - E2E tests for image viewer
+    │   └── documentation-search.spec.ts       # NEW - E2E tests for search functionality
+    └── unit/
+        ├── UserGuideSection.test.tsx          # NEW - Component unit tests
+        └── ScreenshotViewer.test.tsx          # NEW - Component unit tests
+
+public/
+└── docs/
+    ├── manifest.json                          # NEW - Screenshot metadata manifest
+    └── screenshots/                           # NEW - All feature screenshots
+        ├── dashboard/
+        │   ├── 01-overview.png
+        │   ├── 01-overview.webp
+        │   └── 01-overview.avif
+        ├── sales-analytics/
+        │   ├── 01-navigation.png
+        │   ├── 02-filters.png
+        │   └── 03-table-sorting.png
+        ├── stock-profiles/
+        ├── widget-builder/
+        └── ... (13 more feature directories)
+
+scripts/
+├── capture-user-guide-screenshots.ts          # NEW - Playwright screenshot automation
+├── optimize-screenshots.ts                    # NEW - Image compression (Sharp)
+└── generate-manifest.ts                       # NEW - Generate manifest.json
+```
+
+**Structure Decision**: Web application structure (Option 2) is used as this is a frontend-focused feature enhancing the existing `client/src/components/dashboard/documentation.tsx` component. No backend changes required - all new code is React components, TypeScript utilities, and static screenshot assets. The structure leverages existing patterns:
+- Extends existing `dashboard/` component directory
+- Reuses shadcn/ui components from `components/ui/`
+- Follows existing Playwright test structure in `tests/playwright/`
+- Aligns with existing public asset organization in `public/`
+
+## Complexity Tracking
+
+*No violations - Constitution Check passed all applicable principles.*
+
+This feature adheres to all constitutional principles:
+- ✅ Data-First Architecture: Complete data model defined
+- ✅ Component-Based UI: Modular React components with TypeScript
+- ✅ Performance & Monitoring: Optimized lazy loading and image compression
+- ✅ End-to-End Testing: Playwright automation for screenshots and E2E tests
+- ✅ Testing & Verification: Comprehensive test coverage planned
+
+No complexity justification required.

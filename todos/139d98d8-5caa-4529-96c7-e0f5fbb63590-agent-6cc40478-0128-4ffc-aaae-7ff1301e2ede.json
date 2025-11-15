@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Map out current template hierarchy and identify all page templates",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Analyze header implementations and identify content snippet sources",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Examine specific problematic pages (About Us, Private Tutoring, Special Projects)",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Review template parts directory and identify reusability opportunities",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Check for code duplication across templates",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Provide comprehensive analysis with recommendations",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "6"
+  }
+]

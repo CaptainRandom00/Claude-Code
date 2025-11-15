@@ -1,0 +1,363 @@
+# Quickstart: Fix Sales Aggregation Calendar Navigation and Date Alignment
+
+**Feature**: 026-fix-sales-aggregation
+**Date**: 2025-10-10
+**Phase**: Phase 1 - Manual Testing Guide
+
+## Prerequisites
+
+Before testing this feature, ensure:
+
+- ✅ Development server is running (`npm run dev`)
+- ✅ Database contains aggregated sales data across multiple months
+- ✅ User has access to Dashboard → Sales Aggregation page
+- ✅ Browser DevTools open for screenshot/console monitoring (optional)
+
+## Quick Validation (2 minutes)
+
+### 1. Navigate to Sales Aggregation Calendar
+
+```bash
+# Start development server (if not already running)
+npm run dev
+
+# Open browser
+open http://localhost:3000/dashboard
+```
+
+**Steps**:
+1. Click **"Dashboard"** tab in navigation
+2. Click **"Sales Aggregation"** tab
+3. Scroll to **"Aggregated Data Calendar"** card (below the aggregation controls)
+4. Verify calendar is visible
+
+**Expected Result**: Calendar displays current month with day-of-week headers (SU, MO, TU, WE, TH, FR, SA)
+
+---
+
+### 2. Verify Month/Year Navigation Controls (FR-001, FR-006, FR-009)
+
+**Test**: Month and year dropdown controls are immediately visible
+
+**Steps**:
+1. Look at the calendar caption (top of calendar)
+2. Identify two dropdown select elements:
+   - **Month dropdown**: Shows current month (e.g., "October")
+   - **Year dropdown**: Shows current year (e.g., "2025")
+
+**Expected Results**:
+- ✅ Both dropdowns are visible **without** hovering
+- ✅ Dropdowns are positioned at the top-center of calendar
+- ✅ Navigation arrow buttons (◀ ▶) are visible with full opacity (not faded)
+
+**Failure Indicators**:
+- ❌ Only arrow buttons visible, no dropdowns
+- ❌ Dropdowns appear but are faint/low opacity
+- ❌ "Use arrows to navigate" message appears
+
+---
+
+### 3. Test Month Navigation (FR-001, FR-002, FR-003)
+
+**Test**: Navigate between months while preserving date alignment and blue highlighting
+
+**Steps**:
+1. Note the current month displayed
+2. Click the **month dropdown**
+3. Select a different month (e.g., if October, select September)
+4. Observe calendar updates
+
+**Expected Results**:
+- ✅ Calendar immediately shows selected month
+- ✅ Dates align correctly with day-of-week headers:
+  - If September 1st is a Monday, it appears under "MO" column
+  - If September 30th is a Tuesday, it appears under "TU" column
+- ✅ Blue highlighted dates (with aggregated data) remain visible in new month
+- ✅ No layout shift or grid misalignment during transition
+
+**Failure Indicators**:
+- ❌ Dates appear under wrong day-of-week columns
+- ❌ Blue highlighting disappears after navigation
+- ❌ Calendar shows blank cells or misaligned grid
+- ❌ Layout "jumps" or shifts during month change
+
+---
+
+### 4. Test Year Navigation (FR-006)
+
+**Test**: Navigate to a different year quickly
+
+**Steps**:
+1. Click the **year dropdown**
+2. Select a year different from current (e.g., 2024)
+3. Observe calendar updates
+
+**Expected Results**:
+- ✅ Calendar shows the same month but in the selected year
+- ✅ Year changes immediately (<200ms per FR-010)
+- ✅ Dates align correctly with day-of-week headers
+- ✅ Blue highlighting shows aggregated dates for that year (if any exist)
+
+**Failure Indicators**:
+- ❌ Year dropdown doesn't exist (only month dropdown)
+- ❌ Calendar doesn't update after year selection
+- ❌ Dates misalign after year change
+
+---
+
+### 5. Test Date Alignment Across Multiple Months (FR-002, FR-005)
+
+**Test**: Verify consistent alignment across months with different starting days
+
+**Steps**:
+1. Navigate to **January 2025** (starts on Wednesday)
+2. Verify January 1st appears under "WE" column
+3. Navigate to **February 2025** (starts on Saturday)
+4. Verify February 1st appears under "SA" column
+5. Navigate to **March 2025** (starts on Saturday)
+6. Verify March 1st appears under "SA" column
+
+**Expected Results for Each Month**:
+- ✅ 1st day of month appears under correct day-of-week column
+- ✅ All dates align with their day-of-week headers
+- ✅ Calendar shows consistent 6-week grid (42 cells total)
+- ✅ Empty cells at start/end filled with adjacent month dates (grayed out)
+
+**Failure Indicators**:
+- ❌ 1st day of month appears under wrong column
+- ❌ Calendar shows different numbers of weeks (e.g., 4 weeks vs 6 weeks)
+- ❌ Empty cells instead of adjacent month dates
+- ❌ Dates "shift" position during navigation
+
+---
+
+### 6. Test Blue Highlighting Preservation (FR-003)
+
+**Test**: Verify aggregated dates remain highlighted after navigation
+
+**Prerequisites**: Database has aggregated sales data for specific dates
+
+**Steps**:
+1. Navigate to a month with known aggregated data (check database or recent sales)
+2. Identify dates highlighted in **blue** (these have aggregated sales data)
+3. Click **previous month** arrow or dropdown
+4. Click **next month** to return to original month
+5. Verify blue highlighting is still present
+
+**Expected Results**:
+- ✅ Blue highlighted dates are visible before navigation
+- ✅ After navigating away and back, same dates are still blue
+- ✅ Blue highlighting styling unchanged: `bg-blue-500 text-white font-bold`
+- ✅ Hovering blue dates shows `hover:bg-blue-600`
+
+**Failure Indicators**:
+- ❌ Blue highlighting disappears after navigation
+- ❌ Wrong dates are highlighted
+- ❌ Highlighting color changes or styling breaks
+
+---
+
+### 7. Test Date Selection Functionality (FR-004)
+
+**Test**: Verify clicking dates still works correctly
+
+**Steps**:
+1. Navigate to current month
+2. Click on any **blue highlighted date** (has aggregated data)
+3. Observe badge below calendar: "Viewing data for {date}"
+4. Verify sales data table updates (if implemented)
+5. Navigate to a different month
+6. Click a different blue highlighted date
+7. Verify badge and data table update
+
+**Expected Results**:
+- ✅ Clicking any date selects it
+- ✅ Badge displays selected date in localized format
+- ✅ Date selection works across month navigation
+- ✅ Previously selected date is highlighted with primary color
+
+**Failure Indicators**:
+- ❌ Clicking dates has no effect
+- ❌ Badge doesn't update
+- ❌ Date selection breaks after month navigation
+
+---
+
+### 8. Test Year Transition (FR-006 Edge Case)
+
+**Test**: Verify seamless navigation between years (December ↔ January)
+
+**Steps**:
+1. Navigate to **December 2024**
+2. Click **next month arrow** (→)
+3. Verify calendar shows **January 2025**
+4. Click **previous month arrow** (←)
+5. Verify calendar shows **December 2024** again
+
+**Expected Results**:
+- ✅ Smooth transition from December to January
+- ✅ Year changes automatically (2024 → 2025)
+- ✅ Alignment maintained across year boundary
+- ✅ Reverse navigation works correctly
+
+**Failure Indicators**:
+- ❌ Calendar stays on December when clicking next
+- ❌ Year doesn't update when crossing boundary
+- ❌ Alignment breaks during year transition
+
+---
+
+### 9. Test Performance (FR-010)
+
+**Test**: Verify navigation response time is <200ms
+
+**Steps**:
+1. Open browser DevTools → Performance tab
+2. Start recording
+3. Click month dropdown and select different month
+4. Stop recording
+5. Measure time from click to calendar update
+
+**Expected Results**:
+- ✅ Total response time: <200ms
+- ✅ Navigation feels instant and smooth
+- ✅ No visible lag or freezing
+
+**Failure Indicators**:
+- ❌ Response time >200ms
+- ❌ Visible lag during navigation
+- ❌ UI freezes or stutters
+
+**Alternative**: Use `performance.now()` in console:
+```javascript
+const start = performance.now();
+// Click month dropdown and select
+// After calendar updates:
+console.log(`Response time: ${performance.now() - start}ms`);
+```
+
+---
+
+### 10. Cross-Browser Validation (Principle VI)
+
+**Test**: Verify functionality across Chrome, Firefox, and Safari
+
+**Steps**:
+1. Repeat tests 1-9 in **Chrome**
+2. Repeat tests 1-9 in **Firefox**
+3. Repeat tests 1-9 in **Safari**
+4. Compare results
+
+**Expected Results**:
+- ✅ All features work identically across browsers
+- ✅ Navigation controls render consistently
+- ✅ Date alignment is correct in all browsers
+- ✅ Performance meets <200ms target in all browsers
+
+**Failure Indicators**:
+- ❌ Dropdowns missing in specific browser
+- ❌ Alignment breaks in Safari
+- ❌ Performance degradation in Firefox
+
+---
+
+## Visual Regression Checklist
+
+Use these screenshots for before/after comparison:
+
+### Before Fix (Current State)
+- [ ] Screenshot: Calendar with low-opacity navigation arrows
+- [ ] Screenshot: Misaligned dates (e.g., Monday date under Tuesday column)
+- [ ] Screenshot: No month/year dropdowns visible
+
+### After Fix (Expected State)
+- [ ] Screenshot: Calendar with visible month/year dropdowns
+- [ ] Screenshot: Full-opacity navigation arrows
+- [ ] Screenshot: Correctly aligned dates (Monday date under "MO" column)
+- [ ] Screenshot: Consistent 6-week grid across multiple months
+- [ ] Screenshot: Blue highlighting preserved after navigation
+
+---
+
+## Common Issues & Troubleshooting
+
+### Issue: Dropdowns not visible
+**Possible Causes**:
+- `captionLayout` prop not passed to Calendar component
+- react-day-picker version incompatibility
+
+**Debug Steps**:
+1. Inspect Calendar component props in React DevTools
+2. Verify `captionLayout="dropdown-buttons"` is present
+3. Check react-day-picker version: `npm list react-day-picker`
+
+### Issue: Dates misaligned
+**Possible Causes**:
+- `fixedWeeks` prop not set to `true`
+- CSS grid width conflicts
+
+**Debug Steps**:
+1. Inspect Calendar component props for `fixedWeeks={true}`
+2. Check browser DevTools → Elements → calendar cells
+3. Verify each cell has consistent width (w-9 = 36px)
+
+### Issue: Blue highlighting disappears
+**Possible Causes**:
+- `modifiers` or `modifiersClassNames` props removed
+- Aggregated dates state not updating
+
+**Debug Steps**:
+1. Check React DevTools for `modifiers` and `modifiersClassNames` props
+2. Console log `aggregatedDates` state to verify data exists
+3. Verify API is returning aggregated dates for the navigated month
+
+### Issue: Navigation slow (>200ms)
+**Possible Causes**:
+- Heavy re-renders in parent component
+- Excessive API calls on navigation
+
+**Debug Steps**:
+1. Use React DevTools Profiler to measure render time
+2. Check Network tab for unexpected API calls
+3. Verify navigation is client-side only (no server requests)
+
+---
+
+## Success Criteria Summary
+
+Feature is ready for production when:
+
+- ✅ All 10 quickstart tests pass
+- ✅ Cross-browser validation complete (Chrome, Firefox, Safari)
+- ✅ Visual regression screenshots confirm fixes
+- ✅ Performance <200ms verified
+- ✅ No regressions in existing date selection or highlighting functionality
+- ✅ Playwright E2E tests pass (automated validation)
+
+---
+
+## Next Steps
+
+After manual quickstart validation:
+
+1. **Automated Testing**: Run Playwright E2E tests
+   ```bash
+   npm run test:playwright -- sales-calendar-navigation.spec.ts
+   ```
+
+2. **Audit Trail**: Document results in `specs/026-fix-sales-aggregation/audit/`
+   - Test execution logs
+   - Screenshot evidence
+   - Performance metrics
+   - Cross-browser validation report
+
+3. **Production Readiness**: Complete final validation checklist
+   - Accessibility testing (keyboard navigation, screen readers)
+   - Mobile responsive testing
+   - Production build verification
+
+---
+
+**Quickstart Complete**: 2025-10-10
+**Estimated Time**: 15-20 minutes for full validation
+**Next Phase**: Automated Playwright E2E testing

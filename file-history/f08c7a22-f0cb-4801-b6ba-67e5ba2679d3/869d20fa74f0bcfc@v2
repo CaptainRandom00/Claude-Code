@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bb-management-system/schemas/api-epos-sales-response.json",
+  "title": "EPOS Sales API Response",
+  "description": "Enhanced response format with data array and query metadata for pagination",
+  "type": "object",
+  "required": ["data", "meta"],
+  "properties": {
+    "data": {
+      "type": "array",
+      "description": "Array of EPOS sales records matching the query (length <= limit, max 100K)",
+      "items": {
+        "type": "object",
+        "required": ["id", "reportDate", "itemCode", "totalNet"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique record identifier"
+          },
+          "reportDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of the sales report (YYYY-MM-DD)"
+          },
+          "itemCode": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Product item code/SKU"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "Unit of measurement (e.g., 'EA', 'CS', 'KG')"
+          },
+          "description": {
+            "type": "string",
+            "description": "Product description"
+          },
+          "totalQty": {
+            "type": "number",
+            "description": "Total quantity sold"
+          },
+          "totalNet": {
+            "type": "number",
+            "description": "Total net sales amount"
+          },
+          "totalGross": {
+            "type": "number",
+            "description": "Total gross sales amount"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original EPOS file name"
+          },
+          "uploadBatch": {
+            "type": "string",
+            "description": "Batch identifier for upload group"
+          },
+          "uploadedBy": {
+            "type": "string",
+            "description": "User who uploaded the data"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of data upload"
+          },
+          "supplierName": {
+            "type": "string",
+            "description": "Supplier name (joined from brn_stock_snapshots)"
+          },
+          "supplierId": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "integer" }
+            ],
+            "description": "Supplier identifier"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Product category (joined from brn_stock_snapshots)"
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Product brand (joined from brn_stock_snapshots)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["totalCount", "limit", "offset", "hasMore", "filtered"],
+      "description": "Metadata about the query results for pagination and UI display",
+      "properties": {
+        "totalCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of records matching filters (before LIMIT applied)"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "The limit value used for this query (after safety cap applied)"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Starting offset for this result set (0-based)"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "True if more records are available beyond current offset+limit"
+        },
+        "filtered": {
+          "type": "boolean",
+          "description": "True if any filters were applied (excluding limit/offset/sort)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "description": "Default response with 10K records",
+      "value": {
+        "data": [
+          {
+            "id": 1,
+            "reportDate": "2024-08-22",
+            "itemCode": "12345",
+            "unit": "EA",
+            "description": "Sample Product",
+            "totalQty": 150,
+            "totalNet": 1250.50,
+            "totalGross": 1500.00,
+            "supplierName": "ABC Distributors",
+            "categoryName": "Beverages"
+          }
+        ],
+        "meta": {
+          "totalCount": 75000,
+          "limit": 10000,
+          "offset": 0,
+          "hasMore": true,
+          "filtered": false
+        }
+      }
+    },
+    {
+      "description": "Filtered response with fewer results than limit",
+      "value": {
+        "data": [
+          {
+            "id": 42,
+            "reportDate": "2024-08-22",
+            "itemCode": "RARE-ITEM",
+            "totalNet": 99.99
+          }
+        ],
+        "meta": {
+          "totalCount": 5,
+          "limit": 10000,
+          "offset": 0,
+          "hasMore": false,
+          "filtered": true
+        }
+      }
+    },
+    {
+      "description": "Load More response (second page)",
+      "value": {
+        "data": [],
+        "meta": {
+          "totalCount": 25000,
+          "limit": 10000,
+          "offset": 10000,
+          "hasMore": true,
+          "filtered": false
+        }
+      }
+    },
+    {
+      "description": "Safety cap enforced (total > 100K)",
+      "value": {
+        "data": [],
+        "meta": {
+          "totalCount": 150000,
+          "limit": 100000,
+          "offset": 0,
+          "hasMore": false,
+          "filtered": false
+        }
+      }
+    }
+  ]
+}

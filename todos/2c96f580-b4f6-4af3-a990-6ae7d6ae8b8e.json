@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Fix Claude integration import error in Streamlit app",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Complete comprehensive memory system integration",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test Claude API integration with real data",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Verify all timeframe candle counts are working",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  }
+]

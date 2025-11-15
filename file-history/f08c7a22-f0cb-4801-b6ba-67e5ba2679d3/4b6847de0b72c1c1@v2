@@ -1,0 +1,211 @@
+-- Additional Dashboard Templates for User Story 2
+-- Feature: 028-build-a-widget
+-- Adds 2 more templates: Expiry Management and Sales Performance
+
+-- ============================================================================
+-- Additional Widget Definitions
+-- ============================================================================
+
+-- Widget 4: BBD Expiry Alert (Alert widget)
+INSERT INTO widget_definitions (id, user_id, widget_type, name, description, api_endpoint, http_method, query_params, calculation_config, visualization_config, refresh_interval, is_system, is_active)
+VALUES (
+  4,
+  NULL, -- System widget
+  'alert',
+  'BBD Expiry Alerts',
+  'Shows products expiring within next 7 days',
+  '/api/dashboard/expiry-alerts',
+  'GET',
+  JSON_OBJECT('days', 7),
+  JSON_OBJECT(
+    'filters', JSON_ARRAY(),
+    'aggregations', JSON_ARRAY(
+      JSON_OBJECT('type', 'count', 'field', 'id', 'alias', 'alert_count')
+    ),
+    'sort', JSON_ARRAY(
+      JSON_OBJECT('field', 'expiry_date', 'order', 'asc')
+    ),
+    'limit', 10
+  ),
+  JSON_OBJECT(
+    'label', 'Expiring Soon',
+    'format', JSON_OBJECT('type', 'list'),
+    'description', 'Products expiring in the next 7 days'
+  ),
+  300000, -- 5 minutes
+  TRUE,
+  TRUE
+);
+
+-- Widget 5: Expiry Count by Category (Metric widget)
+INSERT INTO widget_definitions (id, user_id, widget_type, name, description, api_endpoint, http_method, query_params, calculation_config, visualization_config, refresh_interval, is_system, is_active)
+VALUES (
+  5,
+  NULL,
+  'metric',
+  'Expiring Items Count',
+  'Total count of items expiring within 30 days',
+  '/api/dashboard/expiry-count',
+  'GET',
+  JSON_OBJECT('days', 30),
+  JSON_OBJECT(
+    'filters', JSON_ARRAY(),
+    'aggregations', JSON_ARRAY(
+      JSON_OBJECT('type', 'count', 'field', 'id', 'alias', 'expiry_count')
+    )
+  ),
+  JSON_OBJECT(
+    'label', 'Items Expiring (30 days)',
+    'format', JSON_OBJECT('type', 'number', 'decimalPlaces', 0),
+    'description', 'Total items expiring in next 30 days'
+  ),
+  300000,
+  TRUE,
+  TRUE
+);
+
+-- Widget 6: Daily Sales Average (Metric widget)
+INSERT INTO widget_definitions (id, user_id, widget_type, name, description, api_endpoint, http_method, query_params, calculation_config, visualization_config, refresh_interval, is_system, is_active)
+VALUES (
+  6,
+  NULL,
+  'metric',
+  'Daily Sales Average',
+  'Average daily sales over last 30 days',
+  '/api/dashboard/daily-sales-average',
+  'GET',
+  JSON_OBJECT('days', 30),
+  JSON_OBJECT(
+    'filters', JSON_ARRAY(),
+    'aggregations', JSON_ARRAY(
+      JSON_OBJECT('type', 'avg', 'field', 'total_sales', 'alias', 'avg_sales')
+    )
+  ),
+  JSON_OBJECT(
+    'label', 'Avg Daily Sales (30d)',
+    'format', JSON_OBJECT('type', 'currency', 'decimalPlaces', 2),
+    'description', 'Average daily sales performance'
+  ),
+  60000,
+  TRUE,
+  TRUE
+);
+
+-- Widget 7: Low Stock Alerts (Alert widget)
+INSERT INTO widget_definitions (id, user_id, widget_type, name, description, api_endpoint, http_method, query_params, calculation_config, visualization_config, refresh_interval, is_system, is_active)
+VALUES (
+  7,
+  NULL,
+  'alert',
+  'Low Stock Alerts',
+  'Products below minimum stock level',
+  '/api/dashboard/low-stock',
+  'GET',
+  JSON_OBJECT('threshold', 10),
+  JSON_OBJECT(
+    'filters', JSON_ARRAY(),
+    'aggregations', JSON_ARRAY(
+      JSON_OBJECT('type', 'count', 'field', 'id', 'alias', 'low_stock_count')
+    ),
+    'sort', JSON_ARRAY(
+      JSON_OBJECT('field', 'stock_level', 'order', 'asc')
+    ),
+    'limit', 10
+  ),
+  JSON_OBJECT(
+    'label', 'Low Stock Items',
+    'format', JSON_OBJECT('type', 'list'),
+    'description', 'Items requiring restocking'
+  ),
+  300000,
+  TRUE,
+  TRUE
+);
+
+-- ============================================================================
+-- Additional Dashboard Templates
+-- ============================================================================
+
+-- Template 2: Expiry Management
+INSERT INTO dashboard_templates (id, name, description, category, preview_image_url, config, is_active, sort_order, created_at)
+VALUES (
+  2,
+  'Expiry Management',
+  'Monitor product expiry dates and manage BBD compliance with alerts and counts',
+  'inventory',
+  '/assets/templates/expiry-management-preview.png',
+  JSON_OBJECT(
+    'globalFilters', JSON_OBJECT(
+      'dateRange', JSON_OBJECT(
+        'start', DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+        'end', LAST_DAY(CURDATE())
+      ),
+      'categories', JSON_ARRAY()
+    ),
+    'layout', 'grid',
+    'refreshInterval', 300000
+  ),
+  TRUE,
+  2,
+  NOW()
+);
+
+-- Template 3: Sales Performance
+INSERT INTO dashboard_templates (id, name, description, category, preview_image_url, config, is_active, sort_order, created_at)
+VALUES (
+  3,
+  'Sales Performance',
+  'Comprehensive sales analytics with metrics, trends, and top performers',
+  'sales',
+  '/assets/templates/sales-performance-preview.png',
+  JSON_OBJECT(
+    'globalFilters', JSON_OBJECT(
+      'dateRange', JSON_OBJECT(
+        'start', DATE_SUB(CURDATE(), INTERVAL 30 DAY),
+        'end', CURDATE()
+      ),
+      'suppliers', JSON_ARRAY()
+    ),
+    'layout', 'grid',
+    'refreshInterval', 60000
+  ),
+  TRUE,
+  3,
+  NOW()
+);
+
+-- ============================================================================
+-- Link Widgets to Templates
+-- ============================================================================
+
+-- Expiry Management Template Widgets
+INSERT INTO template_widgets (template_id, widget_definition_id, sort_order)
+VALUES
+  (2, 5, 1), -- Expiring Items Count
+  (2, 4, 2), -- BBD Expiry Alerts
+  (2, 7, 3); -- Low Stock Alerts
+
+-- Sales Performance Template Widgets
+INSERT INTO template_widgets (template_id, widget_definition_id, sort_order)
+VALUES
+  (3, 1, 1), -- Total Sales
+  (3, 6, 2), -- Daily Sales Average
+  (3, 2, 3), -- Monthly Sales Trend
+  (3, 3, 4); -- Top 10 Products
+
+-- ============================================================================
+-- Verification Queries (commented out for production)
+-- ============================================================================
+
+-- SELECT 'Widget Definitions:' as info;
+-- SELECT id, name, widget_type, is_system FROM widget_definitions ORDER BY id;
+
+-- SELECT 'Dashboard Templates:' as info;
+-- SELECT id, name, category, is_active FROM dashboard_templates ORDER BY sort_order;
+
+-- SELECT 'Template Widget Links:' as info;
+-- SELECT t.name as template, w.name as widget, tw.sort_order
+-- FROM template_widgets tw
+-- JOIN dashboard_templates t ON tw.template_id = t.id
+-- JOIN widget_definitions w ON tw.widget_definition_id = w.id
+-- ORDER BY t.id, tw.sort_order;

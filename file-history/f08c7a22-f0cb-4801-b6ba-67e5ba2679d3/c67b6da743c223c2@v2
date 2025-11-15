@@ -1,0 +1,59 @@
+import { chromium } from 'playwright';
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  // Capture console logs
+  const consoleMessages = [];
+  page.on('console', msg => {
+    consoleMessages.push(`[${msg.type()}] ${msg.text()}`);
+  });
+
+  // Capture errors
+  const errors = [];
+  page.on('pageerror', err => {
+    errors.push(err.message);
+  });
+
+  console.log('📍 Navigating to dashboard 2...');
+  await page.goto('http://localhost:3000/dashboards/2');
+  await page.waitForTimeout(5000);
+
+  console.log('\n📋 Console Messages:');
+  consoleMessages.forEach(msg => console.log(msg));
+
+  console.log('\n❌ JavaScript Errors:');
+  if (errors.length === 0) {
+    console.log('No JavaScript errors detected');
+  } else {
+    errors.forEach(err => console.log(err));
+  }
+
+  console.log('\n🔍 Analyzing widget states...');
+
+  // Check for error messages in the page
+  const errorElements = await page.$$('[class*="error"]');
+  console.log(`Error elements found: ${errorElements.length}`);
+
+  // Check widget titles
+  const titles = await page.$$eval('h3, h2, [class*="title"]', els =>
+    els.map(el => el.textContent).filter(t => t && t.length > 0)
+  );
+  console.log('\n📝 Widget Titles Found:');
+  titles.forEach(title => console.log(`  - ${title}`));
+
+  // Check for loading states
+  const loadingStates = await page.$$('[class*="loading"], [aria-busy="true"]');
+  console.log(`\n⏳ Loading indicators: ${loadingStates.length}`);
+
+  // Capture network requests
+  console.log('\n🌐 Fetching widget data via API...');
+  const response = await page.goto('http://localhost:3000/api/widgets/dashboards/2/data');
+  const data = await response.json();
+  console.log('Dashboard data response:');
+  console.log(JSON.stringify(data, null, 2));
+
+  await page.waitForTimeout(3000);
+  await browser.close();
+})();

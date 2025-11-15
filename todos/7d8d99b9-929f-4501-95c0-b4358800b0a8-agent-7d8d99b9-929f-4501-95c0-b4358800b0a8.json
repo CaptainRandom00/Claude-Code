@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Execute specify command to create Stock Control System spec",
+    "status": "completed",
+    "activeForm": "Executing specify command to create Stock Control System spec"
+  },
+  {
+    "content": "Load spec template and understand required sections",
+    "status": "completed",
+    "activeForm": "Loading spec template and understanding required sections"
+  },
+  {
+    "content": "Write comprehensive Stock Control System specification",
+    "status": "in_progress",
+    "activeForm": "Writing comprehensive Stock Control System specification"
+  },
+  {
+    "content": "Document dropdown black screen issue as specific task",
+    "status": "pending",
+    "activeForm": "Documenting dropdown black screen issue as specific task"
+  },
+  {
+    "content": "Finalize specification with technical details",
+    "status": "pending",
+    "activeForm": "Finalizing specification with technical details"
+  }
+]

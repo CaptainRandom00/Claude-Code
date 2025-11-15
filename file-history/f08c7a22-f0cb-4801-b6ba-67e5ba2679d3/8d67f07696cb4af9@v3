@@ -1,0 +1,191 @@
+/**
+ * @file ProductImageManager.tsx
+ * @description Main component for managing product images with upload, view, and delete functionality
+ * Feature: 025-product-image-management
+ */
+
+import React, { useState, useCallback } from 'react';
+import { Star, Loader2, ImageIcon } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ImageUploadZone } from './ImageUploadZone';
+import { ImageCarousel } from './ImageCarousel';
+import { useProductImages } from '@/hooks/useProductImages';
+import type { ProductImage } from '../../../../shared/types/product-images';
+
+interface ProductImageManagerProps {
+  itemCode: string;
+  images: ProductImage[];
+  imageCount: number;
+  onUpdate: () => void;
+}
+
+const MAX_IMAGES = 5;
+
+/**
+ * ProductImageManager component for managing product images
+ */
+export function ProductImageManager({
+  itemCode,
+  images: initialImages,
+  imageCount: initialCount,
+  onUpdate,
+}: ProductImageManagerProps) {
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+
+  const {
+    images,
+    imageCount,
+    isLoading,
+    upload,
+    deleteImage,
+    setPrimary,
+    refetch,
+  } = useProductImages(itemCode);
+
+  // Use fetched data if available, otherwise use props
+  const displayImages = images.length > 0 ? images : initialImages;
+  const displayCount = imageCount || initialCount;
+
+  /**
+   * Handle upload success
+   */
+  const handleUploadSuccess = useCallback(async (images: ProductImage[]) => {
+    console.log('[ProductImageManager] Upload success, refetching...', images.length, 'images');
+    await refetch();
+    onUpdate();
+  }, [refetch, onUpdate]);
+
+  /**
+   * Handle thumbnail click
+   */
+  const handleThumbnailClick = useCallback((index: number) => {
+    setSelectedImageIndex(index);
+  }, []);
+
+  /**
+   * Handle carousel close
+   */
+  const handleCarouselClose = useCallback(() => {
+    setSelectedImageIndex(null);
+  }, []);
+
+  /**
+   * Handle delete image
+   */
+  const handleDelete = useCallback(async (imageId: string) => {
+    await deleteImage.mutateAsync(imageId);
+    await refetch();
+    onUpdate();
+  }, [deleteImage, refetch, onUpdate]);
+
+  /**
+   * Handle set primary
+   */
+  const handleSetPrimary = useCallback(async (imageId: string) => {
+    await setPrimary.mutateAsync(imageId);
+    await refetch();
+    onUpdate();
+  }, [setPrimary, refetch, onUpdate]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Product Images</CardTitle>
+          <Badge variant={displayCount >= MAX_IMAGES ? 'destructive' : 'secondary'}>
+            {displayCount}/{MAX_IMAGES} {displayCount >= MAX_IMAGES ? '(max)' : ''}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Upload zone */}
+        <ImageUploadZone
+          itemCode={itemCode}
+          currentCount={displayCount}
+          onUploadSuccess={handleUploadSuccess}
+        />
+
+        {/* Loading state */}
+        {isLoading && displayImages.length === 0 && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && displayImages.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+            <ImageIcon className="h-12 w-12 mb-3 text-gray-300" />
+            <p className="text-sm font-medium">No images yet</p>
+            <p className="text-xs mt-1">Drag images above or click to browse</p>
+          </div>
+        )}
+
+        {/* Image grid */}
+        {displayImages.length > 0 && (
+          <div className="grid grid-cols-4 gap-3">
+            {displayImages.map((image, index) => (
+              <div
+                key={image.id}
+                className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-all"
+                onClick={() => handleThumbnailClick(index)}
+              >
+                {/* Thumbnail */}
+                <div className="aspect-square bg-gray-100">
+                  <img
+                    src={image.thumbnailPath}
+                    alt={image.originalName}
+                    className="w-full h-full object-cover"
+                    style={{ width: '150px', height: '150px' }}
+                  />
+                </div>
+
+                {/* Primary badge */}
+                {image.isPrimary && (
+                  <div className="absolute top-2 right-2">
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 bg-yellow-100 text-yellow-800 border-yellow-300"
+                    >
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                      Primary
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                  <p className="text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    Click to view
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Upload progress indicator */}
+        {upload.isLoading && (
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Uploading images...</span>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Image carousel */}
+      {selectedImageIndex !== null && displayImages.length > 0 && (
+        <ImageCarousel
+          images={displayImages}
+          initialIndex={selectedImageIndex}
+          itemCode={itemCode}
+          onClose={handleCarouselClose}
+          onDelete={handleDelete}
+          onSetPrimary={handleSetPrimary}
+        />
+      )}
+    </Card>
+  );
+}

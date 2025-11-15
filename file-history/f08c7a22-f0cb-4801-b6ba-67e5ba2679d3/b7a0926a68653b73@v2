@@ -1,0 +1,81 @@
+import { chromium } from 'playwright';
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  console.log('📍 Navigating to dashboard 2...');
+  await page.goto('http://localhost:3000/dashboards/2', { waitUntil: 'networkidle' });
+
+  // Wait for widgets to load
+  console.log('⏳ Waiting for widgets to finish loading...');
+  await page.waitForTimeout(5000);
+
+  // Capture full page
+  console.log('📸 Capturing full dashboard...');
+  await page.screenshot({
+    path: 'test-screenshots/chart-widget/final-dashboard-state.png',
+    fullPage: true
+  });
+
+  // Find and highlight chart widgets
+  console.log('\n🎯 Analyzing Chart Widgets...');
+
+  const chartWidgets = await page.$$('text=Product Categories Chart');
+  console.log(`Found "Product Categories Chart" text: ${chartWidgets.length}`);
+
+  const chartWidgets2 = await page.$$('text=Product Category Distribution');
+  console.log(`Found "Product Category Distribution" text: ${chartWidgets2.length}`);
+
+  // Check what's actually rendered in the widget bodies
+  const widgetBodies = await page.$$eval('[class*="widget"], .card, [class*="card"]',
+    els => els.map(el => ({
+      innerHTML: el.innerHTML.substring(0, 500),
+      textContent: el.textContent.substring(0, 200),
+      classes: el.className
+    }))
+  );
+
+  console.log(`\n📦 Found ${widgetBodies.length} potential widget containers`);
+
+  // Check for SVG elements
+  const svgs = await page.$$('svg');
+  console.log(`\n🎨 Total SVG elements on page: ${svgs.length}`);
+
+  // Check specifically for Recharts
+  const hasRecharts = await page.evaluate(() => {
+    const html = document.body.innerHTML;
+    return {
+      hasRechartsClass: html.includes('recharts'),
+      hasBarChart: html.includes('BarChart'),
+      hasSvgContent: document.querySelectorAll('svg').length > 0
+    };
+  });
+
+  console.log('\n🔍 Recharts Detection:');
+  console.log(`  - Has 'recharts' in HTML: ${hasRecharts.hasRechartsClass}`);
+  console.log(`  - Has 'BarChart' in HTML: ${hasRecharts.hasBarChart}`);
+  console.log(`  - Has SVG elements: ${hasRecharts.hasSvgContent}`);
+
+  // Scroll to each widget and capture
+  const widgets = await page.$$('[class*="Product Categories"], h3:has-text("Product Categories Chart")');
+
+  for (let i = 0; i < widgets.length; i++) {
+    console.log(`\n📸 Capturing widget ${i + 1}...`);
+    try {
+      await widgets[i].scrollIntoViewIfNeeded();
+      await page.waitForTimeout(1000);
+      await page.screenshot({
+        path: `test-screenshots/chart-widget/widget-${i + 1}-detail.png`
+      });
+    } catch (e) {
+      console.log(`  ⚠️  Could not capture widget ${i + 1}: ${e.message}`);
+    }
+  }
+
+  console.log('\n✅ Evidence capture complete!');
+  console.log('📂 Screenshots saved to: test-screenshots/chart-widget/');
+
+  await page.waitForTimeout(3000);
+  await browser.close();
+})();

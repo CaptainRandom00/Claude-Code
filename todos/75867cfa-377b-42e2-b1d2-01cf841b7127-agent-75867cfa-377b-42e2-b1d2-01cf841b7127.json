@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Fix Modal Container & Scrolling structure",
+    "status": "completed",
+    "id": "1"
+  },
+  {
+    "content": "Apply Glass Morphism Effects to modal",
+    "status": "completed",
+    "id": "2"
+  },
+  {
+    "content": "Fix all Input Field Styling",
+    "status": "completed",
+    "id": "3"
+  },
+  {
+    "content": "Fix all Button Styling",
+    "status": "completed",
+    "id": "4"
+  },
+  {
+    "content": "Fix Text and Label Styling",
+    "status": "completed",
+    "id": "5"
+  },
+  {
+    "content": "Fix Progress Bar Styling",
+    "status": "completed",
+    "id": "6"
+  },
+  {
+    "content": "Test the modal for proper scrolling and appearance",
+    "status": "completed",
+    "id": "7"
+  }
+]

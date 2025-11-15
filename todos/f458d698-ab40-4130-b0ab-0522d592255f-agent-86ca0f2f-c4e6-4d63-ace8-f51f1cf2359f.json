@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Check Prisma migration files for recent schema changes",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine seed scripts in scripts/ directory for database reset operations",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Look at database migration history and schema changes",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check for any database backup or restore operations",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Investigate if data exists in different database context",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

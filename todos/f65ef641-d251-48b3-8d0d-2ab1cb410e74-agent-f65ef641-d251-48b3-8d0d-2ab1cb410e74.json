@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Create a new React web app for browser-based testing",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Implement Web Bluetooth API for browser Bluetooth access",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create UI components for printer testing",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Add ZPL command functionality for web",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  }
+]

@@ -1,0 +1,551 @@
+/**
+ * Widget Service Unit Tests
+ * Feature: 028-build-a-widget
+ *
+ * Tests for widget CRUD operations, calculation engine,
+ * and data fetching functionality.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { WidgetService } from '../../server/services/widget-service';
+import type { InsertWidgetDefinition } from '@shared/schema';
+
+describe('Widget Service', () => {
+  let widgetService: WidgetService;
+
+  beforeEach(() => {
+    widgetService = new WidgetService();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('create', () => {
+    it('should create a new widget definition with valid data', async () => {
+      const widgetData: InsertWidgetDefinition = {
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Test Widget',
+        apiEndpoint: '/api/products',
+        calculationConfig: {
+          aggregation: 'count',
+          field: 'id'
+        },
+        refreshInterval: 60000,
+        isActive: true,
+        isSystem: false
+      };
+
+      const result = await widgetService.create(widgetData);
+
+      expect(result).toBeDefined();
+      expect(result.name).toBe('Test Widget');
+      expect(result.widgetType).toBe('metric');
+    });
+
+    it('should validate refresh interval is within bounds (30s to 60min)', async () => {
+      const invalidData: InsertWidgetDefinition = {
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Invalid Widget',
+        apiEndpoint: '/api/products',
+        refreshInterval: 10000, // Too short (< 30s)
+        isActive: true,
+        isSystem: false
+      };
+
+      await expect(widgetService.create(invalidData)).rejects.toThrow(
+        'Refresh interval must be between 30000ms (30s) and 3600000ms (60min)'
+      );
+    });
+
+    it('should reject refresh interval above 60 minutes', async () => {
+      const invalidData: InsertWidgetDefinition = {
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Invalid Widget',
+        apiEndpoint: '/api/products',
+        refreshInterval: 4000000, // Too long (> 60min)
+        isActive: true,
+        isSystem: false
+      };
+
+      await expect(widgetService.create(invalidData)).rejects.toThrow(
+        'Refresh interval must be between 30000ms (30s) and 3600000ms (60min)'
+      );
+    });
+
+    it('should create widget with calculation config', async () => {
+      const widgetData: InsertWidgetDefinition = {
+        userId: 1,
+        widgetType: 'chart',
+        name: 'Sales Chart',
+        apiEndpoint: '/api/sales',
+        calculationConfig: {
+          aggregation: 'sum',
+          field: 'amount',
+          groupBy: 'category'
+        },
+        isActive: true,
+        isSystem: false
+      };
+
+      const result = await widgetService.create(widgetData);
+
+      expect(result.calculationConfig).toBeDefined();
+      expect(result.calculationConfig.aggregation).toBe('sum');
+      expect(result.calculationConfig.field).toBe('amount');
+    });
+  });
+
+  describe('getById', () => {
+    it('should retrieve widget by ID', async () => {
+      // Create a widget first
+      const widgetData: InsertWidgetDefinition = {
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Test Widget',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      };
+
+      const created = await widgetService.create(widgetData);
+      const retrieved = await widgetService.getById(created.id);
+
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(created.id);
+      expect(retrieved?.name).toBe('Test Widget');
+    });
+
+    it('should return null for non-existent widget ID', async () => {
+      const result = await widgetService.getById(999999);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getByUser', () => {
+    it('should retrieve all active widgets for a user', async () => {
+      const userId = 1;
+
+      // Create multiple widgets for the user
+      await widgetService.create({
+        userId,
+        widgetType: 'metric',
+        name: 'Widget 1',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      await widgetService.create({
+        userId,
+        widgetType: 'chart',
+        name: 'Widget 2',
+        apiEndpoint: '/api/sales',
+        isActive: true,
+        isSystem: false
+      });
+
+      const widgets = await widgetService.getByUser(userId);
+
+      expect(widgets.length).toBeGreaterThanOrEqual(2);
+      expect(widgets.every(w => w.userId === userId || w.isSystem === true)).toBe(true);
+    });
+
+    it('should include system widgets when includeSystem is true', async () => {
+      const userId = 1;
+      const widgets = await widgetService.getByUser(userId, true);
+
+      // Should include both user widgets and system widgets
+      const hasUserWidgets = widgets.some(w => w.userId === userId);
+      const hasSystemWidgets = widgets.some(w => w.isSystem === true);
+
+      expect(hasUserWidgets || hasSystemWidgets).toBe(true);
+    });
+
+    it('should exclude system widgets when includeSystem is false', async () => {
+      const userId = 1;
+      const widgets = await widgetService.getByUser(userId, false);
+
+      // Should only include user widgets
+      expect(widgets.every(w => w.userId === userId)).toBe(true);
+      expect(widgets.every(w => w.isSystem !== true)).toBe(true);
+    });
+
+    it('should only return active widgets', async () => {
+      const userId = 1;
+      const widgets = await widgetService.getByUser(userId);
+
+      expect(widgets.every(w => w.isActive === true)).toBe(true);
+    });
+  });
+
+  describe('getSystemWidgets', () => {
+    it('should retrieve all system widgets', async () => {
+      const systemWidgets = await widgetService.getSystemWidgets();
+
+      expect(Array.isArray(systemWidgets)).toBe(true);
+      expect(systemWidgets.every(w => w.isSystem === true)).toBe(true);
+      expect(systemWidgets.every(w => w.isActive === true)).toBe(true);
+    });
+  });
+
+  describe('update', () => {
+    it('should update widget name', async () => {
+      // Create widget
+      const created = await widgetService.create({
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Original Name',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      // Update name
+      const updated = await widgetService.update(created.id, {
+        name: 'Updated Name'
+      });
+
+      expect(updated.name).toBe('Updated Name');
+      expect(updated.id).toBe(created.id);
+    });
+
+    it('should update calculation config', async () => {
+      const created = await widgetService.create({
+        userId: 1,
+        widgetType: 'chart',
+        name: 'Chart Widget',
+        apiEndpoint: '/api/sales',
+        calculationConfig: {
+          aggregation: 'sum',
+          field: 'amount'
+        },
+        isActive: true,
+        isSystem: false
+      });
+
+      const updated = await widgetService.update(created.id, {
+        calculationConfig: {
+          aggregation: 'avg',
+          field: 'price'
+        }
+      });
+
+      expect(updated.calculationConfig.aggregation).toBe('avg');
+      expect(updated.calculationConfig.field).toBe('price');
+    });
+
+    it('should validate refresh interval on update', async () => {
+      const created = await widgetService.create({
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Test Widget',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      await expect(
+        widgetService.update(created.id, {
+          refreshInterval: 5000 // Too short
+        })
+      ).rejects.toThrow('Refresh interval must be between 30000ms (30s) and 3600000ms (60min)');
+    });
+
+    it('should throw error for non-existent widget', async () => {
+      await expect(
+        widgetService.update(999999, { name: 'Updated' })
+      ).rejects.toThrow('Widget definition with ID 999999 not found');
+    });
+
+    it('should update updatedAt timestamp', async () => {
+      const created = await widgetService.create({
+        userId: 1,
+        widgetType: 'metric',
+        name: 'Test Widget',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      const originalUpdatedAt = created.updatedAt;
+
+      // Wait a bit to ensure timestamp changes
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const updated = await widgetService.update(created.id, {
+        name: 'Updated Widget'
+      });
+
+      expect(updated.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+    });
+  });
+
+  describe('delete', () => {
+    it('should soft delete widget (set isActive to false)', async () => {
+      const userId = 1;
+      const created = await widgetService.create({
+        userId,
+        widgetType: 'metric',
+        name: 'To Delete',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      const result = await widgetService.delete(created.id, userId);
+
+      expect(result).toBe(true);
+
+      // Verify widget is no longer active
+      const retrieved = await widgetService.getById(created.id);
+      expect(retrieved?.isActive).toBe(false);
+    });
+
+    it('should prevent deletion of system widgets', async () => {
+      // Create a system widget
+      const systemWidget = await widgetService.create({
+        userId: 1,
+        widgetType: 'metric',
+        name: 'System Widget',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: true
+      });
+
+      await expect(
+        widgetService.delete(systemWidget.id, 1)
+      ).rejects.toThrow('Cannot delete system widgets');
+    });
+
+    it('should prevent users from deleting other users widgets', async () => {
+      const ownerUserId = 1;
+      const otherUserId = 2;
+
+      const widget = await widgetService.create({
+        userId: ownerUserId,
+        widgetType: 'metric',
+        name: 'User 1 Widget',
+        apiEndpoint: '/api/products',
+        isActive: true,
+        isSystem: false
+      });
+
+      await expect(
+        widgetService.delete(widget.id, otherUserId)
+      ).rejects.toThrow('Unauthorized to delete this widget');
+    });
+
+    it('should throw error for non-existent widget', async () => {
+      await expect(
+        widgetService.delete(999999, 1)
+      ).rejects.toThrow('Widget definition with ID 999999 not found');
+    });
+  });
+
+  describe('Calculation Engine', () => {
+    describe('applyCalculations - Aggregations', () => {
+      it('should calculate sum aggregation correctly', async () => {
+        const data = [
+          { amount: 100 },
+          { amount: 200 },
+          { amount: 300 }
+        ];
+
+        const config = {
+          aggregation: 'sum' as const,
+          field: 'amount'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].sum).toBe(600);
+      });
+
+      it('should calculate average aggregation correctly', async () => {
+        const data = [
+          { price: 10 },
+          { price: 20 },
+          { price: 30 }
+        ];
+
+        const config = {
+          aggregation: 'avg' as const,
+          field: 'price'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].avg).toBe(20);
+      });
+
+      it('should calculate count aggregation correctly', async () => {
+        const data = [
+          { id: 1 },
+          { id: 2 },
+          { id: 3 },
+          { id: 4 }
+        ];
+
+        const config = {
+          aggregation: 'count' as const,
+          field: 'id'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].count).toBe(4);
+      });
+
+      it('should calculate min aggregation correctly', async () => {
+        const data = [
+          { temperature: 25 },
+          { temperature: 18 },
+          { temperature: 30 },
+          { temperature: 22 }
+        ];
+
+        const config = {
+          aggregation: 'min' as const,
+          field: 'temperature'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].min).toBe(18);
+      });
+
+      it('should calculate max aggregation correctly', async () => {
+        const data = [
+          { score: 85 },
+          { score: 92 },
+          { score: 78 },
+          { score: 95 }
+        ];
+
+        const config = {
+          aggregation: 'max' as const,
+          field: 'score'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].max).toBe(95);
+      });
+    });
+
+    describe('applyCalculations - GroupBy', () => {
+      it('should group data and calculate aggregations per group', async () => {
+        const data = [
+          { category: 'A', amount: 100 },
+          { category: 'B', amount: 200 },
+          { category: 'A', amount: 150 },
+          { category: 'B', amount: 250 }
+        ];
+
+        const config = {
+          aggregation: 'sum' as const,
+          field: 'amount',
+          groupBy: 'category'
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data).toHaveLength(2);
+
+        const categoryA = result.data.find(d => d.category === 'A');
+        const categoryB = result.data.find(d => d.category === 'B');
+
+        expect(categoryA?.sum).toBe(250);
+        expect(categoryB?.sum).toBe(450);
+      });
+    });
+
+    describe('applyCalculations - Filters', () => {
+      it('should filter data before calculating aggregations', async () => {
+        const data = [
+          { status: 'active', amount: 100 },
+          { status: 'inactive', amount: 200 },
+          { status: 'active', amount: 300 }
+        ];
+
+        const config = {
+          aggregation: 'sum' as const,
+          field: 'amount',
+          filters: [
+            { field: 'status', operator: 'eq', value: 'active' }
+          ]
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].sum).toBe(400); // Only active items
+      });
+
+      it('should support greater than filter operator', async () => {
+        const data = [
+          { price: 50 },
+          { price: 150 },
+          { price: 250 }
+        ];
+
+        const config = {
+          aggregation: 'count' as const,
+          field: 'price',
+          filters: [
+            { field: 'price', operator: 'gt', value: 100 }
+          ]
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].count).toBe(2); // 150 and 250
+      });
+
+      it('should support less than filter operator', async () => {
+        const data = [
+          { age: 18 },
+          { age: 25 },
+          { age: 30 }
+        ];
+
+        const config = {
+          aggregation: 'count' as const,
+          field: 'age',
+          filters: [
+            { field: 'age', operator: 'lt', value: 30 }
+          ]
+        };
+
+        const result = await widgetService.applyCalculations(data, config);
+
+        expect(result.data[0].count).toBe(2); // 18 and 25
+      });
+    });
+
+    describe('applyCalculations - Performance', () => {
+      it('should handle large datasets (10K+ records)', async () => {
+        const largeDataset = Array.from({ length: 10000 }, (_, i) => ({
+          id: i + 1,
+          value: Math.random() * 1000
+        }));
+
+        const config = {
+          aggregation: 'count' as const,
+          field: 'id'
+        };
+
+        const startTime = Date.now();
+        const result = await widgetService.applyCalculations(largeDataset, config);
+        const duration = Date.now() - startTime;
+
+        expect(result.data[0].count).toBe(10000);
+        expect(duration).toBeLessThan(1000); // Should complete within 1 second
+      });
+    });
+  });
+});

@@ -1,0 +1,555 @@
+/**
+ * Screenshot Capture Script
+ * Feature: 029-complete-user-guide
+ * Purpose: Automated screenshot capture using Playwright for user guide documentation
+ */
+
+import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import sharp from 'sharp';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ViewportConfig {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+}
+
+interface CaptureTask {
+  id: string;
+  feature: string;
+  step: number;
+  description: string;
+  url: string;
+  viewport: 'desktop' | 'tablet' | 'mobile';
+  waitForSelector?: string;
+  actions?: CaptureAction[];
+  altText: string;
+  caption?: string;
+  delay?: number;
+  fullPage?: boolean;
+  mask?: string[];
+}
+
+interface CaptureAction {
+  type: 'click' | 'fill' | 'select' | 'hover' | 'scroll' | 'wait';
+  selector?: string;
+  value?: string;
+  duration?: number;
+  scrollTo?: { x?: number; y?: number };
+}
+
+interface CaptureResult {
+  taskId: string;
+  success: boolean;
+  error?: string;
+  filePaths?: {
+    png: string;
+    webp?: string;
+    avif?: string;
+  };
+  fileSizes?: {
+    png: number;
+    webp?: number;
+    avif?: number;
+  };
+  duration: number;
+}
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+const VIEWPORTS: Record<string, ViewportConfig> = {
+  desktop: { width: 1280, height: 800, deviceScaleFactor: 1 },
+  tablet: { width: 768, height: 1024, deviceScaleFactor: 1 },
+  mobile: { width: 375, height: 667, deviceScaleFactor: 2 }
+};
+
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const OUTPUT_DIR = path.join(process.cwd(), 'public/docs/screenshots');
+const COMPRESSION_QUALITY = {
+  png: 80,
+  webp: 85,
+  avif: 70
+};
+
+// ============================================================================
+// Capture Tasks Configuration
+// ============================================================================
+
+const CAPTURE_TASKS: CaptureTask[] = [
+  // Dashboard
+  {
+    id: 'dashboard-01',
+    feature: 'dashboard',
+    step: 1,
+    description: 'overview',
+    url: '/dashboard',
+    viewport: 'desktop',
+    waitForSelector: '[data-testid="dashboard-metrics"]',
+    altText: 'Dashboard overview showing key metrics and activity',
+    caption: 'Main dashboard interface with metrics cards'
+  },
+
+  // Sales Analytics
+  {
+    id: 'sales-analytics-01',
+    feature: 'sales-analytics',
+    step: 1,
+    description: 'navigation',
+    url: '/dashboard?tab=sales',
+    viewport: 'desktop',
+    waitForSelector: '[role="tabpanel"]',
+    altText: 'Sales Analytics tab in dashboard navigation',
+    caption: 'Accessing Sales Analytics from the dashboard'
+  },
+  {
+    id: 'sales-analytics-02',
+    feature: 'sales-analytics',
+    step: 2,
+    description: 'filters',
+    url: '/dashboard?tab=sales',
+    viewport: 'desktop',
+    actions: [
+      { type: 'wait', duration: 500 }
+    ],
+    altText: 'Sales Analytics filter panel with date range and supplier filters',
+    caption: 'Available filters for sales data'
+  },
+  {
+    id: 'sales-analytics-03',
+    feature: 'sales-analytics',
+    step: 3,
+    description: 'table-sorting',
+    url: '/dashboard?tab=sales',
+    viewport: 'desktop',
+    waitForSelector: 'table',
+    altText: 'Sales data table with sortable columns',
+    caption: 'Sales data displayed in sortable table format'
+  },
+
+  // Stock Profiles
+  {
+    id: 'stock-profiles-01',
+    feature: 'stock-profiles',
+    step: 1,
+    description: 'grid-view',
+    url: '/dashboard?tab=stock',
+    viewport: 'desktop',
+    waitForSelector: '[role="grid"]',
+    altText: 'Stock profiles grid showing product data',
+    caption: 'Product profiles displayed in grid layout'
+  },
+  {
+    id: 'stock-profiles-02',
+    feature: 'stock-profiles',
+    step: 2,
+    description: 'active-inactive-badges',
+    url: '/dashboard?tab=stock',
+    viewport: 'desktop',
+    waitForSelector: '[role="grid"]',
+    altText: 'Active and inactive product badges in stock profiles',
+    caption: 'Product status indicators'
+  },
+  {
+    id: 'stock-profiles-03',
+    feature: 'stock-profiles',
+    step: 3,
+    description: 'pagination',
+    url: '/dashboard?tab=stock',
+    viewport: 'desktop',
+    waitForSelector: '[role="navigation"][aria-label*="pagination"]',
+    altText: 'Pagination controls for stock profiles',
+    caption: 'Navigate through pages of product data'
+  },
+
+  // Data Upload
+  {
+    id: 'data-upload-01',
+    feature: 'data-upload',
+    step: 1,
+    description: 'navigation',
+    url: '/dashboard?tab=data-upload',
+    viewport: 'desktop',
+    waitForSelector: '[role="tabpanel"]',
+    altText: 'Data Upload section navigation',
+    caption: 'Accessing the Data Upload feature'
+  },
+  {
+    id: 'data-upload-02',
+    feature: 'data-upload',
+    step: 2,
+    description: 'brn-tab',
+    url: '/dashboard?tab=data-upload',
+    viewport: 'desktop',
+    waitForSelector: '[role="tablist"]',
+    altText: 'BRN upload tab selected',
+    caption: 'Selecting BRN Stock upload option'
+  },
+  {
+    id: 'data-upload-03',
+    feature: 'data-upload',
+    step: 3,
+    description: 'file-input',
+    url: '/dashboard?tab=data-upload',
+    viewport: 'desktop',
+    waitForSelector: 'input[type="file"]',
+    altText: 'File upload input field',
+    caption: 'Choose file button for Excel upload'
+  },
+
+  // Widget Builder
+  {
+    id: 'widget-builder-01',
+    feature: 'widget-builder',
+    step: 1,
+    description: 'landing',
+    url: '/dashboards/builder',
+    viewport: 'desktop',
+    waitForSelector: 'h1',
+    altText: 'Widget Builder landing page',
+    caption: 'Widget Builder main interface'
+  },
+  {
+    id: 'widget-builder-02',
+    feature: 'widget-builder',
+    step: 2,
+    description: 'data-source-selection',
+    url: '/dashboards/builder',
+    viewport: 'desktop',
+    actions: [
+      { type: 'click', selector: 'button:has-text("Create New Widget")' },
+      { type: 'wait', duration: 500 }
+    ],
+    altText: 'Data source selection dropdown in widget builder',
+    caption: 'Selecting a data source for the widget'
+  },
+
+  // Stock Ordering
+  {
+    id: 'stock-ordering-01',
+    feature: 'stock-ordering',
+    step: 1,
+    description: 'overview',
+    url: '/dashboard?tab=order-management',
+    viewport: 'desktop',
+    waitForSelector: '[role="tabpanel"]',
+    altText: 'Stock Ordering interface with recommendations',
+    caption: 'Order management and recommendations view'
+  },
+  {
+    id: 'stock-ordering-02',
+    feature: 'stock-ordering',
+    step: 2,
+    description: 'recommendations',
+    url: '/dashboard?tab=order-management',
+    viewport: 'desktop',
+    waitForSelector: '[data-testid="order-recommendations"]',
+    altText: 'AI-powered order recommendations',
+    caption: 'System-generated order suggestions'
+  }
+];
+
+// ============================================================================
+// Screenshot Capture Functions
+// ============================================================================
+
+async function setupBrowser(): Promise<{ browser: Browser; context: BrowserContext }> {
+  console.log('🚀 Launching Chromium browser...');
+  const browser = await chromium.launch({
+    headless: false, // Visual confirmation
+    args: ['--disable-dev-shm-usage']
+  });
+
+  const context = await browser.newContext({
+    viewport: VIEWPORTS.desktop,
+    deviceScaleFactor: 1
+  });
+
+  // Disable animations for consistent screenshots
+  await context.addInitScript(() => {
+    // Disable CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+      }
+    `;
+    document.head.appendChild(style);
+  });
+
+  return { browser, context };
+}
+
+async function performActions(page: Page, actions: CaptureAction[]): Promise<void> {
+  for (const action of actions) {
+    try {
+      switch (action.type) {
+        case 'click':
+          if (action.selector) {
+            await page.click(action.selector);
+          }
+          break;
+        case 'fill':
+          if (action.selector && action.value) {
+            await page.fill(action.selector, action.value);
+          }
+          break;
+        case 'select':
+          if (action.selector && action.value) {
+            await page.selectOption(action.selector, action.value);
+          }
+          break;
+        case 'hover':
+          if (action.selector) {
+            await page.hover(action.selector);
+          }
+          break;
+        case 'scroll':
+          if (action.scrollTo) {
+            await page.evaluate((pos) => {
+              window.scrollTo(pos.x || 0, pos.y || 0);
+            }, action.scrollTo);
+          }
+          break;
+        case 'wait':
+          await page.waitForTimeout(action.duration || 500);
+          break;
+      }
+    } catch (error) {
+      console.warn(`⚠️  Action failed: ${action.type}`, error);
+    }
+  }
+}
+
+async function captureScreenshot(
+  page: Page,
+  task: CaptureTask
+): Promise<string> {
+  const filename = `${task.feature}/${String(task.step).padStart(2, '0')}-${task.description}.png`;
+  const outputPath = path.join(OUTPUT_DIR, filename);
+
+  // Ensure directory exists
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+  // Capture screenshot
+  await page.screenshot({
+    path: outputPath,
+    fullPage: task.fullPage || false,
+    animations: 'disabled',
+    mask: task.mask ? await Promise.all(task.mask.map(s => page.locator(s))) : undefined
+  });
+
+  return outputPath;
+}
+
+async function optimizeImage(
+  inputPath: string,
+  formats: ('png' | 'webp' | 'avif')[] = ['png', 'webp', 'avif']
+): Promise<Record<string, { path: string; size: number }>> {
+  const results: Record<string, { path: string; size: number }> = {};
+  const basePath = inputPath.replace(/\.png$/, '');
+
+  for (const format of formats) {
+    try {
+      const outputPath = `${basePath}.${format}`;
+
+      let pipeline = sharp(inputPath);
+
+      switch (format) {
+        case 'png':
+          pipeline = pipeline.png({
+            quality: COMPRESSION_QUALITY.png,
+            compressionLevel: 9,
+            adaptiveFiltering: true
+          });
+          break;
+        case 'webp':
+          pipeline = pipeline.webp({
+            quality: COMPRESSION_QUALITY.webp,
+            effort: 6
+          });
+          break;
+        case 'avif':
+          pipeline = pipeline.avif({
+            quality: COMPRESSION_QUALITY.avif,
+            speed: 4
+          });
+          break;
+      }
+
+      await pipeline.toFile(outputPath);
+      const stats = await fs.stat(outputPath);
+
+      results[format] = {
+        path: outputPath,
+        size: stats.size
+      };
+
+      console.log(`  ✓ ${format.toUpperCase()}: ${(stats.size / 1024).toFixed(1)} KB`);
+    } catch (error) {
+      console.warn(`  ⚠️  Failed to optimize ${format}:`, error);
+    }
+  }
+
+  return results;
+}
+
+async function executeCaptureTask(
+  context: BrowserContext,
+  task: CaptureTask
+): Promise<CaptureResult> {
+  const startTime = Date.now();
+  console.log(`\n📸 Capturing: ${task.id} (${task.feature}/${task.description})`);
+
+  try {
+    const page = await context.newPage();
+
+    // Set viewport for this task
+    await page.setViewportSize(VIEWPORTS[task.viewport]);
+
+    // Navigate to URL
+    console.log(`  → Navigating to ${task.url}`);
+    await page.goto(`${BASE_URL}${task.url}`, {
+      waitUntil: 'networkidle',
+      timeout: 30000
+    });
+
+    // Wait for specific selector if provided
+    if (task.waitForSelector) {
+      console.log(`  → Waiting for selector: ${task.waitForSelector}`);
+      await page.waitForSelector(task.waitForSelector, { timeout: 10000 });
+    }
+
+    // Perform actions if any
+    if (task.actions && task.actions.length > 0) {
+      console.log(`  → Performing ${task.actions.length} actions`);
+      await performActions(page, task.actions);
+    }
+
+    // Additional delay if specified
+    if (task.delay) {
+      await page.waitForTimeout(task.delay);
+    }
+
+    // Capture screenshot
+    console.log(`  → Capturing screenshot`);
+    const screenshotPath = await captureScreenshot(page, task);
+
+    // Optimize image
+    console.log(`  → Optimizing image formats`);
+    const optimized = await optimizeImage(screenshotPath);
+
+    await page.close();
+
+    const duration = Date.now() - startTime;
+    console.log(`  ✅ Completed in ${duration}ms`);
+
+    return {
+      taskId: task.id,
+      success: true,
+      filePaths: {
+        png: optimized.png?.path || screenshotPath,
+        webp: optimized.webp?.path,
+        avif: optimized.avif?.path
+      },
+      fileSizes: {
+        png: optimized.png?.size || 0,
+        webp: optimized.webp?.size,
+        avif: optimized.avif?.size
+      },
+      duration
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`  ❌ Failed: ${error}`);
+
+    return {
+      taskId: task.id,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      duration
+    };
+  }
+}
+
+// ============================================================================
+// Main Execution
+// ============================================================================
+
+async function main() {
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('  📸 User Guide Screenshot Capture');
+  console.log('  Feature: 029-complete-user-guide');
+  console.log('═══════════════════════════════════════════════════════════\n');
+
+  console.log(`Base URL: ${BASE_URL}`);
+  console.log(`Output Directory: ${OUTPUT_DIR}`);
+  console.log(`Total Tasks: ${CAPTURE_TASKS.length}\n`);
+
+  // Setup browser
+  const { browser, context } = await setupBrowser();
+
+  // Execute capture tasks
+  const results: CaptureResult[] = [];
+
+  for (const task of CAPTURE_TASKS) {
+    const result = await executeCaptureTask(context, task);
+    results.push(result);
+  }
+
+  // Cleanup
+  await context.close();
+  await browser.close();
+
+  // Summary
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('  📊 Capture Summary');
+  console.log('═══════════════════════════════════════════════════════════\n');
+
+  const successful = results.filter(r => r.success);
+  const failed = results.filter(r => !r.success);
+
+  console.log(`✅ Successful: ${successful.length}/${results.length}`);
+  console.log(`❌ Failed: ${failed.length}/${results.length}`);
+
+  if (failed.length > 0) {
+    console.log('\n❌ Failed Tasks:');
+    failed.forEach(f => {
+      console.log(`  - ${f.taskId}: ${f.error}`);
+    });
+  }
+
+  const totalSize = successful.reduce((acc, r) => {
+    return acc + (r.fileSizes?.png || 0) + (r.fileSizes?.webp || 0) + (r.fileSizes?.avif || 0);
+  }, 0);
+
+  const totalDuration = results.reduce((acc, r) => acc + r.duration, 0);
+
+  console.log(`\n📦 Total Size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`⏱️  Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
+  console.log(`📁 Screenshots saved to: ${OUTPUT_DIR}\n`);
+}
+
+// Run if called directly
+if (require.main === module) {
+  main()
+    .then(() => {
+      console.log('✅ Screenshot capture completed successfully!\n');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('❌ Screenshot capture failed:', error);
+      process.exit(1);
+    });
+}
+
+export { main as captureScreenshots, CAPTURE_TASKS, executeCaptureTask };

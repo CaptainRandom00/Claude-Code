@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Create comprehensive authentication and infrastructure tests",
+    "status": "completed",
+    "priority": "high",
+    "id": "infrastructure-tests-1"
+  },
+  {
+    "content": "Build end-to-end project creation test suite",
+    "status": "completed",
+    "priority": "high",
+    "id": "e2e-project-tests-2"
+  },
+  {
+    "content": "Implement character confusion prevention tests",
+    "status": "completed",
+    "priority": "medium",
+    "id": "char-confusion-tests-3"
+  },
+  {
+    "content": "Create full user journey smoke tests",
+    "status": "completed",
+    "priority": "high",
+    "id": "smoke-tests-4"
+  },
+  {
+    "content": "Fix login credentials - SUCCESS",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-credentials-5"
+  },
+  {
+    "content": "Debug project navigation after successful creation",
+    "status": "completed",
+    "priority": "high",
+    "id": "debug-project-nav-6"
+  },
+  {
+    "content": "Fix API response data structure issue",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "fix-api-response-7"
+  }
+]

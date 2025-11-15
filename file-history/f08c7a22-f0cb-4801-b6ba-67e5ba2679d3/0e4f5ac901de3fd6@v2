@@ -1,0 +1,297 @@
+/**
+ * Conditional Formatting Builder Component
+ * Feature: 028-build-a-widget (User Story 5 - T092)
+ *
+ * Allows users to configure conditional formatting rules for widget data
+ * Based on operators like gt, gte, lt, lte, eq, ne, between
+ */
+
+import { useState } from 'react';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Trash2 } from 'lucide-react';
+
+export interface ConditionalFormattingRule {
+  field: string;
+  operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'ne' | 'between';
+  value?: number;
+  min?: number;
+  max?: number;
+  color?: string;
+  backgroundColor?: string;
+  icon?: string;
+}
+
+interface ConditionalFormattingBuilderProps {
+  availableFields: string[];
+  rules: ConditionalFormattingRule[];
+  onRulesChange: (rules: ConditionalFormattingRule[]) => void;
+}
+
+const OPERATORS = [
+  { value: 'gt', label: 'Greater Than (>)', useValue: true },
+  { value: 'gte', label: 'Greater Than or Equal (≥)', useValue: true },
+  { value: 'lt', label: 'Less Than (<)', useValue: true },
+  { value: 'lte', label: 'Less Than or Equal (≤)', useValue: true },
+  { value: 'eq', label: 'Equal (=)', useValue: true },
+  { value: 'ne', label: 'Not Equal (≠)', useValue: true },
+  { value: 'between', label: 'Between', useValue: false },
+];
+
+const PRESET_COLORS = [
+  { name: 'Red', text: '#ef4444', bg: '#fef2f2' },
+  { name: 'Green', text: '#22c55e', bg: '#f0fdf4' },
+  { name: 'Blue', text: '#3b82f6', bg: '#eff6ff' },
+  { name: 'Yellow', text: '#eab308', bg: '#fefce8' },
+  { name: 'Orange', text: '#f97316', bg: '#fff7ed' },
+];
+
+const ICONS = ['arrow-up', 'arrow-down', 'alert', 'check', 'x'];
+
+export function ConditionalFormattingBuilder({
+  availableFields,
+  rules,
+  onRulesChange,
+}: ConditionalFormattingBuilderProps) {
+  const addRule = () => {
+    const newRule: ConditionalFormattingRule = {
+      field: availableFields[0] || '',
+      operator: 'gt',
+      value: 0,
+      color: PRESET_COLORS[0].text,
+      backgroundColor: PRESET_COLORS[0].bg,
+    };
+    onRulesChange([...rules, newRule]);
+  };
+
+  const removeRule = (index: number) => {
+    const updated = rules.filter((_, i) => i !== index);
+    onRulesChange(updated);
+  };
+
+  const updateRule = (index: number, updates: Partial<ConditionalFormattingRule>) => {
+    const updated = rules.map((rule, i) => (i === index ? { ...rule, ...updates } : rule));
+    onRulesChange(updated);
+  };
+
+  const selectPresetColor = (index: number, preset: typeof PRESET_COLORS[0]) => {
+    updateRule(index, {
+      color: preset.text,
+      backgroundColor: preset.bg,
+    });
+  };
+
+  return (
+    <div data-testid="conditional-formatting-builder" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-lg">Conditional Formatting</h3>
+          <p className="text-sm text-muted-foreground">
+            Apply visual styles based on data values
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addRule}
+          disabled={availableFields.length === 0}
+          data-testid="add-formatting-rule"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add Rule
+        </Button>
+      </div>
+
+      {rules.length === 0 ? (
+        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            No formatting rules configured
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Click "Add Rule" to create conditional formatting
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {rules.map((rule, index) => {
+            const selectedOperator = OPERATORS.find((op) => op.value === rule.operator);
+            const isBetween = rule.operator === 'between';
+
+            return (
+              <div
+                key={index}
+                className="p-4 border rounded-lg space-y-3"
+                data-testid={`formatting-rule-${index}`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Rule {index + 1}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeRule(index)}
+                    data-testid={`remove-rule-${index}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+
+                {/* Field Selector */}
+                <div className="space-y-2">
+                  <Label>Field</Label>
+                  <Select
+                    value={rule.field}
+                    onValueChange={(field) => updateRule(index, { field })}
+                  >
+                    <SelectTrigger data-testid={`rule-${index}-field-select`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFields.map((field) => (
+                        <SelectItem key={field} value={field}>
+                          {field}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Operator Selector */}
+                <div className="space-y-2">
+                  <Label>Condition</Label>
+                  <Select
+                    value={rule.operator}
+                    onValueChange={(operator: any) => updateRule(index, { operator })}
+                  >
+                    <SelectTrigger data-testid={`rule-${index}-operator-select`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OPERATORS.map((op) => (
+                        <SelectItem key={op.value} value={op.value}>
+                          {op.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Value Input(s) */}
+                {isBetween ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Min Value</Label>
+                      <Input
+                        type="number"
+                        value={rule.min ?? ''}
+                        onChange={(e) => updateRule(index, { min: parseFloat(e.target.value) })}
+                        placeholder="Min"
+                        data-testid={`rule-${index}-min-input`}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Max Value</Label>
+                      <Input
+                        type="number"
+                        value={rule.max ?? ''}
+                        onChange={(e) => updateRule(index, { max: parseFloat(e.target.value) })}
+                        placeholder="Max"
+                        data-testid={`rule-${index}-max-input`}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Value</Label>
+                    <Input
+                      type="number"
+                      value={rule.value ?? ''}
+                      onChange={(e) => updateRule(index, { value: parseFloat(e.target.value) })}
+                      placeholder="Enter value"
+                      data-testid={`rule-${index}-value-input`}
+                    />
+                  </div>
+                )}
+
+                {/* Color Presets */}
+                <div className="space-y-2">
+                  <Label>Color Preset</Label>
+                  <div className="flex gap-2">
+                    {PRESET_COLORS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        className="w-10 h-10 rounded border-2 transition-all"
+                        style={{
+                          backgroundColor: preset.bg,
+                          borderColor:
+                            rule.color === preset.text && rule.backgroundColor === preset.bg
+                              ? preset.text
+                              : 'transparent',
+                        }}
+                        onClick={() => selectPresetColor(index, preset)}
+                        data-testid={`rule-${index}-preset-${preset.name.toLowerCase()}`}
+                        title={preset.name}
+                      >
+                        <div
+                          className="w-full h-full rounded flex items-center justify-center text-xs font-bold"
+                          style={{ color: preset.text }}
+                        >
+                          A
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Icon Selector */}
+                <div className="space-y-2">
+                  <Label>Icon (Optional)</Label>
+                  <Select
+                    value={rule.icon || 'none'}
+                    onValueChange={(icon) => updateRule(index, { icon: icon === 'none' ? undefined : icon })}
+                  >
+                    <SelectTrigger data-testid={`rule-${index}-icon-select`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Icon</SelectItem>
+                      {ICONS.map((icon) => (
+                        <SelectItem key={icon} value={icon}>
+                          {icon}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Preview */}
+                <div className="pt-2">
+                  <Label>Preview</Label>
+                  <div
+                    className="mt-1 p-2 rounded text-center font-medium text-sm"
+                    style={{
+                      color: rule.color,
+                      backgroundColor: rule.backgroundColor,
+                    }}
+                    data-testid={`rule-${index}-preview`}
+                  >
+                    {rule.icon && <span className="mr-1">{rule.icon}</span>}
+                    Sample Value: 123
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,609 @@
+# Quickstart Guide: Widget Dashboard Framework
+
+**Feature**: Widget-Based Dashboard Framework
+**Branch**: `028-build-a-widget`
+**For**: Developers implementing the widget framework
+
+---
+
+## Overview
+
+This guide provides the essential steps to implement the widget-based dashboard framework. Follow these steps sequentially to build the feature according to the spec and constitution requirements.
+
+---
+
+## Prerequisites
+
+- [x] Spec validated (`spec.md` - 61 functional requirements)
+- [x] Research complete (`research.md` - all unknowns resolved)
+- [x] Data model defined (`data-model.md` - 8 core tables)
+- [x] API contracts documented (`contracts/widget-api.md` - 21 endpoints)
+- [x] Constitution check passed (all 10 principles satisfied)
+
+---
+
+## Phase 1: Database Schema (1-2 days)
+
+### 1.1 Create Migration
+
+```bash
+# Create migration file
+touch db/migrations/028_widget_dashboard_framework.sql
+```
+
+**Migration content** (from `data-model.md`):
+- Create 8 tables: `widget_definitions`, `dashboards`, `dashboard_widgets`, `widget_layouts`, `dashboard_templates`, `template_widgets`, `api_endpoints_metadata`, `dashboard_versions`
+- Add indexes for performance
+- Set up foreign key relationships
+
+### 1.2 Update Drizzle Schema
+
+**File**: `shared/schema.ts`
+
+Add exports from `data-model.md` Drizzle schema section:
+- `widgetDefinitions`
+- `dashboards`
+- `dashboardWidgets`
+- `widgetLayouts`
+- `dashboardTemplates`
+- `apiEndpointsMetadata`
+- `dashboardVersions`
+
+### 1.3 Run Migration
+
+```bash
+# Run migration
+npm run db:migrate
+
+# Verify tables created
+npm run db:studio # or mysql -u root -p BB_Management_System
+```
+
+### 1.4 Seed Initial Data
+
+Create system widgets and templates:
+```sql
+-- Insert system widgets (metric, chart, table, alert, progress examples)
+-- Insert 3 dashboard templates (Sales Performance, Expiry Management, Stock Overview)
+-- See data-model.md for template structure
+```
+
+---
+
+## Phase 2: Backend API (3-5 days)
+
+### 2.1 Create Route File
+
+**File**: `server/routes-widget-dashboard.ts`
+
+```typescript
+import type { Express } from "express";
+
+export function registerWidgetDashboardRoutes(app: Express) {
+  // Widget Definitions (6 endpoints)
+  app.post("/api/widgets/definitions", createWidgetDefinition);
+  app.get("/api/widgets/definitions", getWidgetDefinitions);
+  app.get("/api/widgets/definitions/:id", getWidgetDefinitionById);
+  app.put("/api/widgets/definitions/:id", updateWidgetDefinition);
+  app.delete("/api/widgets/definitions/:id", deleteWidgetDefinition);
+
+  // Dashboards (8 endpoints)
+  app.post("/api/widgets/dashboards", createDashboard);
+  app.get("/api/widgets/dashboards", getUserDashboards);
+  app.get("/api/widgets/dashboards/:id", getDashboardById);
+  app.put("/api/widgets/dashboards/:id", updateDashboard);
+  app.delete("/api/widgets/dashboards/:id", deleteDashboard);
+  app.patch("/api/widgets/dashboards/:dashboardId/layouts", updateWidgetLayouts);
+  app.get("/api/widgets/dashboards/:id/versions", getDashboardVersions);
+  app.post("/api/widgets/dashboards/:id/versions/:versionNumber/restore", restoreDashboardVersion);
+
+  // Templates (2 endpoints)
+  app.get("/api/widgets/templates", getTemplates);
+  app.post("/api/widgets/dashboards/from-template/:templateId", createDashboardFromTemplate);
+
+  // API Metadata (2 endpoints)
+  app.get("/api/widgets/metadata/endpoints", getAvailableEndpoints);
+  app.get("/api/widgets/metadata/endpoints/:id/schema", getEndpointSchema);
+
+  // Widget Data (2 endpoints)
+  app.post("/api/widgets/data/fetch", fetchWidgetData);
+  app.post("/api/widgets/data/preview", previewWidgetData);
+
+  // Utility (2 endpoints)
+  app.post("/api/widgets/validate", validateWidgetConfig);
+  app.get("/api/widgets/system/limits", getSystemLimits);
+}
+```
+
+### 2.2 Create Service Layer
+
+**File**: `server/services/widget-service.ts`
+
+Implement business logic:
+- Widget CRUD operations
+- Dashboard CRUD with version management
+- Calculation pipeline execution (using Lodash from research.md)
+- API metadata extraction from route registry
+- Template instantiation
+
+### 2.3 Create Validation Schemas
+
+**File**: `server/validation/widget-schemas.ts`
+
+```typescript
+import { z } from 'zod';
+
+export const widgetDefinitionSchema = z.object({
+  widgetType: z.enum(['metric', 'chart', 'table', 'alert', 'progress']),
+  name: z.string().min(3).max(255),
+  description: z.string().optional(),
+  apiEndpoint: z.string().url(),
+  httpMethod: z.enum(['GET', 'POST', 'PUT', 'DELETE']).default('GET'),
+  queryParams: z.record(z.any()).optional(),
+  calculationConfig: calculationConfigSchema,
+  visualizationConfig: visualizationConfigSchema,
+  refreshInterval: z.number().min(30000).max(3600000).default(60000),
+  errorConfig: z.object({
+    showLastData: z.boolean().optional(),
+    retryAttempts: z.number().optional(),
+    retryDelay: z.number().optional(),
+  }).optional(),
+});
+
+// Add other schemas...
+```
+
+### 2.4 Register Routes
+
+**File**: `server/index.ts`
+
+```typescript
+import { registerWidgetDashboardRoutes } from './routes-widget-dashboard';
+
+// After existing routes...
+registerWidgetDashboardRoutes(app);
+```
+
+### 2.5 Update Route Registry
+
+```bash
+npm run routes:generate:registry
+npm run routes:validate
+```
+
+---
+
+## Phase 3: Frontend Components (5-7 days)
+
+### 3.1 Install Dependencies
+
+```bash
+npm install react-grid-layout @types/react-grid-layout
+npm install isomorphic-dompurify  # For XSS prevention
+```
+
+### 3.2 Create Widget Components
+
+**Directory**: `client/src/components/widgets/`
+
+```
+widgets/
+├── base/
+│   ├── WidgetContainer.tsx       # Base wrapper with error boundaries
+│   ├── WidgetHeader.tsx           # Title, refresh, settings
+│   └── WidgetError.tsx            # Error state display
+├── types/
+│   ├── MetricWidget.tsx           # Single value display
+│   ├── ChartWidget.tsx            # Recharts integration
+│   ├── TableWidget.tsx            # Data grid
+│   ├── AlertWidget.tsx            # Notification list
+│   └── ProgressWidget.tsx         # Gauge/bar indicators
+└── WidgetFactory.tsx              # Widget type renderer
+```
+
+### 3.3 Create Dashboard Builder
+
+**Directory**: `client/src/components/dashboard-builder/`
+
+```
+dashboard-builder/
+├── DashboardBuilder.tsx           # Main builder component
+├── WidgetSelector.tsx             # Widget type selection
+├── WidgetConfigurator.tsx         # Data source & calculation config
+├── ApiEndpointPicker.tsx          # API metadata browser
+├── CalculationBuilder.tsx         # Visual calculation pipeline builder
+├── LayoutEditor.tsx               # react-grid-layout wrapper
+└── PreviewPanel.tsx               # Real-time data preview
+```
+
+### 3.4 Create Dashboard Viewer
+
+**File**: `client/src/pages/dashboard-viewer.tsx`
+
+```typescript
+import { WidthProvider, Responsive } from 'react-grid-layout';
+import { WidgetFactory } from '@/components/widgets/WidgetFactory';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+export function DashboardViewer({ dashboardId }: Props) {
+  const { data: dashboard } = useQuery({
+    queryKey: ['dashboard', dashboardId],
+    queryFn: () => fetchDashboard(dashboardId),
+  });
+
+  const layouts = transformLayoutsForGrid(dashboard.widgets);
+
+  return (
+    <ResponsiveGridLayout
+      className="layout"
+      layouts={layouts}
+      breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+      cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+      rowHeight={30}
+      onLayoutChange={handleLayoutChange}
+    >
+      {dashboard.widgets.map((widget) => (
+        <div key={widget.id} data-grid={widget.layout}>
+          <WidgetFactory widget={widget} />
+        </div>
+      ))}
+    </ResponsiveGridLayout>
+  );
+}
+```
+
+### 3.5 Create Hooks
+
+**Directory**: `client/src/hooks/`
+
+```
+hooks/
+├── use-widget-data.ts            # Widget data fetching with TanStack Query
+├── use-calculation-pipeline.ts   # Client-side calculations
+├── use-dashboard-builder.ts      # Builder state management
+├── use-layout-persistence.ts     # Auto-save layout changes
+└── use-api-metadata.ts           # API discovery
+```
+
+### 3.6 Add Routes
+
+**File**: `client/src/App.tsx`
+
+```typescript
+import { DashboardBuilder } from '@/pages/dashboard-builder';
+import { DashboardViewer } from '@/pages/dashboard-viewer';
+
+// Add routes
+<Route path="/dashboards/builder" element={<DashboardBuilder />} />
+<Route path="/dashboards/builder/:id" element={<DashboardBuilder />} />
+<Route path="/dashboards/:id" element={<DashboardViewer />} />
+<Route path="/dashboards/templates" element={<TemplateGallery />} />
+```
+
+---
+
+## Phase 4: Accessibility (2-3 days)
+
+### 4.1 Implement Keyboard Navigation
+
+**File**: `client/src/components/dashboard-builder/KeyboardNavigation.tsx`
+
+```typescript
+// Custom keyboard handler for react-grid-layout
+const handleKeyDown = (e: KeyboardEvent, widgetId: string) => {
+  if (e.key === 'ArrowUp') moveWidget(widgetId, 'up');
+  if (e.key === 'ArrowDown') moveWidget(widgetId, 'down');
+  if (e.key === 'ArrowLeft') moveWidget(widgetId, 'left');
+  if (e.key === 'ArrowRight') moveWidget(widgetId, 'right');
+  if (e.key === ' ' || e.key === 'Enter') activateWidget(widgetId);
+  if (e.key === 'Escape') cancelOperation();
+};
+```
+
+### 4.2 Add ARIA Labels
+
+Update all widget components with:
+- `aria-label` on widgets
+- `aria-live="polite"` on dynamic data regions
+- `role="region"` on dashboard sections
+- Focus management for modals and dialogs
+
+### 4.3 Ensure Color Contrast
+
+Validate all charts and UI elements meet WCAG 2.1 AA:
+- 4.5:1 for normal text
+- 3:1 for large text and UI components
+- Use color-blind safe palettes for charts
+
+---
+
+## Phase 5: Testing (3-4 days)
+
+### 5.1 Create Playwright E2E Tests
+
+**Directory**: `tests/playwright/`
+
+```
+playwright/
+├── widget-configuration.spec.ts
+├── dashboard-builder.spec.ts
+├── layout-persistence.spec.ts
+├── responsive-behavior.spec.ts
+├── accessibility.spec.ts
+└── cross-browser.spec.ts
+```
+
+**Example test**:
+```typescript
+test('User can create dashboard from template', async ({ page }) => {
+  await page.goto('/dashboards/templates');
+  await page.click('text=Sales Performance');
+  await page.fill('input[name="dashboardName"]', 'My Sales Dashboard');
+  await page.click('button:has-text("Create Dashboard")');
+
+  await expect(page).toHaveURL(/\/dashboards\/\d+/);
+  await expect(page.locator('.widget')).toHaveCount(3); // Template has 3 widgets
+});
+```
+
+### 5.2 Create Unit Tests
+
+**Directory**: `tests/unit/`
+
+```
+unit/
+├── calculation-pipeline.test.ts
+├── widget-validators.test.ts
+├── layout-collision.test.ts
+└── api-metadata-parser.test.ts
+```
+
+### 5.3 Create Audit Trail
+
+**Directory**: `specs/028-build-a-widget/audit/`
+
+```
+audit/
+├── playwright-execution-logs/
+│   ├── widget-configuration.log
+│   ├── dashboard-builder.log
+│   └── layout-persistence.log
+├── failure-analysis/
+│   ├── [test-name]-analysis.md
+│   └── screenshots/
+├── remediation/
+│   ├── fixes-applied.md
+│   └── retest-results.md
+└── validation-report.md
+```
+
+### 5.4 Run Test Suite
+
+```bash
+# Unit tests
+npm run test:unit
+
+# E2E tests
+npm run test:playwright
+
+# Accessibility tests
+npm run test:playwright -- --grep "accessibility"
+
+# Cross-browser
+npm run test:playwright -- --project=chromium --project=firefox --project=webkit
+```
+
+---
+
+## Phase 6: Security & Performance (2-3 days)
+
+### 6.1 Implement Security
+
+**XSS Prevention**:
+```typescript
+import DOMPurify from 'isomorphic-dompurify';
+
+const sanitizedName = DOMPurify.sanitize(userInput);
+```
+
+**CSRF Protection**:
+```typescript
+// Middleware for state-changing operations
+app.use('/api/widgets', csrfProtection);
+```
+
+**Input Validation**:
+All endpoints use Zod schemas for validation.
+
+### 6.2 Performance Optimization
+
+**Virtualization** (for >20 widgets):
+```typescript
+import { FixedSizeGrid } from 'react-window';
+```
+
+**Memoization**:
+```typescript
+const MemoizedWidget = React.memo(WidgetComponent);
+```
+
+**Calculation Caching**:
+Implemented in widget-service.ts using `widget_calculation_cache` table.
+
+### 6.3 Resource Monitoring
+
+Implement limits from FR-057 to FR-061:
+- Memory limit: 250MB per dashboard
+- Concurrent requests: max 10
+- Bandwidth: 50MB/min
+- CPU throttling at 80%
+
+---
+
+## Phase 7: Documentation & Deployment
+
+### 7.1 Update Route Registry
+
+```bash
+npm run routes:generate:registry
+npm run routes:generate:docs
+npm run routes:generate:openapi
+```
+
+### 7.2 Create User Guide
+
+**File**: `docs/widget-dashboard-user-guide.md`
+
+Include:
+- How to create dashboard from template
+- How to configure widget data sources
+- How to customize layouts
+- Keyboard shortcuts
+
+### 7.3 Update Agent Context
+
+```bash
+bash .specify/scripts/bash/update-agent-context.sh claude
+```
+
+Adds new technologies to CLAUDE.md:
+- react-grid-layout v1.5.2
+- Widget framework architecture
+- Calculation pipeline pattern
+
+### 7.4 Deploy
+
+```bash
+# Build
+npm run build
+
+# Verify routes
+npm run routes:health
+
+# Deploy
+npm run deploy # or deployment script
+```
+
+---
+
+## Verification Checklist
+
+Use this checklist to verify implementation completeness:
+
+### Database
+- [ ] All 8 tables created with proper indexes
+- [ ] Foreign keys established
+- [ ] 3+ dashboard templates seeded
+- [ ] System widgets seeded
+
+### Backend
+- [ ] 21 API endpoints implemented
+- [ ] All Zod validation schemas created
+- [ ] Service layer complete
+- [ ] Route registry updated
+- [ ] API documentation generated
+
+### Frontend
+- [ ] 5 widget types implemented (metric, chart, table, alert, progress)
+- [ ] Dashboard builder UI complete
+- [ ] Layout editor with react-grid-layout
+- [ ] API metadata browser
+- [ ] Calculation pipeline builder
+- [ ] Real-time preview (<500ms)
+
+### Accessibility
+- [ ] WCAG 2.1 AA compliance verified
+- [ ] Keyboard navigation implemented
+- [ ] Screen reader compatible
+- [ ] Color contrast validated (4.5:1 text, 3:1 UI)
+- [ ] Focus management correct
+
+### Testing
+- [ ] Playwright E2E tests passing (6+ test files)
+- [ ] Unit tests passing (4+ test files)
+- [ ] Cross-browser tests passing (Chrome, Firefox, Safari)
+- [ ] Audit trail complete
+- [ ] Validation report created
+
+### Security
+- [ ] XSS prevention implemented (DOMPurify)
+- [ ] CSRF protection enabled
+- [ ] Input validation on all endpoints
+- [ ] SQL injection prevention (Drizzle parameterized queries)
+- [ ] Authentication on all endpoints
+
+### Performance
+- [ ] Dashboard loads <3 seconds
+- [ ] Widget refresh <2 seconds (10K records)
+- [ ] Layout save <1 second
+- [ ] Memory limit enforced (250MB)
+- [ ] Request throttling implemented (max 10 concurrent)
+
+### Constitution Compliance
+- [ ] Principle I: Data model in shared/schema.ts ✅
+- [ ] Principle II: Modular routes (routes-widget-dashboard.ts) ✅
+- [ ] Principle III: Component-based UI ✅
+- [ ] Principle V: <200ms API responses ✅
+- [ ] Principle VI: E2E tests + audit trail ✅
+- [ ] Principle VII: Security implemented ✅
+- [ ] Principle VIII: Comprehensive testing ✅
+- [ ] Principle IX: Route documentation ✅
+- [ ] Principle X: Route analysis complete ✅
+
+---
+
+## Common Issues & Solutions
+
+### Issue: react-grid-layout keyboard navigation not working
+**Solution**: Implement custom keyboard handler (see Phase 4.1)
+
+### Issue: Widget data not refreshing
+**Solution**: Check TanStack Query `refetchInterval` configuration and `staleTime` settings
+
+### Issue: Layout changes not persisting
+**Solution**: Verify auto-save is triggered on layout change (debounced 500ms)
+
+### Issue: Calculation timeout
+**Solution**: Implement Web Worker for calculations >5K records, or offer async calculation per FR-058
+
+### Issue: Memory limit exceeded
+**Solution**: Implement widget virtualization and lazy loading for off-screen widgets
+
+---
+
+## Success Criteria Validation
+
+Verify against spec success criteria:
+
+- [ ] **SC-001**: Users create 3-widget dashboard in <5 minutes ✅
+- [ ] **SC-002**: Add widget in <30 seconds ✅
+- [ ] **SC-003**: 90% create first dashboard without support ✅
+- [ ] **SC-004**: Widget refresh <2 seconds for 10K records ✅
+- [ ] **SC-005**: Dashboard loads <3 seconds ✅
+- [ ] **SC-006**: 100 concurrent users supported ✅
+- [ ] **SC-007**: Layout saves <1 second ✅
+- [ ] **SC-008**: 50 widgets display simultaneously ✅
+- [ ] **SC-012**: 100% calculation accuracy ✅
+- [ ] **SC-013**: Zero data discrepancies ✅
+
+---
+
+## Next Steps After Implementation
+
+1. **Monitor Performance**: Track SC-005 to SC-008 metrics in production
+2. **Gather User Feedback**: Validate SC-001 to SC-003 adoption metrics
+3. **Iterate on Templates**: Add more templates based on user needs
+4. **Expand Widget Types**: Consider additional visualization types
+5. **Implement Sharing**: Add dashboard_sharing table functionality (currently optional)
+
+---
+
+## Support
+
+For questions or issues during implementation:
+- **Spec**: `/specs/028-build-a-widget/spec.md`
+- **Research**: `/specs/028-build-a-widget/research.md`
+- **Data Model**: `/specs/028-build-a-widget/data-model.md`
+- **API Contracts**: `/specs/028-build-a-widget/contracts/widget-api.md`
+- **Constitution**: `/.specify/memory/constitution.md`

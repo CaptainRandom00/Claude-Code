@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Analyze WordPress menu registration and location mapping in The7 theme files",
+    "status": "in_progress",
+    "activeForm": "Analyzing WordPress menu registration and location mapping in The7 theme files"
+  },
+  {
+    "content": "Investigate custom menu walker implementations and menu modifications",
+    "status": "pending",
+    "activeForm": "Investigating custom menu walker implementations and menu modifications"
+  },
+  {
+    "content": "Examine widget configuration and menu assignment database storage",
+    "status": "pending",
+    "activeForm": "Examining widget configuration and menu assignment database storage"
+  },
+  {
+    "content": "Create WordPress menu system investigation script to analyze live sidebar configuration",
+    "status": "pending",
+    "activeForm": "Creating WordPress menu system investigation script to analyze live sidebar configuration"
+  },
+  {
+    "content": "Document menu hooks, filters, and custom modifications affecting display",
+    "status": "pending",
+    "activeForm": "Documenting menu hooks, filters, and custom modifications affecting display"
+  },
+  {
+    "content": "Generate comprehensive WordPress menu system analysis report",
+    "status": "pending",
+    "activeForm": "Generating comprehensive WordPress menu system analysis report"
+  }
+]

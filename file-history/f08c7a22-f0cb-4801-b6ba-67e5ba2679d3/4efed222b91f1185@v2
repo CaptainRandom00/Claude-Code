@@ -1,0 +1,332 @@
+/**
+ * ScreenshotViewer Component
+ * Feature: 029-complete-user-guide
+ * Purpose: Display screenshots with zoom, lazy loading, and format fallback
+ */
+
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { ZoomIn, ZoomOut, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type ImageFormat = 'png' | 'webp' | 'avif';
+export type ViewportType = 'desktop' | 'desktopHD' | 'tablet' | 'mobile';
+
+export interface Annotation {
+  type: 'arrow' | 'box' | 'circle' | 'text';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  text?: string;
+  color?: string;
+}
+
+export interface ScreenshotViewerProps {
+  /** Screenshot source path (without extension) */
+  src: string;
+
+  /** Alt text for accessibility */
+  alt: string;
+
+  /** Optional caption */
+  caption?: string;
+
+  /** Optional annotations overlay */
+  annotations?: Annotation[];
+
+  /** Enable zoom functionality */
+  zoomable?: boolean;
+
+  /** Lazy load the image */
+  lazyLoad?: boolean;
+
+  /** Preferred format order */
+  formatPriority?: ImageFormat[];
+
+  /** CSS class name */
+  className?: string;
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function ScreenshotViewer({
+  src,
+  alt,
+  caption,
+  annotations,
+  zoomable = true,
+  lazyLoad = true,
+  formatPriority = ['avif', 'webp', 'png'],
+  className = ''
+}: ScreenshotViewerProps) {
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [currentFormat, setCurrentFormat] = useState<ImageFormat | null>(null);
+  const [error, setError] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Lazy loading with Intersection Observer
+  useEffect(() => {
+    if (!lazyLoad || !containerRef.current) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsLoaded(true);
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        rootMargin: '50px'
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [lazyLoad]);
+
+  // Format fallback logic
+  const getImageSrc = (format: ImageFormat): string => {
+    return `${src}.${format}`;
+  };
+
+  const tryNextFormat = (failedFormat: ImageFormat) => {
+    const currentIndex = formatPriority.indexOf(failedFormat);
+    const nextFormat = formatPriority[currentIndex + 1];
+
+    if (nextFormat) {
+      setCurrentFormat(nextFormat);
+    } else {
+      setError(true);
+    }
+  };
+
+  // Initialize with first format
+  useEffect(() => {
+    if (!currentFormat && (lazyLoad ? isLoaded : true)) {
+      setCurrentFormat(formatPriority[0]);
+    }
+  }, [currentFormat, formatPriority, isLoaded, lazyLoad]);
+
+  const handleImageError = () => {
+    if (currentFormat) {
+      tryNextFormat(currentFormat);
+    }
+  };
+
+  const handleZoomClick = () => {
+    if (zoomable) {
+      setIsZoomed(true);
+    }
+  };
+
+  const handleCloseZoom = () => {
+    setIsZoomed(false);
+  };
+
+  // Don't render anything if lazy loading and not loaded yet
+  if (lazyLoad && !isLoaded) {
+    return (
+      <div
+        ref={containerRef}
+        className={`relative bg-gray-100 rounded-lg ${className}`}
+        style={{ minHeight: '200px' }}
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-sm text-gray-500">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className={`relative bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
+        <div className="text-sm text-red-600">
+          Failed to load screenshot: {alt}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div ref={containerRef} className={`relative group ${className}`}>
+        {/* Main Image */}
+        <div
+          className={`relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${
+            zoomable ? 'cursor-zoom-in' : ''
+          }`}
+          onClick={handleZoomClick}
+        >
+          {currentFormat && (
+            <img
+              ref={imgRef}
+              src={getImageSrc(currentFormat)}
+              alt={alt}
+              onError={handleImageError}
+              className="w-full h-auto"
+              loading={lazyLoad ? 'lazy' : 'eager'}
+            />
+          )}
+
+          {/* Annotations Overlay */}
+          {annotations && annotations.length > 0 && (
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{ zIndex: 10 }}
+            >
+              {annotations.map((annotation, index) => (
+                <AnnotationOverlay key={index} annotation={annotation} />
+              ))}
+            </svg>
+          )}
+
+          {/* Zoom Hint */}
+          {zoomable && (
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 hover:bg-white"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Caption */}
+        {caption && (
+          <p className="mt-2 text-sm text-gray-600 text-center">{caption}</p>
+        )}
+      </div>
+
+      {/* Zoomed Dialog */}
+      {isZoomed && (
+        <Dialog open={isZoomed} onOpenChange={setIsZoomed}>
+          <DialogContent className="max-w-7xl max-h-[90vh] overflow-auto">
+            <DialogTitle className="sr-only">{alt}</DialogTitle>
+            <div className="relative">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="absolute top-2 right-2 z-50"
+                onClick={handleCloseZoom}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              {currentFormat && (
+                <img
+                  src={getImageSrc(currentFormat)}
+                  alt={alt}
+                  className="w-full h-auto"
+                />
+              )}
+              {caption && (
+                <p className="mt-4 text-sm text-gray-600 text-center">
+                  {caption}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+// ============================================================================
+// Annotation Overlay Sub-component
+// ============================================================================
+
+function AnnotationOverlay({ annotation }: { annotation: Annotation }) {
+  const color = annotation.color || '#3b82f6';
+
+  switch (annotation.type) {
+    case 'arrow':
+      return (
+        <g>
+          <defs>
+            <marker
+              id={`arrowhead-${annotation.x}-${annotation.y}`}
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3, 0 6" fill={color} />
+            </marker>
+          </defs>
+          <line
+            x1={annotation.x}
+            y1={annotation.y}
+            x2={(annotation.width || 0) + annotation.x}
+            y2={(annotation.height || 0) + annotation.y}
+            stroke={color}
+            strokeWidth="2"
+            markerEnd={`url(#arrowhead-${annotation.x}-${annotation.y})`}
+          />
+        </g>
+      );
+
+    case 'box':
+      return (
+        <rect
+          x={annotation.x}
+          y={annotation.y}
+          width={annotation.width || 100}
+          height={annotation.height || 100}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          rx="4"
+        />
+      );
+
+    case 'circle':
+      return (
+        <circle
+          cx={annotation.x}
+          cy={annotation.y}
+          r={annotation.width || 20}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        />
+      );
+
+    case 'text':
+      return (
+        <text
+          x={annotation.x}
+          y={annotation.y}
+          fill={color}
+          fontSize="14"
+          fontWeight="bold"
+        >
+          {annotation.text || ''}
+        </text>
+      );
+
+    default:
+      return null;
+  }
+}

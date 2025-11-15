@@ -1,0 +1,82 @@
+/**
+ * @file calendar-diagnostic.spec.ts
+ * @description Quick diagnostic test to assess current calendar state
+ */
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Calendar Dropdown Diagnostic', () => {
+  test('assess current calendar dropdown state', async ({ page }) => {
+    // Navigate to Sales Aggregation
+    await page.goto('http://localhost:3000/dashboard');
+    await page.click('button:has-text("Sales Aggregation")');
+    await page.waitForSelector('text=Aggregated Data Calendar', { timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    console.log('\n========== CALENDAR DIAGNOSTIC REPORT ==========\n');
+
+    // Check for dropdowns existence
+    const dropdowns = page.locator('select');
+    const dropdownCount = await dropdowns.count();
+    console.log(`✓ Dropdowns found: ${dropdownCount}`);
+
+    if (dropdownCount >= 2) {
+      // Check month dropdown
+      const monthDropdown = dropdowns.first();
+      const monthVisible = await monthDropdown.isVisible();
+      const monthValue = await monthDropdown.inputValue();
+      console.log(`✓ Month dropdown visible: ${monthVisible}`);
+      console.log(`  Current value: ${monthValue}`);
+
+      // Check year dropdown
+      const yearDropdown = dropdowns.nth(1);
+      const yearVisible = await yearDropdown.isVisible();
+      const yearValue = await yearDropdown.inputValue();
+      console.log(`✓ Year dropdown visible: ${yearVisible}`);
+      console.log(`  Current value: ${yearValue}`);
+
+      // Check dropdown styling
+      const monthClasses = await monthDropdown.getAttribute('class');
+      console.log(`  Month dropdown classes: ${monthClasses || 'none'}`);
+
+      const yearClasses = await yearDropdown.getAttribute('class');
+      console.log(`  Year dropdown classes: ${yearClasses || 'none'}`);
+
+      // Take screenshot
+      await page.screenshot({ path: 'calendar-dropdowns-current-state.png' });
+      console.log('✓ Screenshot saved: calendar-dropdowns-current-state.png');
+    } else {
+      console.log('✗ ERROR: Expected 2 dropdowns, found', dropdownCount);
+    }
+
+    // Check calendar grid
+    const dateCells = page.locator('[role="gridcell"]');
+    const cellCount = await dateCells.count();
+    console.log(`\n✓ Date cells count: ${cellCount} (expected: 42 for fixedWeeks)`);
+
+    // Check headers
+    const headers = page.locator('[role="columnheader"]');
+    const headerCount = await headers.count();
+    console.log(`✓ Day headers count: ${headerCount} (expected: 7)`);
+
+    // Check navigation arrows
+    const navButtons = page.locator('button[name*="month"]').or(page.locator('.rdp-nav_button'));
+    const navButtonCount = await navButtons.count();
+    console.log(`✓ Navigation buttons count: ${navButtonCount} (expected: 2)`);
+
+    // Check caption area
+    const caption = page.locator('.rdp-caption').or(page.locator('[class*="caption"]'));
+    const captionExists = await caption.count() > 0;
+    console.log(`✓ Caption element exists: ${captionExists}`);
+
+    if (captionExists) {
+      const captionHTML = await caption.first().innerHTML();
+      console.log(`  Caption HTML preview: ${captionHTML.substring(0, 200)}...`);
+    }
+
+    console.log('\n========== END DIAGNOSTIC REPORT ==========\n');
+
+    // Always pass - this is diagnostic only
+    expect(true).toBe(true);
+  });
+});

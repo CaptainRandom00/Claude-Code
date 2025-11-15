@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create project folder structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create main index.html with navigation",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create CSS and JavaScript assets",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create individual guide pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create template files and examples",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Add interactive features and styling",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

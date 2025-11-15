@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Investigate frontend loading/initialization system that's stuck on 'Loading...' and 'Initializing style system...'",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine API JSON parsing errors causing 400 Bad Request with 'invalid_request_error'",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check recent changes that might have broken the loading process",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Review API request/response handling and middleware for JSON issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create diagnostic test to reproduce the exact loading and API issues",
+    "status": "in_progress",
+    "priority": "medium",
+    "id": "5"
+  }
+]

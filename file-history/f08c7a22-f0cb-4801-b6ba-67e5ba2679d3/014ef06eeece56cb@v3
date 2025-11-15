@@ -1,0 +1,2056 @@
+import { mysqlTable, varchar, int, boolean, timestamp, decimal, json, date, index, unique, text, bigint, mysqlEnum } from "drizzle-orm/mysql-core";
+import { relations } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// =============================================================================
+// CORE ENTITIES - Users, Suppliers, Categories, Locations
+// =============================================================================
+
+export const users = mysqlTable("users", {
+  id: int("id").primaryKey().autoincrement(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull().default("Assistant"), // Admin, Manager, Supervisor, Assistant
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const suppliers = mysqlTable("suppliers", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull(),
+  contactPerson: varchar("contact_person", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("suppliers_name_idx").on(table.name),
+}));
+
+// =============================================================================
+// SUPPLIER PROFILES - Enhanced supplier management for Product & Supplier Profiles System
+// =============================================================================
+
+export const supplierProfiles = mysqlTable("supplier_profiles", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Core supplier identification
+  supplierCode: varchar("supplier_code", { length: 50 }).notNull().unique(),
+  supplierName: varchar("supplier_name", { length: 255 }).notNull(),
+
+  // Order management settings
+  minimumOrderQuantity: int("minimum_order_quantity").notNull().default(1),
+  leadTimeDays: int("lead_time_days").notNull().default(1),
+  dropDays: varchar("drop_days", { length: 100 }), // e.g., "Mon,Wed,Fri"
+
+  // Contact information
+  contactName: varchar("contact_name", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 50 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  address: text("address"),
+
+  // Status and lifecycle
+  isActive: boolean("is_active").notNull().default(true),
+
+  // Data tracking and audit
+  source: varchar("source", { length: 20 }).notNull().default("brn"), // brn, manual, import
+  originalData: json("original_data"), // Original BRN/EPOS data for reference
+
+  // Audit trail
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: int("created_by").references(() => users.id),
+  updatedBy: int("updated_by").references(() => users.id),
+}, (table) => ({
+  supplierCodeIdx: index("supplier_profiles_supplier_code_idx").on(table.supplierCode),
+  supplierNameIdx: index("supplier_profiles_supplier_name_idx").on(table.supplierName),
+  isActiveIdx: index("supplier_profiles_is_active_idx").on(table.isActive),
+  sourceIdx: index("supplier_profiles_source_idx").on(table.source),
+  leadTimeIdx: index("supplier_profiles_lead_time_idx").on(table.leadTimeDays),
+  createdAtIdx: index("supplier_profiles_created_at_idx").on(table.createdAt),
+  updatedAtIdx: index("supplier_profiles_updated_at_idx").on(table.updatedAt),
+  // Composite indexes for common query patterns
+  activeNameIdx: index("supplier_profiles_active_name_idx").on(table.isActive, table.supplierName),
+  activeCodeIdx: index("supplier_profiles_active_code_idx").on(table.isActive, table.supplierCode),
+}));
+
+export const categories = mysqlTable("categories", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  parentId: int("parent_id"), // Self-referencing for subcategories - will be set below
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("categories_name_idx").on(table.name),
+  parentIdx: index("categories_parent_idx").on(table.parentId),
+}));
+
+export const locations = mysqlTable("locations", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 50 }).notNull().default("Storage"), // Storage, Retail, Warehouse
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("locations_name_idx").on(table.name),
+  typeIdx: index("locations_type_idx").on(table.type),
+}));
+
+// =============================================================================
+// PRODUCT MASTER DATA - Proper relational product management
+// =============================================================================
+
+export const products = mysqlTable("products", {
+  id: int("id").primaryKey().autoincrement(),
+  itemCode: varchar("item_code", { length: 50 }).notNull().unique(), // SKU/Item Code (sage_code from BRN)
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  categoryId: int("category_id").notNull().references(() => categories.id),
+  supplierId: int("supplier_id").references(() => suppliers.id),
+  unit: varchar("unit", { length: 50 }).notNull(), // Each, Kg, Litre, etc.
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  reorderLevel: int("reorder_level").notNull().default(10),
+  maxStockLevel: int("max_stock_level"),
+  barcode: varchar("barcode", { length: 100 }),
+  expiryDays: int("expiry_days"), // Days until expiry from received date
+
+  // Lifecycle tracking
+  firstSeenDate: date("first_seen_date").notNull(), // When first detected in BRN
+  lastSeenDate: date("last_seen_date").notNull(), // Most recent BRN appearance
+  status: varchar("status", { length: 20 }).notNull().default("active"), // 'new', 'active', 'missing', 'discontinued', 'returned'
+  consecutiveMissingDays: int("consecutive_missing_days").notNull().default(0),
+  missingAlertSent: boolean("missing_alert_sent").notNull().default(false),
+
+  // Source tracking
+  discoverySource: varchar("discovery_source", { length: 20 }).notNull().default("BRN"), // 'BRN', 'EPOS'
+  discoveryFileName: varchar("discovery_file_name", { length: 255 }),
+
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  itemCodeIdx: index("products_item_code_idx").on(table.itemCode),
+  categoryIdx: index("products_category_idx").on(table.categoryId),
+  supplierIdx: index("products_supplier_idx").on(table.supplierId),
+  barcodeIdx: index("products_barcode_idx").on(table.barcode),
+  statusIdx: index("products_status_idx").on(table.status),
+  lastSeenIdx: index("products_last_seen_idx").on(table.lastSeenDate),
+}));
+
+// =============================================================================
+// INVENTORY MANAGEMENT - Current stock levels per location
+// =============================================================================
+
+export const inventory = mysqlTable("inventory", {
+  id: int("id").primaryKey().autoincrement(),
+  productId: int("product_id").notNull().references(() => products.id),
+  locationId: int("location_id").notNull().references(() => locations.id),
+  currentStock: decimal("current_stock", { precision: 10, scale: 3 }).notNull().default("0"),
+  reservedStock: decimal("reserved_stock", { precision: 10, scale: 3 }).notNull().default("0"), // Stock allocated but not yet shipped
+  availableStock: decimal("available_stock", { precision: 10, scale: 3 }).notNull().default("0"), // currentStock - reservedStock
+  lastStockDate: timestamp("last_stock_date"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  productLocationIdx: unique("inventory_product_location_unique").on(table.productId, table.locationId),
+  productIdx: index("inventory_product_idx").on(table.productId),
+  locationIdx: index("inventory_location_idx").on(table.locationId),
+  lowStockIdx: index("inventory_low_stock_idx").on(table.currentStock),
+}));
+
+// =============================================================================
+// STOCK MOVEMENTS - All inventory transactions (IN/OUT/ADJUSTMENTS)
+// =============================================================================
+
+export const stockMovements = mysqlTable("stock_movements", {
+  id: int("id").primaryKey().autoincrement(),
+  productId: int("product_id").notNull().references(() => products.id),
+  locationId: int("location_id").notNull().references(() => locations.id),
+  movementType: varchar("movement_type", { length: 50 }).notNull(), // RECEIPT, SALE, ADJUSTMENT, TRANSFER, WASTE
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }),
+  referenceType: varchar("reference_type", { length: 50 }), // PURCHASE_ORDER, SALES_ORDER, MANUAL_ADJUSTMENT
+  referenceId: int("reference_id"), // ID of the related document
+  batchNumber: varchar("batch_number", { length: 100 }),
+  expiryDate: date("expiry_date"),
+  reason: varchar("reason", { length: 255 }), // For adjustments and waste
+  notes: text("notes"),
+  createdBy: int("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  productIdx: index("stock_movements_product_idx").on(table.productId),
+  locationIdx: index("stock_movements_location_idx").on(table.locationId),
+  typeIdx: index("stock_movements_type_idx").on(table.movementType),
+  dateIdx: index("stock_movements_date_idx").on(table.createdAt),
+  referenceIdx: index("stock_movements_reference_idx").on(table.referenceType, table.referenceId),
+  batchIdx: index("stock_movements_batch_idx").on(table.batchNumber),
+  expiryIdx: index("stock_movements_expiry_idx").on(table.expiryDate),
+}));
+
+// =============================================================================
+// SALES TRANSACTIONS - Proper relational sales recording
+// =============================================================================
+
+export const salesOrders = mysqlTable("sales_orders", {
+  id: int("id").primaryKey().autoincrement(),
+  orderNumber: varchar("order_number", { length: 100 }).notNull().unique(),
+  saleDate: timestamp("sale_date").notNull(),
+  customerId: int("customer_id"), // Optional customer reference
+  locationId: int("location_id").notNull().references(() => locations.id),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("COMPLETED"), // PENDING, COMPLETED, CANCELLED
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  processedBy: int("processed_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orderNumberIdx: index("sales_orders_number_idx").on(table.orderNumber),
+  dateIdx: index("sales_orders_date_idx").on(table.saleDate),
+  locationIdx: index("sales_orders_location_idx").on(table.locationId),
+  statusIdx: index("sales_orders_status_idx").on(table.status),
+}));
+
+export const salesOrderItems = mysqlTable("sales_order_items", {
+  id: int("id").primaryKey().autoincrement(),
+  salesOrderId: int("sales_order_id").notNull().references(() => salesOrders.id),
+  productId: int("product_id").notNull().references(() => products.id),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
+  batchNumber: varchar("batch_number", { length: 100 }),
+  expiryDate: date("expiry_date"),
+}, (table) => ({
+  orderIdx: index("sales_order_items_order_idx").on(table.salesOrderId),
+  productIdx: index("sales_order_items_product_idx").on(table.productId),
+  batchIdx: index("sales_order_items_batch_idx").on(table.batchNumber),
+}));
+
+// =============================================================================
+// BRN STOCK SNAPSHOTS - Daily stock position snapshots from BRN uploads
+// =============================================================================
+
+export const brnStockSnapshots = mysqlTable("brn_stock_snapshots", {
+  // Composite primary key: date + sage_code
+  snapshotDate: date("snapshot_date").notNull(), // Extracted from filename BRN_Report_10032025
+  sageCode: varchar("sage_code", { length: 50 }).notNull(), // Primary item identifier from Sage system
+
+  // Product identification and details
+  supplier: varchar("supplier", { length: 255 }),
+  category: varchar("category", { length: 100 }),
+  brand: varchar("brand", { length: 100 }),
+  description: varchar("description", { length: 500 }).notNull(),
+  packingSize: varchar("packing_size", { length: 100 }),
+
+  // Stock levels by location (as per your columns)
+  stockALP: decimal("stock_alp", { precision: 10, scale: 3 }).default("0"), // Location ALP
+  stockTOT: decimal("stock_tot", { precision: 10, scale: 3 }).default("0"), // Location TOT
+  stockGST: decimal("stock_gst", { precision: 10, scale: 3 }).default("0"), // Location GST
+  stockCOL: decimal("stock_col", { precision: 10, scale: 3 }).default("0"), // Location COL
+  stockSTR: decimal("stock_str", { precision: 10, scale: 3 }).default("0"), // Location STR
+  stockNMA: decimal("stock_nma", { precision: 10, scale: 3 }).default("0"), // Location NMA (new shop)
+
+  // Total stock calculation
+  totalStock: decimal("total_stock", { precision: 10, scale: 3 }).default("0"), // Sum of all locations
+
+  // Additional codes for reference
+  caseCode: varchar("case_code", { length: 50 }),
+  singleCode: varchar("single_code", { length: 50 }),
+
+  // Upload tracking
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  uploadBatch: varchar("upload_batch", { length: 100 }), // Group uploads together
+  uploadedBy: int("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => ({
+  // Composite primary key
+  primaryKey: [table.snapshotDate, table.sageCode],
+
+  // Indexes for efficient queries
+  dateIdx: index("brn_snapshots_date_idx").on(table.snapshotDate),
+  sageCodeIdx: index("brn_snapshots_sage_code_idx").on(table.sageCode),
+  supplierIdx: index("brn_snapshots_supplier_idx").on(table.supplier),
+  categoryIdx: index("brn_snapshots_category_idx").on(table.category),
+  brandIdx: index("brn_snapshots_brand_idx").on(table.brand),
+  totalStockIdx: index("brn_snapshots_total_stock_idx").on(table.totalStock),
+  uploadBatchIdx: index("brn_snapshots_upload_batch_idx").on(table.uploadBatch),
+
+  // Low stock analysis
+  lowStockIdx: index("brn_snapshots_low_stock_idx").on(table.totalStock),
+}));
+
+// =============================================================================
+// EPOS SALES SUMMARIES - For EPOS Excel file imports
+// =============================================================================
+
+export const eposSalesSummaries = mysqlTable("epos_sales_summaries", {
+  id: int("id").primaryKey().autoincrement(),
+  reportDate: date("report_date").notNull(), // Date extracted from Excel A1 cell
+  itemCode: varchar("item_code", { length: 50 }).notNull(),
+  unit: varchar("unit", { length: 50 }),
+  description: varchar("description", { length: 255 }).notNull(),
+  totalQty: decimal("total_qty", { precision: 10, scale: 3 }).notNull().default("0"),
+  totalNet: decimal("total_net", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalGross: decimal("total_gross", { precision: 12, scale: 2 }).notNull().default("0"),
+
+  // Upload tracking
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  uploadBatch: varchar("upload_batch", { length: 100 }), // Group uploads together
+  uploadedBy: int("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => ({
+  // Composite unique key for report date + item code
+  reportItemIdx: unique("epos_report_item_unique").on(table.reportDate, table.itemCode),
+
+  // Indexes for efficient queries
+  reportDateIdx: index("epos_report_date_idx").on(table.reportDate),
+  itemCodeIdx: index("epos_item_code_idx").on(table.itemCode),
+  totalNetIdx: index("epos_total_net_idx").on(table.totalNet),
+  uploadBatchIdx: index("epos_upload_batch_idx").on(table.uploadBatch),
+}));
+
+// =============================================================================
+// DAILY SALES AGGREGATION - Consolidated sales by item variants
+// =============================================================================
+
+export const dailySalesAggregation = mysqlTable("daily_sales_aggregation", {
+  id: int("id").primaryKey().autoincrement(),
+  salesDate: date("sales_date").notNull(),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(), // Core item code (e.g., "65")
+
+  // Sales values by variant type
+  cSales: decimal("c_sales", { precision: 12, scale: 2 }).notNull().default("0"), // Case sales (65c)
+  sSales: decimal("s_sales", { precision: 12, scale: 2 }).notNull().default("0"), // Single sales (65s)
+  p1Sales: decimal("p1_sales", { precision: 12, scale: 2 }).notNull().default("0"), // Pack 1 sales (65p1)
+  p2Sales: decimal("p2_sales", { precision: 12, scale: 2 }).notNull().default("0"), // Pack 2 sales (65p2)
+  totalSales: decimal("total_sales", { precision: 12, scale: 2 }).notNull().default("0"), // Sum of all variants
+
+  // Quantities by variant type
+  cQuantity: decimal("c_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // Case quantities
+  sQuantity: decimal("s_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // Single quantities
+  p1Quantity: decimal("p1_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // Pack 1 quantities
+  p2Quantity: decimal("p2_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // Pack 2 quantities
+  totalQuantity: decimal("total_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // Sum of all quantities
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Business constraint: one aggregation per date per base item
+  dailyItemUnique: unique("daily_item_unique").on(table.salesDate, table.baseItemCode),
+
+  // Indexes for efficient queries
+  salesDateIdx: index("daily_sales_date_idx").on(table.salesDate),
+  baseItemIdx: index("daily_base_item_idx").on(table.baseItemCode),
+  totalSalesIdx: index("daily_total_sales_idx").on(table.totalSales),
+  totalQuantityIdx: index("daily_total_quantity_idx").on(table.totalQuantity),
+}));
+
+// =============================================================================
+// TIME SERIES SALES DATA - For analytics and reporting
+// =============================================================================
+
+export const timeSeriesSales = mysqlTable("time_series_sales", {
+  id: int("id").primaryKey().autoincrement(),
+  timestamp: timestamp("timestamp").notNull(),
+  itemCode: varchar("item_code", { length: 50 }).notNull(),
+  itemName: varchar("item_name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull(),
+
+  // Upload tracking
+  uploadBatch: varchar("upload_batch", { length: 100 }),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => ({
+  timestampIdx: index("time_series_timestamp_idx").on(table.timestamp),
+  itemCodeIdx: index("time_series_item_code_idx").on(table.itemCode),
+  uploadBatchIdx: index("time_series_upload_batch_idx").on(table.uploadBatch),
+}));
+
+// =============================================================================
+// PRODUCT PROFILES - Enhanced with complete override and audit system
+// =============================================================================
+
+export const productProfiles = mysqlTable("product_profiles", {
+  // Primary key - matches actual database structure
+  itemCode: varchar("item_code", { length: 50 }).primaryKey().notNull(),
+
+  // Core product data - confirmed to exist in database
+  description: text("description").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  supplier: varchar("supplier", { length: 100 }).notNull(),
+  packingSize: varchar("packing_size", { length: 100 }).notNull(),
+  unitsPerCase: int("units_per_case").notNull(),
+  caseQuantity: int("case_quantity"),
+
+  // Unit and type information
+  unitType: varchar("unit_type", { length: 50 }).default("unit"),
+
+  // Pricing fields for edit system
+  p1Price: decimal("p1_price", { precision: 10, scale: 2 }),
+  p2Price: decimal("p2_price", { precision: 10, scale: 2 }),
+  p3Price: decimal("p3_price", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+
+  // Order management
+  minimumOrderQuantity: int("minimum_order_quantity").default(1),
+  leadTimeDays: int("lead_time_days").default(0),
+
+  // Edit tracking and audit fields
+  hasOverrides: boolean("has_overrides").default(false),
+  versionNumber: int("version_number").default(1),
+  editedBy: int("edited_by"),
+  editedAt: timestamp("edited_at"),
+
+  // EPOS tracking for EPOS-only items
+  eposOnlyItem: boolean("epos_only_item").default(false),
+  eposDiscoveryDate: date("epos_discovery_date"),
+  eposLastSeenDate: date("epos_last_seen_date"),
+
+  // Data source and status
+  dataSource: varchar("data_source", { length: 20 }).default("brn"),
+  isActive: boolean("is_active").notNull().default(true),
+
+  // Case management fields (confirmed to exist in database)
+  caseUnitDescription: varchar("case_unit_description", { length: 100 }),
+  caseSource: varchar("case_source", { length: 20 }).default("manual"),
+
+  // Additional timestamp for last_updated (confirmed to exist)
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+
+  // Product Image Management (Feature 025)
+  primaryImagePath: varchar("primary_image_path", { length: 500 }),
+  imageMetadata: json("image_metadata").$type<import('./types/product-images').ProductImage[]>(),
+  imageCount: int("image_count").notNull().default(0),
+  lastImageUpdated: timestamp("last_image_updated"),
+
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+
+}, (table) => ({
+  // Basic indexes for confirmed columns
+  dataSourceIdx: index("product_profiles_data_source_idx").on(table.dataSource),
+  supplierIdx: index("idx_product_supplier").on(table.supplier),
+  categoryIdx: index("idx_product_category").on(table.category),
+
+  // Status indexes (removed non-existent field references)
+  isActiveIdx: index("product_profiles_is_active_idx").on(table.isActive),
+  eposOnlyIdx: index("product_profiles_epos_only_idx").on(table.eposOnlyItem),
+
+  // Quality and version indexes (removed non-existent field references)
+
+  // Composite indexes for common queries (removed non-existent field references)
+  supplierCategoryIdx: index("product_profiles_supplier_category_idx").on(table.supplier, table.category),
+
+  // Edit tracking indexes
+  editedByIdx: index("product_profiles_edited_by_idx").on(table.editedBy),
+  versionNumberIdx: index("product_profiles_version_number_idx").on(table.versionNumber),
+}));
+
+// =============================================================================
+// PRODUCT PROFILE CHANGES - Audit trail for field-level modifications
+// =============================================================================
+
+export const productProfileChanges = mysqlTable("product_profile_changes", {
+  id: varchar("id", { length: 50 }).primaryKey().notNull(),
+  itemCode: varchar("item_code", { length: 50 }).notNull(),
+  fieldName: varchar("field_name", { length: 100 }).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedBy: varchar("changed_by", { length: 100 }).notNull(),
+  changedAt: timestamp("changed_at").notNull().defaultNow(),
+  changeReason: varchar("change_reason", { length: 255 }).notNull(),
+  sessionId: varchar("session_id", { length: 50 }).notNull(),
+}, (table) => ({
+  itemTimeIdx: index("idx_product_changes_item_time").on(table.itemCode, table.changedAt),
+  sessionIdx: index("idx_product_changes_session").on(table.sessionId),
+  userIdx: index("idx_product_changes_user").on(table.changedBy, table.changedAt),
+  fieldIdx: index("idx_product_changes_field").on(table.fieldName),
+}));
+
+// =============================================================================
+// PRODUCT EDIT SESSIONS - Concurrent edit conflict prevention
+// =============================================================================
+
+export const productEditSessions = mysqlTable("product_edit_sessions", {
+  id: varchar("id", { length: 50 }).primaryKey().notNull(),
+  itemCode: varchar("item_code", { length: 50 }).notNull(),
+  userId: int("user_id").notNull(),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  lastActivity: timestamp("last_activity").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  lockVersion: int("lock_version").notNull().default(1),
+  userAgent: varchar("user_agent", { length: 500 }),
+  ipAddress: varchar("ip_address", { length: 45 }),
+}, (table) => ({
+  activeIdx: index("idx_edit_sessions_active").on(table.isActive, table.itemCode),
+  userIdx: index("idx_edit_sessions_user").on(table.userId, table.startedAt),
+  activityIdx: index("idx_edit_sessions_activity").on(table.lastActivity),
+  // Unique constraint: Only one active session per item_code
+  uniqueActiveSession: unique("uk_active_session_per_item").on(table.itemCode, table.isActive),
+}));
+
+// =============================================================================
+// CASE SIZE HISTORY - Track all case size changes
+// =============================================================================
+
+export const caseSizeHistory = mysqlTable("case_size_history", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Item identification
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+
+  // Change details
+  oldCaseSize: int("old_case_size"),
+  newCaseSize: int("new_case_size").notNull(),
+  oldConfidence: decimal("old_confidence", { precision: 3, scale: 2 }),
+  newConfidence: decimal("new_confidence", { precision: 3, scale: 2 }).notNull(),
+
+  // Change metadata
+  changeSource: varchar("change_source", { length: 50 }).notNull(), // 'brn_sync', 'manual_edit', 'auto_detection', 'supplier_update'
+  changeReason: text("change_reason"),
+
+  // Tracking
+  changedBy: int("changed_by").references(() => users.id),
+  changedAt: timestamp("changed_at").notNull().defaultNow(),
+}, (table) => ({
+  itemCodeIdx: index("case_history_item_idx").on(table.baseItemCode),
+  changedAtIdx: index("case_history_date_idx").on(table.changedAt),
+  sourceIdx: index("case_history_source_idx").on(table.changeSource),
+}));
+
+// =============================================================================
+// ORDER MANAGEMENT DATA LAYER - Smart correlation system
+// =============================================================================
+
+export const orderManagementCorrelations = mysqlTable("order_management_correlations", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Core item identification
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(), // Master item code (from BRN)
+  eposVariants: json("epos_variants"), // Array of EPOS codes that map to this item: ["67S", "67C", "67P1", "67P2"]
+
+  // Stock information (from BRN)
+  currentStock: decimal("current_stock", { precision: 10, scale: 3 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  packingSize: varchar("packing_size", { length: 100 }),
+  supplier: varchar("supplier", { length: 100 }),
+  category: varchar("category", { length: 100 }),
+
+  // Compiled sales analysis (last 7 days)
+  weeklyConsumption: decimal("weekly_consumption", { precision: 10, scale: 3 }).notNull().default("0"),
+  dailyAverage: decimal("daily_average", { precision: 10, scale: 3 }).notNull().default("0"),
+  salesByVariant: json("sales_by_variant"), // {"67S": 150, "67C": 5, "67P1": 25.5}
+
+  // Order recommendation logic
+  requiredForWeek: decimal("required_for_week", { precision: 10, scale: 3 }).notNull().default("0"), // Weekly consumption
+  carryoverBuffer: decimal("carryover_buffer", { precision: 10, scale: 3 }).notNull().default("0"), // +1 case buffer
+  totalOrderNeeded: decimal("total_order_needed", { precision: 10, scale: 3 }).notNull().default("0"), // Required + Buffer - Current
+
+  // Meta information
+  lastAnalyzedDate: date("last_analyzed_date").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  baseItemIdx: index("order_mgmt_base_item_idx").on(table.baseItemCode),
+  supplierIdx: index("order_mgmt_supplier_idx").on(table.supplier),
+  lastAnalyzedIdx: index("order_mgmt_analyzed_date_idx").on(table.lastAnalyzedDate),
+}));
+
+// =============================================================================
+// ENHANCED ORDER ANALYTICS - AI-powered order intelligence and analytics
+// =============================================================================
+
+export const enhancedOrderAnalytics = mysqlTable("enhanced_order_analytics", {
+  id: int("id").primaryKey().autoincrement(),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+  analysisDate: date("analysis_date").notNull(),
+  analysisWindowDays: int("analysis_window_days").notNull().default(7),
+
+  // Sales velocity metrics
+  dailyAvgConsumption: decimal("daily_avg_consumption", { precision: 10, scale: 3 }),
+  weeklyConsumption: decimal("weekly_consumption", { precision: 10, scale: 3 }),
+  consumptionTrend: varchar("consumption_trend", { length: 20 }), // 'increasing', 'decreasing', 'stable'
+  seasonalFactor: decimal("seasonal_factor", { precision: 5, scale: 3 }).default("1.0"),
+
+  // Stock metrics
+  currentTotalStock: decimal("current_total_stock", { precision: 10, scale: 3 }),
+  daysOfSupply: decimal("days_of_supply", { precision: 8, scale: 2 }),
+  stockStatus: varchar("stock_status", { length: 20 }), // 'critical', 'low', 'adequate', 'overstocked'
+
+  // Recommendations
+  recommendedAction: varchar("recommended_action", { length: 30 }), // 'order_now', 'order_soon', 'monitor', 'investigate_decline'
+  recommendedQuantity: decimal("recommended_quantity", { precision: 10, scale: 3 }),
+  confidenceScore: int("confidence_score"), // 0-100
+
+  // Analytics metadata
+  forecastReliability: varchar("forecast_reliability", { length: 10 }), // 'high', 'medium', 'low'
+  reasoningText: text("reasoning_text"), // Human-readable reasoning
+  alternativeStrategies: json("alternative_strategies"), // Array of alternative strategies
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  itemDateIdx: index("enhanced_analytics_item_date_idx").on(table.baseItemCode, table.analysisDate),
+  actionConfidenceIdx: index("enhanced_analytics_action_confidence_idx").on(table.recommendedAction, table.confidenceScore),
+  analysisDateIdx: index("enhanced_analytics_analysis_date_idx").on(table.analysisDate),
+  stockStatusIdx: index("enhanced_analytics_stock_status_idx").on(table.stockStatus),
+
+  // Unique constraint for one analysis per item per date
+  itemAnalysisUnique: unique("enhanced_analytics_item_analysis_unique").on(table.baseItemCode, table.analysisDate),
+}));
+
+// =============================================================================
+// PURCHASE ORDERS - For receiving stock
+// =============================================================================
+
+export const purchaseOrders = mysqlTable("purchase_orders", {
+  id: int("id").primaryKey().autoincrement(),
+  poNumber: varchar("po_number", { length: 100 }).notNull().unique(),
+  supplierId: int("supplier_id").notNull().references(() => suppliers.id),
+  locationId: int("location_id").notNull().references(() => locations.id),
+  orderDate: date("order_date").notNull(),
+  expectedDate: date("expected_date"),
+  receivedDate: date("received_date"),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("PENDING"), // PENDING, RECEIVED, CANCELLED
+  notes: text("notes"),
+  createdBy: int("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  poNumberIdx: index("purchase_orders_po_number_idx").on(table.poNumber),
+  supplierIdx: index("purchase_orders_supplier_idx").on(table.supplierId),
+  statusIdx: index("purchase_orders_status_idx").on(table.status),
+  dateIdx: index("purchase_orders_date_idx").on(table.orderDate),
+}));
+
+export const purchaseOrderItems = mysqlTable("purchase_order_items", {
+  id: int("id").primaryKey().autoincrement(),
+  purchaseOrderId: int("purchase_order_id").notNull().references(() => purchaseOrders.id),
+  productId: int("product_id").notNull().references(() => products.id),
+  orderedQuantity: decimal("ordered_quantity", { precision: 10, scale: 3 }).notNull(),
+  receivedQuantity: decimal("received_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
+  batchNumber: varchar("batch_number", { length: 100 }),
+  expiryDate: date("expiry_date"),
+}, (table) => ({
+  orderIdx: index("purchase_order_items_order_idx").on(table.purchaseOrderId),
+  productIdx: index("purchase_order_items_product_idx").on(table.productId),
+}));
+
+export const tasks = mysqlTable("tasks", {
+  id: int("id").primaryKey().autoincrement(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  priority: varchar("priority", { length: 50 }).notNull().default("Medium"), // High, Medium, Low
+  status: varchar("status", { length: 50 }).notNull().default("Pending"), // Pending, In Progress, Completed
+  department: varchar("department", { length: 100 }),
+  assignedTo: int("assigned_to").references(() => users.id),
+  createdBy: int("created_by").references(() => users.id),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const handovers = mysqlTable("handovers", {
+  id: int("id").primaryKey().autoincrement(),
+  shift: varchar("shift", { length: 50 }).notNull(), // Morning, Afternoon, Evening, Night
+  date: timestamp("date").notNull(),
+  fromUser: int("from_user").references(() => users.id),
+  toUser: int("to_user").references(() => users.id),
+  notes: varchar("notes", { length: 255 }),
+  keyPoints: json("key_points"), // Array of important points
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const alerts = mysqlTable("alerts", {
+  id: int("id").primaryKey().autoincrement(),
+  type: varchar("type", { length: 50 }).notNull(), // low_stock, expiry, waste_spike, system
+  title: varchar("title", { length: 255 }).notNull(),
+  message: varchar("message", { length: 255 }).notNull(),
+  severity: varchar("severity", { length: 50 }).notNull().default("Medium"), // High, Medium, Low
+  isRead: boolean("is_read").notNull().default(false),
+  targetUser: int("target_user").references(() => users.id),
+  metadata: json("metadata"), // Additional alert data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const uploadHistory = mysqlTable("upload_history", {
+  id: int("id").primaryKey().autoincrement(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileType: varchar("file_type", { length: 50 }).notNull(), // sales, stock, waste
+  status: varchar("status", { length: 50 }).notNull(), // processed, failed, warnings
+  recordCount: int("record_count"),
+  errorLog: varchar("error_log", { length: 255 }),
+  uploadedBy: int("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+});
+
+// =============================================================================
+// SYSTEM CONFIGURATION - Settings and preferences
+// =============================================================================
+
+export const systemSettings = mysqlTable("system_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),
+  settingValue: json("setting_value").notNull(), // JSON for flexible configuration storage
+  category: varchar("category", { length: 50 }).notNull().default("general"), // general, analytics, ui, integrations
+  description: varchar("description", { length: 500 }),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedBy: int("updated_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  settingKeyIdx: index("system_settings_key_idx").on(table.settingKey),
+  categoryIdx: index("system_settings_category_idx").on(table.category),
+}));
+
+// =============================================================================
+// WASTE MANAGEMENT SYSTEM - Track and analyze waste data
+// =============================================================================
+
+export const wasteRecords = mysqlTable("waste_records", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Core waste data from Excel file (Column B, E, F, K, N)
+  itemCode: varchar("item_code", { length: 50 }).notNull(), // Column B: Item code identifier
+  quantityWasted: decimal("quantity_wasted", { precision: 10, scale: 3 }).notNull(), // Column E: Number wasted
+  weightWasted: decimal("weight_wasted", { precision: 10, scale: 3 }), // Column F: Weight (if weighted item)
+  wasteDate: date("waste_date").notNull(), // Column K: Date waste was recorded
+  wasteReason: varchar("waste_reason", { length: 100 }).notNull(), // Column N: Reason for waste
+
+  // Enriched product information (from itemCode lookup)
+  productName: varchar("product_name", { length: 255 }),
+  category: varchar("category", { length: 100 }),
+  supplier: varchar("supplier", { length: 255 }),
+  brand: varchar("brand", { length: 100 }),
+
+  // Calculated values
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }),
+
+  // Upload tracking
+  batchUploadId: varchar("batch_upload_id", { length: 100 }).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  uploadedBy: int("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+
+  // Processing metadata
+  isProcessed: boolean("is_processed").notNull().default(true),
+  processingNotes: text("processing_notes"),
+
+  // Location and department tracking
+  locationId: int("location_id").references(() => locations.id),
+  department: varchar("department", { length: 100 }),
+
+  // Audit trail
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  itemCodeIdx: index("waste_records_item_code_idx").on(table.itemCode),
+  wasteDateIdx: index("waste_records_waste_date_idx").on(table.wasteDate),
+  reasonIdx: index("waste_records_reason_idx").on(table.wasteReason),
+  batchIdx: index("waste_records_batch_idx").on(table.batchUploadId),
+  totalValueIdx: index("waste_records_total_value_idx").on(table.totalValue),
+  categoryIdx: index("waste_records_category_idx").on(table.category),
+  supplierIdx: index("waste_records_supplier_idx").on(table.supplier),
+  departmentIdx: index("waste_records_department_idx").on(table.department),
+  uploadedByIdx: index("waste_records_uploaded_by_idx").on(table.uploadedBy),
+}));
+
+export const wasteUploadHistory = mysqlTable("waste_upload_history", {
+  id: int("id").primaryKey().autoincrement(),
+  batchId: varchar("batch_id", { length: 100 }).notNull().unique(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+
+  // File metadata
+  fileSize: bigint("file_size", { mode: "number" }),
+  fileHash: varchar("file_hash", { length: 64 }).unique(), // SHA256 for duplicate detection
+
+  // Processing results
+  totalRecords: int("total_records").default(0),
+  processedRecords: int("processed_records").default(0),
+  failedRecords: int("failed_records").default(0),
+  duplicateRecords: int("duplicate_records").default(0),
+
+  // Processing metadata
+  status: varchar("status", { length: 20 }).default("pending"), // pending, processing, completed, failed
+  errorLog: text("error_log"),
+  processingTimeMs: int("processing_time_ms"),
+
+  // Summary statistics
+  totalWasteValue: decimal("total_waste_value", { precision: 12, scale: 2 }).default("0"),
+  totalQuantityWasted: decimal("total_quantity_wasted", { precision: 10, scale: 3 }).default("0"),
+  uniqueItems: int("unique_items").default(0),
+
+  // Upload tracking
+  uploadedBy: int("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+}, (table) => ({
+  batchIdIdx: index("waste_upload_batch_idx").on(table.batchId),
+  statusIdx: index("waste_upload_status_idx").on(table.status),
+  uploadedByIdx: index("waste_upload_user_idx").on(table.uploadedBy),
+  fileHashIdx: index("waste_upload_hash_idx").on(table.fileHash),
+  uploadedAtIdx: index("waste_upload_date_idx").on(table.uploadedAt),
+}));
+
+// =============================================================================
+// STOCK ORDERING SYSTEM - Intelligent order generation and management
+// =============================================================================
+
+export const stockOrderingRules = mysqlTable("stock_ordering_rules", {
+  id: int("id").primaryKey().autoincrement(),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull().unique(),
+  supplierId: int("supplier_id").references(() => suppliers.id),
+
+  // Ordering parameters
+  reorderLevel: decimal("reorder_level", { precision: 10, scale: 3 }).notNull().default("0"),
+  maxOrderQuantity: decimal("max_order_quantity", { precision: 10, scale: 3 }),
+  minOrderQuantity: decimal("min_order_quantity", { precision: 10, scale: 3 }).notNull().default("1"),
+  leadTimeDays: int("lead_time_days").notNull().default(7),
+
+  // Buffer and safety stock
+  bufferPercentage: decimal("buffer_percentage", { precision: 5, scale: 2 }).notNull().default("20.00"), // 20%
+  safetyStockDays: int("safety_stock_days").notNull().default(3),
+
+  // Automation settings
+  autoOrderEnabled: boolean("auto_order_enabled").notNull().default(true),
+  orderFrequency: varchar("order_frequency", { length: 20 }).notNull().default("weekly"), // 'daily', 'weekly', 'monthly'
+
+  // Cost and budget
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  budgetLimit: decimal("budget_limit", { precision: 10, scale: 2 }),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: int("updated_by").references(() => users.id),
+}, (table) => ({
+  itemCodeIdx: index("stock_rules_item_idx").on(table.baseItemCode),
+  supplierIdx: index("stock_rules_supplier_idx").on(table.supplierId),
+  autoOrderIdx: index("stock_rules_auto_idx").on(table.autoOrderEnabled),
+  reorderLevelIdx: index("stock_rules_reorder_idx").on(table.reorderLevel),
+}));
+
+export const draftOrders = mysqlTable("draft_orders", {
+  id: int("id").primaryKey().autoincrement(),
+  orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
+
+  // Order details
+  orderDate: date("order_date").notNull(),
+  supplierId: int("supplier_id").references(() => suppliers.id),
+  supplierName: varchar("supplier_name", { length: 255 }), // Cached for performance
+
+  // Analysis context
+  analysisPeriodDays: int("analysis_period_days").notNull().default(14),
+  bufferPercentage: decimal("buffer_percentage", { precision: 5, scale: 2 }).notNull().default("20.00"),
+  baseDate: date("base_date").notNull(), // Reference date for analysis
+
+  // Order summary
+  totalItems: int("total_items").notNull().default(0),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalCases: decimal("total_cases", { precision: 10, scale: 2 }).notNull().default("0"),
+
+  // Status and workflow
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // 'draft', 'reviewed', 'approved', 'cancelled', 'exported'
+  priority: varchar("priority", { length: 20 }).notNull().default("normal"), // 'low', 'normal', 'high', 'urgent'
+
+  // Generation details
+  generatedBy: int("generated_by").references(() => users.id),
+  generationMethod: varchar("generation_method", { length: 50 }).notNull().default("manual"), // 'manual', 'auto', 'scheduled'
+
+  // Approval workflow
+  reviewedBy: int("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  approvedBy: int("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+
+  // Export tracking
+  exportedAt: timestamp("exported_at"),
+  exportedBy: int("exported_by").references(() => users.id),
+  exportFormat: varchar("export_format", { length: 20 }), // 'excel', 'pdf', 'csv'
+
+  // Notes and comments
+  notes: text("notes"),
+  internalComments: text("internal_comments"),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orderNumberIdx: index("draft_orders_number_idx").on(table.orderNumber),
+  supplierIdx: index("draft_orders_supplier_idx").on(table.supplierId),
+  statusIdx: index("draft_orders_status_idx").on(table.status),
+  orderDateIdx: index("draft_orders_date_idx").on(table.orderDate),
+  generatedByIdx: index("draft_orders_generated_by_idx").on(table.generatedBy),
+  priorityIdx: index("draft_orders_priority_idx").on(table.priority),
+}));
+
+export const draftOrderItems = mysqlTable("draft_order_items", {
+  id: int("id").primaryKey().autoincrement(),
+  draftOrderId: int("draft_order_id").notNull().references(() => draftOrders.id, { onDelete: "cascade" }),
+
+  // Item identification
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+  itemDescription: varchar("item_description", { length: 255 }),
+  category: varchar("category", { length: 100 }),
+  brand: varchar("brand", { length: 100 }),
+
+  // Current stock situation
+  currentStock: decimal("current_stock", { precision: 10, scale: 3 }).notNull().default("0"),
+  currentStockLocation: varchar("current_stock_location", { length: 100 }),
+
+  // Sales analysis
+  salesPeriodDays: int("sales_period_days").notNull().default(14),
+  averageDailySales: decimal("average_daily_sales", { precision: 10, scale: 3 }).notNull().default("0"),
+  totalSalesInPeriod: decimal("total_sales_in_period", { precision: 10, scale: 3 }).notNull().default("0"),
+  salesTrend: varchar("sales_trend", { length: 20 }).notNull().default("stable"), // 'increasing', 'stable', 'decreasing'
+
+  // Case size information
+  caseSize: int("case_size").notNull().default(1),
+  caseSizeConfidence: decimal("case_size_confidence", { precision: 3, scale: 2 }).notNull().default("1.00"),
+  caseSizeSource: varchar("case_size_source", { length: 50 }), // 'brn', 'manual', 'estimated'
+
+  // Order calculations
+  requiredQuantity: decimal("required_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  bufferQuantity: decimal("buffer_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  recommendedOrderQuantity: decimal("recommended_order_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  recommendedCases: decimal("recommended_cases", { precision: 10, scale: 2 }).notNull().default("0"),
+
+  // Manual overrides
+  manualOrderQuantity: decimal("manual_order_quantity", { precision: 10, scale: 3 }),
+  manualCases: decimal("manual_cases", { precision: 10, scale: 2 }),
+  overrideReason: varchar("override_reason", { length: 100 }),
+
+  // Final order details
+  finalOrderQuantity: decimal("final_order_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  finalCases: decimal("final_cases", { precision: 10, scale: 2 }).notNull().default("0"),
+
+  // Pricing
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  caseCost: decimal("case_cost", { precision: 10, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+
+  // Status and notes
+  status: varchar("status", { length: 20 }).notNull().default("active"), // 'active', 'removed', 'modified'
+  notes: text("notes"),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  draftOrderIdx: index("draft_items_order_idx").on(table.draftOrderId),
+  itemCodeIdx: index("draft_items_item_idx").on(table.baseItemCode),
+  statusIdx: index("draft_items_status_idx").on(table.status),
+  categoryIdx: index("draft_items_category_idx").on(table.category),
+  totalCostIdx: index("draft_items_cost_idx").on(table.totalCost),
+}));
+
+export const orderTemplates = mysqlTable("order_templates", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // Template scope
+  supplierId: int("supplier_id").references(() => suppliers.id),
+  category: varchar("category", { length: 100 }),
+
+  // Template parameters
+  defaultAnalysisPeriod: int("default_analysis_period").notNull().default(14),
+  defaultBufferPercentage: decimal("default_buffer_percentage", { precision: 5, scale: 2 }).notNull().default("20.00"),
+  defaultLeadTime: int("default_lead_time").notNull().default(7),
+
+  // Item filters
+  itemFilters: json("item_filters"), // {"categories": ["DAIRY", "MEAT"], "suppliers": [1,2,3]}
+
+  // Ordering rules
+  minOrderValue: decimal("min_order_value", { precision: 10, scale: 2 }),
+  maxOrderValue: decimal("max_order_value", { precision: 10, scale: 2 }),
+  roundingRules: json("rounding_rules"), // {"cases": "round_up", "value": "nearest_10"}
+
+  // Schedule settings
+  scheduleEnabled: boolean("schedule_enabled").notNull().default(false),
+  scheduleFrequency: varchar("schedule_frequency", { length: 20 }), // 'daily', 'weekly', 'monthly'
+  scheduleDay: varchar("schedule_day", { length: 10 }), // 'monday', 'tuesday', etc.
+  scheduleTime: varchar("schedule_time", { length: 8 }), // 'HH:MM:SS'
+
+  // Status and ownership
+  isActive: boolean("is_active").notNull().default(true),
+  isShared: boolean("is_shared").notNull().default(false),
+  createdBy: int("created_by").references(() => users.id),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("order_templates_name_idx").on(table.name),
+  supplierIdx: index("order_templates_supplier_idx").on(table.supplierId),
+  activeIdx: index("order_templates_active_idx").on(table.isActive),
+  createdByIdx: index("order_templates_created_by_idx").on(table.createdBy),
+}));
+
+export const orderPerformanceMetrics = mysqlTable("order_performance_metrics", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Reference data
+  orderDate: date("order_date").notNull(),
+  supplierId: int("supplier_id").references(() => suppliers.id),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+
+  // Order vs. actual performance
+  orderedQuantity: decimal("ordered_quantity", { precision: 10, scale: 3 }).notNull(),
+  deliveredQuantity: decimal("delivered_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+  consumedQuantity: decimal("consumed_quantity", { precision: 10, scale: 3 }).notNull().default("0"),
+
+  // Timing performance
+  expectedDeliveryDate: date("expected_delivery_date"),
+  actualDeliveryDate: date("actual_delivery_date"),
+  leadTimeDays: int("lead_time_days"),
+
+  // Accuracy metrics
+  forecastAccuracy: decimal("forecast_accuracy", { precision: 5, scale: 2 }), // Percentage
+  stockoutDays: int("stockout_days").notNull().default(0),
+  overstockDays: int("overstock_days").notNull().default(0),
+
+  // Cost performance
+  orderedCost: decimal("ordered_cost", { precision: 10, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 10, scale: 2 }),
+  wasteValue: decimal("waste_value", { precision: 10, scale: 2 }).notNull().default("0"),
+
+  // Performance scores
+  overallScore: decimal("overall_score", { precision: 5, scale: 2 }), // 0-100
+  deliveryScore: decimal("delivery_score", { precision: 5, scale: 2 }),
+  accuracyScore: decimal("accuracy_score", { precision: 5, scale: 2 }),
+  costScore: decimal("cost_score", { precision: 5, scale: 2 }),
+
+  // Analysis period
+  analysisStartDate: date("analysis_start_date").notNull(),
+  analysisEndDate: date("analysis_end_date").notNull(),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orderDateIdx: index("order_perf_date_idx").on(table.orderDate),
+  supplierIdx: index("order_perf_supplier_idx").on(table.supplierId),
+  itemCodeIdx: index("order_perf_item_idx").on(table.baseItemCode),
+  overallScoreIdx: index("order_perf_score_idx").on(table.overallScore),
+  deliveryScoreIdx: index("order_perf_delivery_idx").on(table.deliveryScore),
+}));
+
+// =============================================================================
+// BBD (BEST BEFORE DATE) TRACKING SYSTEM
+// =============================================================================
+
+export const bbdTracking = mysqlTable("bbd_tracking", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Core fields from Excel scan
+  scanId: int("scan_id").notNull(), // ID No from Excel
+  stockCodeRaw: varchar("stock_code_raw", { length: 50 }).notNull(), // Original code with C/S suffix
+  stockCodeBase: varchar("stock_code_base", { length: 50 }).notNull(), // Base code for lookup
+  stockType: varchar("stock_type", { length: 1 }).notNull(), // 'C' or 'S'
+
+  // Quantity and stock information (at time of scan)
+  qtyScanned: decimal("qty_scanned", { precision: 10, scale: 2 }).notNull(),
+  qtyInStock: decimal("qty_in_stock", { precision: 10, scale: 2 }),
+  variance: decimal("variance", { precision: 10, scale: 2 }),
+
+  // BBD information
+  bestBeforeDate: date("best_before_date").notNull(),
+  daysUntilExpiry: int("days_until_expiry"), // Calculated field updated by trigger
+  expiryStatus: varchar("expiry_status", { length: 20 }), // fresh, expiring_soon, expiring_critical, expired
+
+  // Scan metadata
+  deviceName: varchar("device_name", { length: 100 }),
+  scannedBy: varchar("scanned_by", { length: 100 }),
+  scanDate: date("scan_date").notNull(),
+  scanTime: varchar("scan_time", { length: 20 }), // Stored as string from Excel
+  location: varchar("location", { length: 100 }), // From filename (e.g., 'Aisle 1 to 5')
+
+  // Upload batch tracking
+  batchUploadId: varchar("batch_upload_id", { length: 100 }),
+  fileName: varchar("file_name", { length: 255 }),
+
+  // Conversion tracking
+  isConverted: boolean("is_converted").default(false),
+  conversionFactor: int("conversion_factor").default(1),
+
+  // Status tracking
+  isResolved: boolean("is_resolved").default(false),
+  resolvedBy: int("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stockCodeIdx: index("bbd_stock_code_idx").on(table.stockCodeBase),
+  bbdIdx: index("bbd_date_idx").on(table.bestBeforeDate),
+  expiryStatusIdx: index("bbd_expiry_status_idx").on(table.expiryStatus),
+  scanDateIdx: index("bbd_scan_date_idx").on(table.scanDate),
+  batchIdx: index("bbd_batch_idx").on(table.batchUploadId),
+  locationIdx: index("bbd_location_idx").on(table.location),
+  resolvedIdx: index("bbd_resolved_idx").on(table.isResolved),
+
+  // Unique constraint to prevent duplicate BBD records
+  // Based on scan ID, stock code, best before date, and scan date to identify identical scanner entries
+  recordUnique: unique("bbd_record_unique").on(table.scanId, table.stockCodeRaw, table.bestBeforeDate, table.scanDate, table.location),
+}));
+
+export const stockCodeConversions = mysqlTable("stock_code_conversions", {
+  id: int("id").primaryKey().autoincrement(),
+  baseCode: varchar("base_code", { length: 50 }).notNull().unique(),
+  caseCode: varchar("case_code", { length: 50 }), // Code with C
+  singleCode: varchar("single_code", { length: 50 }), // Code with S
+  caseSize: int("case_size").default(1), // Units per case
+  source: varchar("source", { length: 20 }).default("manual"), // manual, brn, calculated
+  confidence: decimal("confidence", { precision: 3, scale: 2 }).default(1.00),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  baseIdx: index("conversion_base_idx").on(table.baseCode),
+  caseIdx: index("conversion_case_idx").on(table.caseCode),
+  singleIdx: index("conversion_single_idx").on(table.singleCode),
+}));
+
+export const bbdUploadHistory = mysqlTable("bbd_upload_history", {
+  id: int("id").primaryKey().autoincrement(),
+  batchId: varchar("batch_id", { length: 100 }).notNull().unique(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }),
+  location: varchar("location", { length: 100 }),
+
+  // File duplicate detection
+  fileHash: varchar("file_hash", { length: 64 }).unique(), // SHA256 hash for duplicate detection
+  fileSize: bigint("file_size", { mode: "number" }),
+
+  totalRecords: int("total_records").default(0),
+  processedRecords: int("processed_records").default(0),
+  failedRecords: int("failed_records").default(0),
+  duplicateRecords: int("duplicate_records").default(0), // Count of duplicate records skipped
+  status: varchar("status", { length: 20 }).default("pending"), // pending, processing, completed, failed, duplicate
+  errorLog: text("error_log"),
+  uploadedBy: int("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+}, (table) => ({
+  batchIdIdx: index("bbd_upload_batch_idx").on(table.batchId),
+  statusIdx: index("bbd_upload_status_idx").on(table.status),
+  uploadedByIdx: index("bbd_upload_user_idx").on(table.uploadedBy),
+  fileHashIdx: index("bbd_upload_hash_idx").on(table.fileHash),
+}));
+
+export const bbdProcessingQueue = mysqlTable("bbd_processing_queue", {
+  id: int("id").primaryKey().autoincrement(),
+  batchId: varchar("batch_id", { length: 100 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileSize: int("file_size"),
+  status: varchar("status", { length: 20 }).default("pending"), // pending, processing, completed, failed, skipped
+  priority: int("priority").default(0), // Higher numbers = higher priority
+  attempts: int("attempts").default(0),
+  maxAttempts: int("max_attempts").default(3),
+  error: text("error"),
+  processedBy: int("processed_by"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  batchIdIdx: index("queue_batch_idx").on(table.batchId),
+  statusIdx: index("queue_status_idx").on(table.status),
+  priorityIdx: index("queue_priority_idx").on(table.priority, table.createdAt),
+  filePathIdx: index("queue_file_path_idx").on(table.filePath),
+}));
+
+// =============================================================================
+// STOCK DISCREPANCY TRACKING - Snapshot-based discrepancy detection
+// =============================================================================
+
+export const dailyStockPositions = mysqlTable("daily_stock_positions", {
+  id: int("id").primaryKey().autoincrement(),
+  positionDate: date("position_date").notNull(),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+  locationCode: varchar("location_code", { length: 10 }).notNull(), // COL, TOT, GST, etc.
+
+  // Stock levels
+  openingStock: decimal("opening_stock", { precision: 10, scale: 3 }).notNull(), // From BRN snapshot
+  salesQuantity: decimal("sales_quantity", { precision: 10, scale: 3 }).notNull().default("0"), // From EPOS aggregation
+  expectedClosing: decimal("expected_closing", { precision: 10, scale: 3 }).notNull(), // Calculated: opening - sales
+  actualClosing: decimal("actual_closing", { precision: 10, scale: 3 }), // Next day's BRN opening
+
+  // Discrepancy tracking
+  discrepancy: decimal("discrepancy", { precision: 10, scale: 3 }), // actual - expected
+  discrepancyPercent: decimal("discrepancy_percent", { precision: 5, scale: 2 }),
+  discrepancyValue: decimal("discrepancy_value", { precision: 10, scale: 2 }), // monetary value of discrepancy
+
+  // Status and analysis
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'matched', 'shortage', 'overage', 'pending'
+  possibleCauses: json("possible_causes"), // ['theft', 'waste', 'unrecorded_sales', 'recording_error']
+  notes: text("notes"),
+
+  // Metadata
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  analyzedAt: timestamp("analyzed_at"),
+}, (table) => ({
+  // Unique constraint: one position per item per location per date
+  uniquePosition: unique("position_unique").on(table.positionDate, table.baseItemCode, table.locationCode),
+
+  // Indexes
+  dateIdx: index("position_date_idx").on(table.positionDate),
+  itemCodeIdx: index("position_item_idx").on(table.baseItemCode),
+  locationIdx: index("position_location_idx").on(table.locationCode),
+  statusIdx: index("position_status_idx").on(table.status),
+  discrepancyIdx: index("position_discrepancy_idx").on(table.discrepancy),
+}));
+
+export const discrepancyPatterns = mysqlTable("discrepancy_patterns", {
+  id: int("id").primaryKey().autoincrement(),
+  baseItemCode: varchar("base_item_code", { length: 50 }).notNull(),
+  patternType: varchar("pattern_type", { length: 50 }).notNull(),
+  // 'consistent_shortage', 'random_variance', 'day_specific', 'location_specific', 'seasonal'
+
+  // Pattern metrics
+  avgDiscrepancy: decimal("avg_discrepancy", { precision: 10, scale: 3 }).notNull(),
+  discrepancyStdDev: decimal("discrepancy_std_dev", { precision: 10, scale: 3 }),
+  occurrenceCount: int("occurrence_count").notNull().default(0),
+  confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }), // 0.00-1.00
+
+  // Pattern details
+  dayOfWeekPattern: json("day_of_week_pattern"), // {"monday": -5.2, "tuesday": -3.1, ...}
+  locationPattern: json("location_pattern"), // {"COL": -10, "TOT": -5, ...}
+  possibleCauses: json("possible_causes"), // ['theft', 'waste', 'process_gap']
+
+  // Analysis metadata
+  analysisStartDate: date("analysis_start_date").notNull(),
+  analysisEndDate: date("analysis_end_date").notNull(),
+  lastAnalyzed: timestamp("last_analyzed").notNull().defaultNow(),
+
+  // Alert configuration
+  alertThreshold: decimal("alert_threshold", { precision: 10, scale: 3 }),
+  alertEnabled: boolean("alert_enabled").notNull().default(true),
+  lastAlertSent: timestamp("last_alert_sent"),
+
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+}, (table) => ({
+  itemCodeIdx: index("pattern_item_idx").on(table.baseItemCode),
+  patternTypeIdx: index("pattern_type_idx").on(table.patternType),
+  confidenceIdx: index("pattern_confidence_idx").on(table.confidenceScore),
+  activeIdx: index("pattern_active_idx").on(table.isActive),
+}));
+
+// =============================================================================
+// THEME SYSTEM - Dynamic color configuration
+// =============================================================================
+
+export const themeColors = mysqlTable("theme_colors", {
+  id: int("id").primaryKey().autoincrement(),
+
+  // Color categorization
+  category: varchar("category", { length: 50 }).notNull(), // 'primary', 'semantic', 'component', 'status', 'chart'
+  identifier: varchar("identifier", { length: 100 }).notNull().unique(), // 'background', 'text-primary', 'border-warning', etc.
+
+  // Color values
+  colorValue: varchar("color_value", { length: 50 }).notNull(), // '#00FF00', 'rgb(0,255,0)', etc.
+  tailwindClass: varchar("tailwind_class", { length: 100 }), // 'text-green-500', 'bg-primary', etc.
+  cssVariable: varchar("css_variable", { length: 100 }), // '--primary', '--background', etc.
+
+  // Usage information
+  description: text("description"), // Where/how this color is used
+  uiElement: varchar("ui_element", { length: 100 }), // 'text', 'background', 'border', 'icon', etc.
+  componentUsage: json("component_usage"), // Array of components using this color
+
+  // Configuration
+  isActive: boolean("is_active").notNull().default(true),
+  isDarkMode: boolean("is_dark_mode").notNull().default(true), // Theme variant
+  priority: int("priority").notNull().default(0), // Sort order
+
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+}, (table) => ({
+  categoryIdx: index("theme_colors_category_idx").on(table.category),
+  identifierIdx: index("theme_colors_identifier_idx").on(table.identifier),
+  darkModeIdx: index("theme_colors_dark_mode_idx").on(table.isDarkMode),
+  priorityIdx: index("theme_colors_priority_idx").on(table.priority),
+}));
+
+// =============================================================================
+// PRODUCT LIFECYCLE TRACKING - Track product discovery and discontinuation
+// =============================================================================
+
+export const productLifecycleEvents = mysqlTable("product_lifecycle_events", {
+  id: int("id").primaryKey().autoincrement(),
+  productId: int("product_id").references(() => products.id),
+  itemCode: varchar("item_code", { length: 50 }).notNull(), // sage_code/item_code
+
+  eventType: varchar("event_type", { length: 30 }).notNull(),
+  // 'discovered', 'missing', 'returned', 'discontinued', 'supplier_changed', 'category_changed'
+
+  eventDate: date("event_date").notNull(),
+  details: json("details"), // Additional context about the event
+
+  // For missing events
+  lastKnownStock: decimal("last_known_stock", { precision: 10, scale: 3 }),
+  lastKnownSupplier: varchar("last_known_supplier", { length: 100 }),
+  lastKnownCategory: varchar("last_known_category", { length: 100 }),
+
+  // Metadata
+  fileName: varchar("file_name", { length: 255 }), // BRN file that triggered the event
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  productIdx: index("lifecycle_product_idx").on(table.productId),
+  itemCodeIdx: index("lifecycle_item_code_idx").on(table.itemCode),
+  eventTypeIdx: index("lifecycle_event_type_idx").on(table.eventType),
+  eventDateIdx: index("lifecycle_event_date_idx").on(table.eventDate),
+}));
+
+// =============================================================================
+// RELATIONAL DATABASE RELATIONSHIPS
+// =============================================================================
+
+// Users Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  tasksCreated: many(tasks, { relationName: "creator" }),
+  tasksAssigned: many(tasks, { relationName: "assignee" }),
+  handoversFrom: many(handovers, { relationName: "fromUser" }),
+  handoversTo: many(handovers, { relationName: "toUser" }),
+  alerts: many(alerts),
+  uploads: many(uploadHistory),
+  systemSettingsUpdated: many(systemSettings),
+  supplierProfilesCreated: many(supplierProfiles, { relationName: "createdBy" }),
+  supplierProfilesUpdated: many(supplierProfiles, { relationName: "updatedBy" }),
+  // stockBatches: many(stockBatches), // Commented out until implemented
+}));
+
+// Core Entity Relations
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  products: many(products),
+  purchaseOrders: many(purchaseOrders),
+  // stockBatches: many(stockBatches), // Commented out until implemented
+}));
+
+// =============================================================================
+// SUPPLIER PROFILES RELATIONS (Task T004)
+// =============================================================================
+
+export const supplierProfilesRelations = relations(supplierProfiles, ({ one, many }) => ({
+  // User relationships for audit trail
+  createdByUser: one(users, {
+    fields: [supplierProfiles.createdBy],
+    references: [users.id],
+    relationName: "createdBy"
+  }),
+  updatedByUser: one(users, {
+    fields: [supplierProfiles.updatedBy],
+    references: [users.id],
+    relationName: "updatedBy"
+  }),
+
+  // Product profiles that reference this supplier
+  productProfiles: many(productProfiles),
+}));
+
+export const categoriesRelations = relations(categories, ({ many, one }) => ({
+  products: many(products),
+  parent: one(categories, {
+    fields: [categories.parentId],
+    references: [categories.id],
+    relationName: "parent_category"
+  }),
+  children: many(categories, { relationName: "parent_category" }),
+}));
+
+export const locationsRelations = relations(locations, ({ many }) => ({
+  inventory: many(inventory),
+  salesOrders: many(salesOrders),
+  purchaseOrders: many(purchaseOrders),
+  stockMovements: many(stockMovements),
+  // stockBatches: many(stockBatches), // Commented out until implemented
+}));
+
+// Product Relations
+export const productsRelations = relations(products, ({ one, many }) => ({
+  category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
+  supplier: one(suppliers, { fields: [products.supplierId], references: [suppliers.id] }),
+  inventory: many(inventory),
+  salesOrderItems: many(salesOrderItems),
+  purchaseOrderItems: many(purchaseOrderItems),
+  stockMovements: many(stockMovements),
+  productProfiles: many(productProfiles),
+  // stockBatches: many(stockBatches), // Commented out until implemented
+}));
+
+// =============================================================================
+// ENHANCED PRODUCT PROFILES RELATIONS (Task T004)
+// =============================================================================
+
+export const productProfilesRelations = relations(productProfiles, ({ one, many }) => ({
+  editedBy: one(users, { fields: [productProfiles.editedBy], references: [users.id] }),
+  changes: many(productProfileChanges),
+  editSessions: many(productEditSessions),
+}));
+
+// Product Profile Changes Relations
+export const productProfileChangesRelations = relations(productProfileChanges, ({ one }) => ({
+  productProfile: one(productProfiles, { fields: [productProfileChanges.itemCode], references: [productProfiles.itemCode] }),
+  editSession: one(productEditSessions, { fields: [productProfileChanges.sessionId], references: [productEditSessions.id] }),
+}));
+
+// Product Edit Sessions Relations
+export const productEditSessionsRelations = relations(productEditSessions, ({ one, many }) => ({
+  productProfile: one(productProfiles, { fields: [productEditSessions.itemCode], references: [productProfiles.itemCode] }),
+  user: one(users, { fields: [productEditSessions.userId], references: [users.id] }),
+  changes: many(productProfileChanges),
+}));
+
+// Inventory Relations
+export const inventoryRelations = relations(inventory, ({ one }) => ({
+  product: one(products, { fields: [inventory.productId], references: [products.id] }),
+  location: one(locations, { fields: [inventory.locationId], references: [locations.id] }),
+}));
+
+// Stock Movement Relations
+export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
+  product: one(products, { fields: [stockMovements.productId], references: [products.id] }),
+  location: one(locations, { fields: [stockMovements.locationId], references: [locations.id] }),
+  createdBy: one(users, { fields: [stockMovements.createdBy], references: [users.id] }),
+}));
+
+// Sales Relations
+export const salesOrdersRelations = relations(salesOrders, ({ one, many }) => ({
+  location: one(locations, { fields: [salesOrders.locationId], references: [locations.id] }),
+  processedBy: one(users, { fields: [salesOrders.processedBy], references: [users.id] }),
+  items: many(salesOrderItems),
+}));
+
+export const salesOrderItemsRelations = relations(salesOrderItems, ({ one }) => ({
+  salesOrder: one(salesOrders, { fields: [salesOrderItems.salesOrderId], references: [salesOrders.id] }),
+  product: one(products, { fields: [salesOrderItems.productId], references: [products.id] }),
+}));
+
+// Purchase Relations
+export const purchaseOrdersRelations = relations(purchaseOrders, ({ one, many }) => ({
+  supplier: one(suppliers, { fields: [purchaseOrders.supplierId], references: [suppliers.id] }),
+  location: one(locations, { fields: [purchaseOrders.locationId], references: [locations.id] }),
+  createdBy: one(users, { fields: [purchaseOrders.createdBy], references: [users.id] }),
+  items: many(purchaseOrderItems),
+}));
+
+export const purchaseOrderItemsRelations = relations(purchaseOrderItems, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, { fields: [purchaseOrderItems.purchaseOrderId], references: [purchaseOrders.id] }),
+  product: one(products, { fields: [purchaseOrderItems.productId], references: [products.id] }),
+}));
+
+// Stock Batch Relations - commented out as stockBatches table not yet implemented
+// export const stockBatchesRelations = relations(stockBatches, ({ one }) => ({
+//   product: one(products, { fields: [stockBatches.productId], references: [products.id] }),
+//   location: one(locations, { fields: [stockBatches.locationId], references: [locations.id] }),
+//   supplier: one(suppliers, { fields: [stockBatches.supplierId], references: [suppliers.id] }),
+//   createdBy: one(users, { fields: [stockBatches.createdBy], references: [users.id] }),
+// }));
+
+// Management Relations (keeping existing)
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  creator: one(users, { fields: [tasks.createdBy], references: [users.id], relationName: "creator" }),
+  assignee: one(users, { fields: [tasks.assignedTo], references: [users.id], relationName: "assignee" }),
+}));
+
+export const handoversRelations = relations(handovers, ({ one }) => ({
+  fromUser: one(users, { fields: [handovers.fromUser], references: [users.id], relationName: "fromUser" }),
+  toUser: one(users, { fields: [handovers.toUser], references: [users.id], relationName: "toUser" }),
+}));
+
+export const alertsRelations = relations(alerts, ({ one }) => ({
+  targetUser: one(users, { fields: [alerts.targetUser], references: [users.id] }),
+}));
+
+export const uploadHistoryRelations = relations(uploadHistory, ({ one }) => ({
+  uploader: one(users, { fields: [uploadHistory.uploadedBy], references: [users.id] }),
+}));
+
+export const systemSettingsRelations = relations(systemSettings, ({ one }) => ({
+  updatedBy: one(users, { fields: [systemSettings.updatedBy], references: [users.id] }),
+}));
+
+// =============================================================================
+// INSERT SCHEMAS AND VALIDATION
+// =============================================================================
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Core Entity Schemas
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+});
+
+// =============================================================================
+// SUPPLIER PROFILES SCHEMAS (Task T004)
+// =============================================================================
+
+export const insertSupplierProfileSchema = createInsertSchema(supplierProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Stock System Schemas
+export const insertInventorySchema = createInsertSchema(inventory).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
+  id: true,
+  createdAt: true,
+});
+
+// BRN Stock Snapshot Schema
+export const insertBrnStockSnapshotSchema = createInsertSchema(brnStockSnapshots).omit({
+  uploadedAt: true,
+});
+
+// EPOS Excel upload validation schema
+export const eposExcelSchema = z.object({
+  reportDate: z.string(), // Will be parsed from Excel A1 cell
+  itemCode: z.string(),
+  unit: z.string().nullable().optional(),
+  description: z.string(),
+  totalQty: z.number().default(0),
+  totalNet: z.number().default(0),
+  totalGross: z.number().default(0),
+  fileName: z.string(),
+  uploadedBy: z.number().nullable().optional(),
+});
+
+export const insertEposSalesSummarySchema = createInsertSchema(eposSalesSummaries).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertTimeSeriesSalesSchema = createInsertSchema(timeSeriesSales).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertDailySalesAggregationSchema = createInsertSchema(dailySalesAggregation).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Product Profiles Schema - Enhanced for T004
+export const insertProductProfileSchema = createInsertSchema(productProfiles).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Order Management Schema
+export const insertOrderManagementCorrelationSchema = createInsertSchema(orderManagementCorrelations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// BRN Excel upload validation schema
+export const brnExcelSchema = z.object({
+  supplier: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  sageCode: z.string(),
+  brand: z.string().nullable().optional(),
+  description: z.string(),
+  packingSize: z.string().nullable().optional(),
+  stockALP: z.number().default(0),
+  stockTOT: z.number().default(0),
+  stockGST: z.number().default(0),
+  stockCOL: z.number().default(0),
+  stockSTR: z.number().default(0),
+  stockNMA: z.number().default(0),
+  caseCode: z.string().nullable().optional(),
+  singleCode: z.string().nullable().optional(),
+  fileName: z.string(),
+  snapshotDate: z.string(), // Will be parsed from filename
+  uploadedBy: z.number().nullable().optional(),
+});
+
+// Sales System Schemas
+export const insertSalesOrderSchema = createInsertSchema(salesOrders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSalesOrderItemSchema = createInsertSchema(salesOrderItems).omit({
+  id: true,
+});
+
+// Purchase System Schemas
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({
+  id: true,
+});
+
+// Enhanced Analytics Schema
+export const insertEnhancedOrderAnalyticsSchema = createInsertSchema(enhancedOrderAnalytics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Stock Ordering System Schemas
+export const insertStockOrderingRulesSchema = createInsertSchema(stockOrderingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDraftOrdersSchema = createInsertSchema(draftOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDraftOrderItemsSchema = createInsertSchema(draftOrderItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrderTemplatesSchema = createInsertSchema(orderTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrderPerformanceMetricsSchema = createInsertSchema(orderPerformanceMetrics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Case Size History Schema
+export const insertCaseSizeHistorySchema = createInsertSchema(caseSizeHistory).omit({
+  id: true,
+  changedAt: true,
+});
+
+export const insertHandoverSchema = createInsertSchema(handovers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAlertSchema = createInsertSchema(alerts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUploadHistorySchema = createInsertSchema(uploadHistory).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertThemeColorSchema = createInsertSchema(themeColors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// BBD Schema Definitions
+export const insertBbdTrackingSchema = createInsertSchema(bbdTracking).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  daysUntilExpiry: true, // Calculated field
+  expiryStatus: true, // Calculated field
+});
+
+export const insertStockCodeConversionsSchema = createInsertSchema(stockCodeConversions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBbdUploadHistorySchema = createInsertSchema(bbdUploadHistory).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertBbdProcessingQueueSchema = createInsertSchema(bbdProcessingQueue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// =============================================================================
+// PRODUCT PROFILE EDIT SYSTEM - Audit Trail and Session Management
+// =============================================================================
+
+
+// Product Override Tracking - Maintain distinction between original system data and manual modifications
+export const productOverrideTracking = mysqlTable("product_override_tracking", {
+  id: int("id").primaryKey().autoincrement(),
+  itemCode: varchar("item_code", { length: 50 }).notNull(),
+  fieldName: varchar("field_name", { length: 100 }).notNull(),
+  originalValue: json("original_value"),
+  overrideValue: json("override_value"),
+  overrideReason: varchar("override_reason", { length: 255 }).notNull(),
+  overriddenBy: int("overridden_by").notNull(),
+  overriddenAt: timestamp("overridden_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  itemCodeIdx: index("product_override_tracking_item_code_idx").on(table.itemCode),
+  overriddenByIdx: index("product_override_tracking_overridden_by_idx").on(table.overriddenBy),
+  isActiveIdx: index("product_override_tracking_is_active_idx").on(table.isActive),
+  itemCodeFieldActiveIdx: unique("product_override_tracking_item_field_active_unique").on(table.itemCode, table.fieldName, table.isActive),
+}));
+
+// Schema generation for the new tables
+export const insertProductProfileChangesSchema = createInsertSchema(productProfileChanges);
+export const insertProductEditSessionsSchema = createInsertSchema(productEditSessions);
+export const insertProductOverrideTrackingSchema = createInsertSchema(productOverrideTracking);
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+// Core System Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+
+// =============================================================================
+// SUPPLIER PROFILES TYPES (Task T004)
+// =============================================================================
+
+export type SupplierProfile = typeof supplierProfiles.$inferSelect;
+export type InsertSupplierProfile = z.infer<typeof insertSupplierProfileSchema>;
+
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+// Stock Management Types
+export type Inventory = typeof inventory.$inferSelect;
+export type InsertInventory = z.infer<typeof insertInventorySchema>;
+
+export type StockMovement = typeof stockMovements.$inferSelect;
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+
+export type BrnStockSnapshot = typeof brnStockSnapshots.$inferSelect;
+export type InsertBrnStockSnapshot = z.infer<typeof insertBrnStockSnapshotSchema>;
+
+export type EposSalesSummary = typeof eposSalesSummaries.$inferSelect;
+export type InsertEposSalesSummary = z.infer<typeof insertEposSalesSummarySchema>;
+
+export type TimeSeriesSales = typeof timeSeriesSales.$inferSelect;
+export type InsertTimeSeriesSales = z.infer<typeof insertTimeSeriesSalesSchema>;
+
+export type DailySalesAggregation = typeof dailySalesAggregation.$inferSelect;
+export type InsertDailySalesAggregation = z.infer<typeof insertDailySalesAggregationSchema>;
+
+export type ProductProfile = typeof productProfiles.$inferSelect;
+export type InsertProductProfile = z.infer<typeof insertProductProfileSchema>;
+
+// Product Profile Edit System Types
+export type ProductProfileChange = typeof productProfileChanges.$inferSelect;
+export type InsertProductProfileChange = z.infer<typeof insertProductProfileChangesSchema>;
+
+export type ProductEditSession = typeof productEditSessions.$inferSelect;
+export type InsertProductEditSession = z.infer<typeof insertProductEditSessionsSchema>;
+
+export type ProductOverrideTracking = typeof productOverrideTracking.$inferSelect;
+export type InsertProductOverrideTracking = z.infer<typeof insertProductOverrideTrackingSchema>;
+
+// Sales System Types
+export type SalesOrder = typeof salesOrders.$inferSelect;
+export type InsertSalesOrder = z.infer<typeof insertSalesOrderSchema>;
+
+export type SalesOrderItem = typeof salesOrderItems.$inferSelect;
+export type InsertSalesOrderItem = z.infer<typeof insertSalesOrderItemSchema>;
+
+// Purchase System Types
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+
+// Enhanced Analytics Types
+export type EnhancedOrderAnalytic = typeof enhancedOrderAnalytics.$inferSelect;
+export type InsertEnhancedOrderAnalytic = z.infer<typeof insertEnhancedOrderAnalyticsSchema>;
+
+// Management Types
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type Handover = typeof handovers.$inferSelect;
+export type InsertHandover = z.infer<typeof insertHandoverSchema>;
+
+export type Alert = typeof alerts.$inferSelect;
+export type InsertAlert = z.infer<typeof insertAlertSchema>;
+
+export type UploadHistory = typeof uploadHistory.$inferSelect;
+export type InsertUploadHistory = z.infer<typeof insertUploadHistorySchema>;
+export type OrderManagementCorrelation = typeof orderManagementCorrelations.$inferSelect;
+export type InsertOrderManagementCorrelation = z.infer<typeof insertOrderManagementCorrelationSchema>;
+
+// Theme System Types
+export type ThemeColor = typeof themeColors.$inferSelect;
+export type InsertThemeColor = z.infer<typeof insertThemeColorSchema>;
+
+// Stock Ordering System Types
+export type StockOrderingRule = typeof stockOrderingRules.$inferSelect;
+export type InsertStockOrderingRule = z.infer<typeof insertStockOrderingRulesSchema>;
+
+export type DraftOrder = typeof draftOrders.$inferSelect;
+export type InsertDraftOrder = z.infer<typeof insertDraftOrdersSchema>;
+
+export type DraftOrderItem = typeof draftOrderItems.$inferSelect;
+export type InsertDraftOrderItem = z.infer<typeof insertDraftOrderItemsSchema>;
+
+export type OrderTemplate = typeof orderTemplates.$inferSelect;
+export type InsertOrderTemplate = z.infer<typeof insertOrderTemplatesSchema>;
+
+export type OrderPerformanceMetric = typeof orderPerformanceMetrics.$inferSelect;
+export type InsertOrderPerformanceMetric = z.infer<typeof insertOrderPerformanceMetricsSchema>;
+
+// BBD System Types
+export type BbdTracking = typeof bbdTracking.$inferSelect;
+export type InsertBbdTracking = z.infer<typeof insertBbdTrackingSchema>;
+
+export type StockCodeConversion = typeof stockCodeConversions.$inferSelect;
+export type InsertStockCodeConversion = z.infer<typeof insertStockCodeConversionsSchema>;
+
+export type BbdUploadHistory = typeof bbdUploadHistory.$inferSelect;
+export type InsertBbdUploadHistory = z.infer<typeof insertBbdUploadHistorySchema>;
+
+export type BbdProcessingQueue = typeof bbdProcessingQueue.$inferSelect;
+export type InsertBbdProcessingQueue = z.infer<typeof insertBbdProcessingQueueSchema>;
+// =============================================================================
+// WIDGET DASHBOARD FRAMEWORK - Feature 028
+// =============================================================================
+
+// 1. widget_definitions - Stores widget type definitions and configurations
+export const widgetDefinitions = mysqlTable("widget_definitions", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id"),
+  widgetType: mysqlEnum("widget_type", ["metric", "chart", "table", "alert", "progress"]).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  apiEndpoint: varchar("api_endpoint", { length: 500 }).notNull(),
+  httpMethod: mysqlEnum("http_method", ["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
+  queryParams: json("query_params"),
+  calculationConfig: json("calculation_config").notNull(),
+  visualizationConfig: json("visualization_config").notNull(),
+  refreshInterval: int("refresh_interval").default(60000),
+  errorConfig: json("error_config"),
+  isSystem: boolean("is_system").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("idx_widget_user").on(table.userId),
+  typeIdx: index("idx_widget_type").on(table.widgetType),
+  systemIdx: index("idx_widget_system").on(table.isSystem, table.isActive),
+}));
+
+// 2. dashboards - Stores dashboard configurations and metadata
+export const dashboards = mysqlTable("dashboards", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  globalFilters: json("global_filters"),
+  isTemplate: boolean("is_template").default(false),
+  templateCategory: varchar("template_category", { length: 100 }),
+  isShared: boolean("is_shared").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("idx_dashboard_user").on(table.userId, table.isActive),
+  templateIdx: index("idx_dashboard_template").on(table.isTemplate, table.templateCategory),
+  sharedIdx: index("idx_dashboard_shared").on(table.isShared),
+}));
+
+// 3. dashboard_widgets - Join table linking widgets to dashboards
+export const dashboardWidgets = mysqlTable("dashboard_widgets", {
+  id: int("id").primaryKey().autoincrement(),
+  dashboardId: int("dashboard_id").notNull(),
+  widgetDefinitionId: int("widget_definition_id").notNull(),
+  widgetTitle: varchar("widget_title", { length: 255 }),
+  configOverride: json("config_override"),
+  isVisible: boolean("is_visible").default(true),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  dashboardIdx: index("idx_dashwidget_dashboard").on(table.dashboardId),
+  widgetIdx: index("idx_dashwidget_widget").on(table.widgetDefinitionId),
+  visibleIdx: index("idx_dashwidget_visible").on(table.dashboardId, table.isVisible, table.sortOrder),
+}));
+
+// 4. widget_layouts - Stores widget layout positions per breakpoint
+export const widgetLayouts = mysqlTable("widget_layouts", {
+  id: int("id").primaryKey().autoincrement(),
+  dashboardWidgetId: int("dashboard_widget_id").notNull(),
+  breakpoint: mysqlEnum("breakpoint", ["xxs", "xs", "sm", "md", "lg"]).notNull(),
+  gridX: int("grid_x").notNull(),
+  gridY: int("grid_y").notNull(),
+  gridW: int("grid_w").notNull(),
+  gridH: int("grid_h").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dashwidgetIdx: index("idx_layout_dashwidget").on(table.dashboardWidgetId, table.breakpoint),
+  positionIdx: index("idx_layout_position").on(table.dashboardWidgetId, table.breakpoint, table.gridX, table.gridY),
+}));
+
+// 5. dashboard_templates - Pre-built dashboard templates
+export const dashboardTemplates = mysqlTable("dashboard_templates", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  previewImageUrl: varchar("preview_image_url", { length: 500 }),
+  config: json("config").notNull(),
+  isActive: boolean("is_active").default(true),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  categoryIdx: index("idx_template_category").on(table.category, table.isActive, table.sortOrder),
+}));
+
+// 6. template_widgets - Join table for template widget definitions
+export const templateWidgets = mysqlTable("template_widgets", {
+  id: int("id").primaryKey().autoincrement(),
+  templateId: int("template_id").notNull(),
+  widgetDefinitionId: int("widget_definition_id").notNull(),
+  sortOrder: int("sort_order").default(0),
+}, (table) => ({
+  templateIdx: index("idx_tmpwidget_template").on(table.templateId, table.sortOrder),
+}));
+
+// 7. api_endpoints_metadata - Metadata about available system API endpoints
+export const apiEndpointsMetadata = mysqlTable("api_endpoints_metadata", {
+  id: int("id").primaryKey().autoincrement(),
+  endpointPath: varchar("endpoint_path", { length: 500 }).notNull(),
+  httpMethod: mysqlEnum("http_method", ["GET", "POST", "PUT", "DELETE", "PATCH"]).notNull(),
+  description: text("description").notNull(),
+  requestSchema: json("request_schema"),
+  responseSchema: json("response_schema").notNull(),
+  availableFields: json("available_fields"),
+  requiresAuth: boolean("requires_auth").default(true),
+  rateLimit: varchar("rate_limit", { length: 100 }),
+  category: varchar("category", { length: 100 }),
+  isDeprecated: boolean("is_deprecated").default(false),
+  lastScanned: timestamp("last_scanned").defaultNow(),
+}, (table) => ({
+  pathIdx: index("idx_endpoint_path").on(table.endpointPath, table.httpMethod),
+  categoryIdx: index("idx_endpoint_category").on(table.category, table.isDeprecated),
+}));
+
+// 8. dashboard_versions - Dashboard configuration snapshots for version history
+export const dashboardVersions = mysqlTable("dashboard_versions", {
+  id: int("id").primaryKey().autoincrement(),
+  dashboardId: int("dashboard_id").notNull(),
+  versionNumber: int("version_number").notNull(),
+  configSnapshot: json("config_snapshot").notNull(),
+  changeDescription: text("change_description"),
+  createdByUserId: int("created_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  dashboardIdx: index("idx_version_dashboard").on(table.dashboardId, table.versionNumber),
+  recentIdx: index("idx_version_recent").on(table.dashboardId, table.createdAt),
+}));
+
+// Widget Framework Zod Validation Schemas
+export const insertWidgetDefinitionSchema = createInsertSchema(widgetDefinitions);
+export const insertDashboardSchema = createInsertSchema(dashboards);
+export const insertDashboardWidgetSchema = createInsertSchema(dashboardWidgets);
+export const insertWidgetLayoutSchema = createInsertSchema(widgetLayouts);
+export const insertDashboardTemplateSchema = createInsertSchema(dashboardTemplates);
+export const insertTemplateWidgetSchema = createInsertSchema(templateWidgets);
+export const insertApiEndpointMetadataSchema = createInsertSchema(apiEndpointsMetadata);
+export const insertDashboardVersionSchema = createInsertSchema(dashboardVersions);
+
+// Widget Framework Types
+export type WidgetDefinition = typeof widgetDefinitions.$inferSelect;
+export type InsertWidgetDefinition = z.infer<typeof insertWidgetDefinitionSchema>;
+
+export type Dashboard = typeof dashboards.$inferSelect;
+export type InsertDashboard = z.infer<typeof insertDashboardSchema>;
+
+export type DashboardWidget = typeof dashboardWidgets.$inferSelect;
+export type InsertDashboardWidget = z.infer<typeof insertDashboardWidgetSchema>;
+
+export type WidgetLayout = typeof widgetLayouts.$inferSelect;
+export type InsertWidgetLayout = z.infer<typeof insertWidgetLayoutSchema>;
+
+export type DashboardTemplate = typeof dashboardTemplates.$inferSelect;
+export type InsertDashboardTemplate = z.infer<typeof insertDashboardTemplateSchema>;
+
+export type TemplateWidget = typeof templateWidgets.$inferSelect;
+export type InsertTemplateWidget = z.infer<typeof insertTemplateWidgetSchema>;
+
+export type ApiEndpointMetadata = typeof apiEndpointsMetadata.$inferSelect;
+export type InsertApiEndpointMetadata = z.infer<typeof insertApiEndpointMetadataSchema>;
+
+export type DashboardVersion = typeof dashboardVersions.$inferSelect;
+export type InsertDashboardVersion = z.infer<typeof insertDashboardVersionSchema>;

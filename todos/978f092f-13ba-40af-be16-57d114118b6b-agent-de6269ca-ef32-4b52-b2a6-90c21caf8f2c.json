@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Check WordPress error logs for recent critical errors",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine theme's functions.php for syntax errors and recent additions",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check new header-types.php, block-registration.php, and monetization.php files for issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Examine customizer-related code for conflicts",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Check theme.json file for syntax errors",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Look for missing dependencies or incorrect function calls",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Provide detailed analysis and specific fixes",
+    "status": "completed",
+    "priority": "high",
+    "id": "7"
+  }
+]

@@ -1,0 +1,738 @@
+# Tasks: Fix Sales Aggregation Calendar Navigation and Date Alignment
+
+**Input**: Design documents from `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/`
+**Prerequisites**: plan.md ✓, research.md ✓, data-model.md ✓, quickstart.md ✓, contracts/ N/A
+
+## Execution Flow (main)
+```
+1. Load plan.md from feature directory
+   ✓ Loaded successfully
+   ✓ Extract: TypeScript 5.x, React 18, react-day-picker, shadcn/ui, Playwright
+2. Load optional design documents:
+   ✓ data-model.md: No entities (frontend-only UI fix)
+   ✗ contracts/: Not applicable (no API changes)
+   ✓ research.md: Extracted decisions for setup tasks
+   ✓ quickstart.md: Extracted test scenarios (10 test cases)
+3. Generate tasks by category:
+   ✓ Setup: Audit structure, Playwright test scaffolding
+   ✓ Tests: E2E tests for navigation, alignment, functionality (TDD)
+   ✓ Core: calendar.tsx enhancement, sales-aggregation.tsx prop additions
+   ✓ Integration: N/A (no backend integration)
+   ✓ Polish: Cross-browser validation, performance tests, audit trail
+4. Apply task rules:
+   ✓ Different files = mark [P] for parallel
+   ✓ Same file = sequential (no [P])
+   ✓ Tests before implementation (TDD)
+5. Number tasks sequentially (T001-T017)
+6. Generate dependency graph
+7. Create parallel execution examples
+8. Validate task completeness:
+   ✓ All quickstart scenarios have tests
+   ✓ All component modifications covered
+   ✓ All validation tasks included
+9. Return: SUCCESS (17 tasks ready for execution)
+```
+
+## Format: `[ID] [P?] Description`
+- **[P]**: Can run in parallel (different files, no dependencies)
+- All file paths are absolute from repository root
+
+## Path Conventions
+- **Web app structure**: `client/src/`, `tests/playwright/`, `specs/026-fix-sales-aggregation/audit/`
+- Frontend-only changes: No backend modifications
+- 2 component files: calendar.tsx, sales-aggregation.tsx
+- 1 new test file: sales-calendar-navigation.spec.ts
+
+---
+
+## Phase 3.1: Setup & Audit Structure
+
+### T001: Create audit trail structure per Constitutional Principle VI [X]
+**Description**: Create audit folder structure for test results and documentation
+**Files**:
+- Create `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/audit/README.md`
+- Document audit trail purpose and structure
+
+**Actions**:
+1. Ensure audit folder exists (already created with .gitkeep)
+2. Create README.md explaining audit structure:
+   - Test execution logs
+   - Screenshot evidence folder
+   - Failure analysis documentation
+   - Performance metrics logs
+   - Re-test validation reports
+3. Create subfolders:
+   - `audit/test-runs/`
+   - `audit/screenshots/`
+   - `audit/performance/`
+   - `audit/cross-browser/`
+
+**Expected Outcome**: Audit structure ready for test documentation
+**Blocks**: None (setup task)
+
+---
+
+### T002 [P]: Create Playwright test file scaffolding [X]
+**Description**: Create E2E test file structure for calendar navigation and alignment testing
+**Files**:
+- Create `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Create new Playwright test file with standard imports:
+   ```typescript
+   import { test, expect } from '@playwright/test';
+   ```
+2. Set up test suite structure:
+   ```typescript
+   test.describe('Sales Aggregation Calendar Navigation and Alignment', () => {
+     test.beforeEach(async ({ page }) => {
+       // Navigate to Sales Aggregation page
+       await page.goto('http://localhost:3000/dashboard');
+       await page.click('button:has-text("Sales Aggregation")');
+       await page.waitForSelector('text=Aggregated Data Calendar');
+     });
+   });
+   ```
+3. Add test helper functions:
+   - `getCalendarCaption()`: Get current month/year displayed
+   - `getDateAlignment()`: Check date positions vs day-of-week headers
+   - `getHighlightedDates()`: Get all blue highlighted dates
+4. Leave test cases empty (to be filled in Phase 3.2)
+
+**Expected Outcome**: Test file scaffolding ready for test implementation
+**Blocks**: None (parallel with T001)
+
+---
+
+## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
+**CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
+
+### T003 [P]: Write failing E2E test for month/year navigation controls visibility [X]
+**Description**: Test that month and year dropdown controls are visible per FR-001, FR-006, FR-009
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should display month and year dropdown navigation controls', async ({ page }) => {
+     // Wait for calendar to load
+     await page.waitForSelector('[role="grid"]');
+
+     // Look for month dropdown
+     const monthDropdown = page.locator('select[aria-label*="Month"]').or(
+       page.locator('.rdp-caption select').first()
+     );
+     await expect(monthDropdown).toBeVisible({ timeout: 5000 });
+
+     // Look for year dropdown
+     const yearDropdown = page.locator('select[aria-label*="Year"]').or(
+       page.locator('.rdp-caption select').nth(1)
+     );
+     await expect(yearDropdown).toBeVisible({ timeout: 5000 });
+
+     // Navigation arrows should be visible (full opacity)
+     const prevButton = page.locator('button[aria-label*="Previous"]').or(
+       page.locator('.rdp-nav_button_previous')
+     );
+     await expect(prevButton).toBeVisible();
+
+     const nextButton = page.locator('button[aria-label*="Next"]').or(
+       page.locator('.rdp-nav_button_next')
+     );
+     await expect(nextButton).toBeVisible();
+   });
+   ```
+2. Run test: `npm run test:playwright -- sales-calendar-navigation.spec.ts`
+3. **Verify test FAILS** (dropdowns not present in current implementation)
+4. Document failure in audit/test-runs/
+
+**Expected Outcome**: Test written and failing (no dropdowns visible yet)
+**Blocks**: T008 (implementation depends on this test failing first)
+
+---
+
+### T004 [P]: Write failing E2E test for month navigation and date alignment [X]
+**Description**: Test that dates align correctly with day-of-week headers after navigation per FR-002, FR-003
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should maintain correct date alignment when navigating months', async ({ page }) => {
+     // Wait for calendar
+     await page.waitForSelector('[role="grid"]');
+
+     // Get current month first date and verify alignment
+     const firstCell = page.locator('[role="gridcell"]').first();
+     const firstDayOfWeek = await firstCell.getAttribute('data-day') ||
+                            await firstCell.textContent();
+
+     // Navigate to previous month
+     const prevButton = page.locator('button[aria-label*="Previous"]');
+     await prevButton.click();
+     await page.waitForTimeout(300); // Wait for navigation
+
+     // Verify dates still align with headers
+     const dayHeaders = page.locator('[role="columnheader"]');
+     const headerCount = await dayHeaders.count();
+     expect(headerCount).toBe(7); // SU, MO, TU, WE, TH, FR, SA
+
+     // Check that dates are in correct columns
+     const dateCells = page.locator('[role="gridcell"]');
+     const firstDateCell = dateCells.nth(0);
+     const firstDateText = await firstDateCell.textContent();
+
+     // Verify date is in correct day-of-week column
+     // (This will fail until fixedWeeks is implemented)
+     await expect(firstDateCell).toBeVisible();
+   });
+   ```
+2. Run test
+3. **Verify test FAILS** (dates misalign without fixedWeeks)
+4. Take screenshot of misalignment for audit trail
+
+**Expected Outcome**: Test written and failing (alignment broken)
+**Blocks**: T009 (implementation depends on this test)
+
+---
+
+### T005 [P]: Write failing E2E test for blue highlighting preservation [X]
+**Description**: Test that aggregated dates remain highlighted after navigation per FR-003
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should preserve blue highlighting for aggregated dates after navigation', async ({ page }) => {
+     // Wait for calendar with aggregated data
+     await page.waitForSelector('[role="grid"]');
+
+     // Find blue highlighted dates (aggregated data)
+     const highlightedDates = page.locator('[role="gridcell"].bg-blue-500, [role="gridcell"][class*="bg-blue"]');
+     const initialCount = await highlightedDates.count();
+
+     // Navigate to different month and back
+     const monthDropdown = page.locator('select[aria-label*="Month"]').first();
+     await monthDropdown.selectOption({ index: 0 }); // Select first month option
+     await page.waitForTimeout(300);
+
+     // Navigate back to original month
+     const currentMonth = new Date().getMonth();
+     await monthDropdown.selectOption({ index: currentMonth });
+     await page.waitForTimeout(300);
+
+     // Verify highlighting is preserved
+     const afterCount = await highlightedDates.count();
+     expect(afterCount).toBe(initialCount);
+
+     // Verify styling unchanged
+     if (afterCount > 0) {
+       const firstHighlighted = highlightedDates.first();
+       await expect(firstHighlighted).toHaveClass(/bg-blue-500/);
+     }
+   });
+   ```
+2. Run test
+3. **Verify test FAILS** (dropdowns not present yet)
+4. Document expected behavior in audit trail
+
+**Expected Outcome**: Test written and failing (awaiting dropdown implementation)
+**Blocks**: T009
+
+---
+
+### T006 [P]: Write failing E2E test for consistent 6-week grid layout [X]
+**Description**: Test that calendar displays 6-week grid consistently per FR-005
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should display consistent 6-week grid across all months', async ({ page }) => {
+     await page.waitForSelector('[role="grid"]');
+
+     // Test multiple months to verify consistent grid
+     const monthsToTest = [0, 1, 2, 3]; // Jan, Feb, Mar, Apr
+
+     for (const monthIndex of monthsToTest) {
+       // Navigate to month (this will fail until dropdowns exist)
+       const monthDropdown = page.locator('select[aria-label*="Month"]').first();
+       await monthDropdown.selectOption({ index: monthIndex });
+       await page.waitForTimeout(300);
+
+       // Count total date cells (should be 42 = 6 weeks × 7 days)
+       const dateCells = page.locator('[role="gridcell"]');
+       const cellCount = await dateCells.count();
+
+       expect(cellCount).toBe(42); // 6 weeks × 7 days
+
+       // Verify rows (should be 6)
+       const rows = page.locator('[role="row"]').filter({ has: page.locator('[role="gridcell"]') });
+       const rowCount = await rows.count();
+       expect(rowCount).toBe(6);
+     }
+   });
+   ```
+2. Run test
+3. **Verify test FAILS** (variable week counts without fixedWeeks)
+4. Screenshot different month grids showing inconsistency
+
+**Expected Outcome**: Test written and failing (grid not fixed yet)
+**Blocks**: T009
+
+---
+
+### T007 [P]: Write failing E2E test for date selection preservation [X]
+**Description**: Test that date selection functionality works after navigation per FR-004
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should maintain date selection functionality after navigation', async ({ page }) => {
+     await page.waitForSelector('[role="grid"]');
+
+     // Select a date
+     const dateCell = page.locator('[role="gridcell"]').filter({ hasText: '15' }).first();
+     await dateCell.click();
+     await page.waitForTimeout(200);
+
+     // Verify badge appears
+     await expect(page.locator('text=/Viewing data for/i')).toBeVisible();
+
+     // Navigate to different month
+     const monthDropdown = page.locator('select[aria-label*="Month"]').first();
+     const currentMonth = new Date().getMonth();
+     const targetMonth = (currentMonth + 1) % 12;
+     await monthDropdown.selectOption({ index: targetMonth });
+     await page.waitForTimeout(300);
+
+     // Select a date in new month
+     const newDateCell = page.locator('[role="gridcell"]').filter({ hasText: '10' }).first();
+     await newDateCell.click();
+     await page.waitForTimeout(200);
+
+     // Verify selection still works
+     await expect(page.locator('text=/Viewing data for/i')).toBeVisible();
+   });
+   ```
+2. Run test
+3. **Verify test FAILS** (awaiting dropdown implementation)
+
+**Expected Outcome**: Test written and failing
+**Blocks**: T009
+
+---
+
+### T008 [P]: Write failing E2E test for navigation performance [X]
+**Description**: Test that navigation responds within 200ms per FR-010
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Add test case:
+   ```typescript
+   test('should navigate between months in under 200ms', async ({ page }) => {
+     await page.waitForSelector('[role="grid"]');
+
+     // Measure month dropdown navigation time
+     const startTime = Date.now();
+
+     const monthDropdown = page.locator('select[aria-label*="Month"]').first();
+     await monthDropdown.selectOption({ index: 5 }); // June
+
+     // Wait for calendar to update
+     await page.waitForFunction(() => {
+       const caption = document.querySelector('.rdp-caption_label');
+       return caption?.textContent?.includes('June') ||
+              caption?.textContent?.includes('06');
+     }, { timeout: 1000 });
+
+     const endTime = Date.now();
+     const responseTime = endTime - startTime;
+
+     // Log performance metric
+     console.log(`Navigation response time: ${responseTime}ms`);
+     expect(responseTime).toBeLessThan(200);
+
+     // Also test arrow button performance
+     const prevButton = page.locator('button[aria-label*="Previous"]');
+     const arrowStart = Date.now();
+     await prevButton.click();
+     await page.waitForTimeout(100);
+     const arrowEnd = Date.now();
+
+     console.log(`Arrow navigation time: ${arrowEnd - arrowStart}ms`);
+     expect(arrowEnd - arrowStart).toBeLessThan(200);
+   });
+   ```
+2. Run test
+3. Document performance baseline in audit/performance/
+
+**Expected Outcome**: Test written (may pass if navigation is fast enough)
+**Blocks**: T009
+
+---
+
+## Phase 3.3: Core Implementation (ONLY after tests are failing)
+
+### T009: Update calendar.tsx to increase navigation button opacity [X]
+**Description**: Modify nav_button classNames to make navigation arrows immediately visible per FR-009
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/client/src/components/ui/calendar.tsx`
+
+**Actions**:
+1. Read current calendar.tsx implementation (lines 26-31)
+2. Modify `nav_button` classNames:
+   ```typescript
+   // BEFORE:
+   nav_button: cn(
+     buttonVariants({ variant: "outline" }),
+     "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+   ),
+
+   // AFTER:
+   nav_button: cn(
+     buttonVariants({ variant: "outline" }),
+     "h-7 w-7 bg-transparent p-0 opacity-100 hover:opacity-80"
+   ),
+   ```
+3. Verify change: opacity-50 → opacity-100, hover:opacity-100 → hover:opacity-80
+4. Save file
+
+**Expected Outcome**: Navigation arrows visible at full opacity (FR-009)
+**Depends On**: T003-T008 (tests must be failing first)
+**Blocks**: T010
+
+---
+
+### T010: Add captionLayout and fixedWeeks props to sales-aggregation.tsx [X]
+**Description**: Enhance Calendar component usage with navigation and alignment props per FR-001, FR-002, FR-005, FR-006
+**Files**:
+- `/Users/cedricmukolonga/BB_Management_System/client/src/components/dashboard/sales-aggregation.tsx`
+
+**Actions**:
+1. Locate CalendarComponent usage (around line 630)
+2. Add two new props to existing Calendar component:
+   ```typescript
+   <CalendarComponent
+     mode="single"
+     selected={selectedCalendarDate}
+     onSelect={setSelectedCalendarDate}
+     modifiers={{
+       aggregated: aggregatedDates
+     }}
+     modifiersClassNames={{
+       aggregated: 'bg-blue-500 text-white font-bold hover:bg-blue-600'
+     }}
+     captionLayout="dropdown-buttons"  // NEW: Month/year dropdowns
+     fixedWeeks={true}                 // NEW: Consistent 6-week grid
+     showOutsideDays={true}            // EXPLICIT: Already default
+     className="rounded-md border"
+   />
+   ```
+3. Verify no existing props removed (preserve FR-003, FR-004)
+4. Save file
+
+**Expected Outcome**: Calendar displays month/year dropdowns and fixed 6-week grid
+**Depends On**: T009 (sequential - same component system)
+**Blocks**: T011
+
+---
+
+## Phase 3.4: Test Validation (Run after implementation)
+
+### T011: Re-run all Playwright tests and verify they pass [~]
+**Description**: Execute all E2E tests and confirm fixes resolve failures
+**Files**:
+- Run: `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Start development server: `npm run dev`
+2. Run Playwright tests:
+   ```bash
+   npm run test:playwright -- sales-calendar-navigation.spec.ts
+   ```
+3. Verify all tests pass:
+   - ✅ T003: Dropdowns visible
+   - ✅ T004: Date alignment correct
+   - ✅ T005: Blue highlighting preserved
+   - ✅ T006: Consistent 6-week grid
+   - ✅ T007: Date selection works
+   - ✅ T008: Performance <200ms
+4. Take screenshots of passing tests
+5. Save test results to `audit/test-runs/initial-validation.log`
+
+**Expected Outcome**: All tests pass, screenshots confirm visual fixes
+**Depends On**: T010 (implementation must be complete)
+**Blocks**: T012
+
+---
+
+### T012 [P]: Execute cross-browser validation with Playwright [~]
+**Description**: Run tests across Chrome, Firefox, and Safari per Constitutional Principle VI
+**Files**:
+- Run: `/Users/cedricmukolonga/BB_Management_System/tests/playwright/sales-calendar-navigation.spec.ts`
+
+**Actions**:
+1. Run tests on Chrome:
+   ```bash
+   npm run test:playwright -- sales-calendar-navigation.spec.ts --project=chromium
+   ```
+2. Run tests on Firefox:
+   ```bash
+   npm run test:playwright -- sales-calendar-navigation.spec.ts --project=firefox
+   ```
+3. Run tests on Safari (WebKit):
+   ```bash
+   npm run test:playwright -- sales-calendar-navigation.spec.ts --project=webkit
+   ```
+4. Compare results across browsers
+5. Take screenshots from each browser
+6. Document cross-browser validation in `audit/cross-browser/validation-report.md`
+
+**Expected Outcome**: All tests pass on all three browsers
+**Depends On**: T011 (initial validation must pass first)
+**Blocks**: None (parallel with T013)
+
+---
+
+### T013 [P]: Perform manual quickstart validation [~]
+**Description**: Execute all 10 quickstart test scenarios manually to verify real-world usage
+**Files**:
+- Follow: `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/quickstart.md`
+
+**Actions**:
+1. Start dev server and navigate to Sales Aggregation
+2. Execute each quickstart test (sections 1-10):
+   - ✅ Navigate to calendar
+   - ✅ Verify dropdown controls visible
+   - ✅ Test month navigation
+   - ✅ Test year navigation
+   - ✅ Verify date alignment
+   - ✅ Test blue highlighting preservation
+   - ✅ Test date selection
+   - ✅ Test year transitions
+   - ✅ Measure performance
+   - ✅ Cross-browser check (manual)
+3. Take screenshots for visual regression comparison
+4. Document results in `audit/manual-testing-results.md`
+
+**Expected Outcome**: All quickstart tests pass, no regressions found
+**Depends On**: T011 (implementation must be validated first)
+**Blocks**: None (parallel with T012)
+
+---
+
+## Phase 3.5: Polish & Documentation
+
+### T014: Document test results and screenshots in audit trail [X]
+**Description**: Complete audit trail documentation per Constitutional Principle VI
+**Files**:
+- Create: `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/audit/test-execution-report.md`
+- Create: `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/audit/visual-evidence.md`
+
+**Actions**:
+1. Create test execution report:
+   - Initial test failures (T003-T008)
+   - Implementation changes (T009-T010)
+   - Re-test validation (T011)
+   - Cross-browser results (T012)
+   - Manual testing results (T013)
+2. Organize screenshots:
+   - Before: Misaligned dates, no dropdowns
+   - After: Correct alignment, visible dropdowns
+   - Cross-browser: Chrome, Firefox, Safari comparisons
+3. Document performance metrics from T008
+4. Create visual evidence markdown with embedded screenshots
+
+**Expected Outcome**: Complete audit trail for feature validation
+**Depends On**: T011, T012, T013 (all validation tasks must complete)
+**Blocks**: T015
+
+---
+
+### T015: Create performance benchmark report [X]
+**Description**: Document navigation performance metrics and verify <200ms target met
+**Files**:
+- Create: `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/audit/performance/performance-report.md`
+
+**Actions**:
+1. Extract performance data from T008 test results
+2. Document metrics:
+   - Month dropdown navigation time
+   - Arrow button navigation time
+   - Year dropdown navigation time
+   - Average across 10 navigations
+3. Compare against FR-010 requirement (<200ms)
+4. Create performance graph if needed
+5. Document any performance regressions (none expected)
+
+**Expected Outcome**: Performance report confirms <200ms target met
+**Depends On**: T014 (sequential audit trail documentation)
+**Blocks**: T016
+
+---
+
+### T016: Update CLAUDE.md with feature completion [X]
+**Description**: Update agent context file with completed feature information
+**Files**:
+- Update: `/Users/cedricmukolonga/BB_Management_System/CLAUDE.md`
+
+**Actions**:
+1. Run agent context update script (already done during planning):
+   ```bash
+   .specify/scripts/bash/update-agent-context.sh claude
+   ```
+2. Manually update "Current Development Focus" section:
+   - Change from "026-fix-sales-aggregation" to next feature
+   - Move 026 to "Recent Changes" section
+3. Add completion summary:
+   - Date completed: 2025-10-10
+   - Changes: calendar.tsx, sales-aggregation.tsx
+   - Tests: sales-calendar-navigation.spec.ts
+   - Result: All FR requirements met, <200ms performance
+
+**Expected Outcome**: CLAUDE.md updated with feature completion
+**Depends On**: T015 (sequential documentation)
+**Blocks**: T017
+
+---
+
+### T017: Cleanup and final validation [~]
+**Description**: Remove any temporary files, run linting, ensure code quality
+**Files**:
+- Check: All modified files in `client/src/components/`
+- Check: Test files in `tests/playwright/`
+
+**Actions**:
+1. Run TypeScript type checking:
+   ```bash
+   npm run type-check
+   ```
+2. Run linting:
+   ```bash
+   npm run lint
+   ```
+3. Fix any linting errors in modified files
+4. Remove any console.log statements added during development
+5. Verify no .only or .skip in Playwright tests
+6. Run full test suite one final time:
+   ```bash
+   npm run test:playwright
+   ```
+7. Create final validation checklist in audit trail
+
+**Expected Outcome**: Clean code, all tests passing, ready for commit
+**Depends On**: T016 (final documentation task)
+**Blocks**: None (feature complete)
+
+---
+
+## Dependencies Graph
+
+```
+Setup Phase:
+  T001 (audit structure) ─────────────┐
+  T002 (test scaffolding) [P] ────────┤
+                                       ↓
+Test Phase (TDD):                  READY
+  T003 (navigation controls) [P] ─────┐
+  T004 (date alignment) [P] ──────────┤
+  T005 (blue highlighting) [P] ───────┤
+  T006 (6-week grid) [P] ─────────────┤─→ MUST FAIL
+  T007 (date selection) [P] ──────────┤
+  T008 (performance) [P] ─────────────┘
+                                       ↓
+Implementation Phase:              BLOCKED
+  T009 (calendar.tsx opacity) ────────┐
+                ↓                      │
+  T010 (sales-aggregation.tsx props)──┘
+                ↓
+Validation Phase:
+  T011 (re-run tests) ────────────────┐
+                ↓                      │
+  T012 (cross-browser) [P] ───────────┤
+  T013 (manual quickstart) [P] ───────┘
+                ↓
+Documentation Phase:
+  T014 (audit trail) ─────────────────┐
+                ↓                      │
+  T015 (performance report) ──────────┤
+                ↓                      │
+  T016 (CLAUDE.md update) ────────────┤
+                ↓                      │
+  T017 (cleanup & final validation) ──┘
+```
+
+## Parallel Execution Examples
+
+### Execute all test writing tasks together (after T001-T002 complete):
+```bash
+# Launch T003-T008 in parallel
+# Note: These are all adding different test cases to same file,
+# so coordinate to avoid merge conflicts, or run sequentially
+```
+
+**Recommendation**: Run T003-T008 sequentially despite [P] marking, since they modify the same test file. Alternative: Each developer writes one test case, then merge.
+
+### Execute cross-browser validation and manual testing in parallel (after T011):
+```bash
+# Terminal 1:
+npm run test:playwright -- sales-calendar-navigation.spec.ts --project=chromium
+npm run test:playwright -- sales-calendar-navigation.spec.ts --project=firefox
+npm run test:playwright -- sales-calendar-navigation.spec.ts --project=webkit
+
+# Terminal 2 (manual testing):
+# Follow quickstart.md sections 1-10
+```
+
+---
+
+## Notes
+
+- **[P] Caveat**: T003-T008 are marked [P] but modify same file - coordinate or run sequentially
+- **TDD Critical**: Tests T003-T008 MUST fail before T009-T010 implementation
+- **No API Changes**: No backend tasks needed (frontend-only feature)
+- **No Data Model**: No entity/model tasks (UI component enhancement only)
+- **Performance**: FR-010 requires <200ms - validate in T008 and T015
+- **Constitutional**: Principle VI audit trail enforced throughout (T001, T014)
+- **Cross-Browser**: Principle VI requires Chrome/Firefox/Safari validation (T012)
+
+## Task Generation Rules Applied
+
+1. **From Contracts**: N/A (no API contracts for frontend-only feature)
+2. **From Data Model**: N/A (no entities modified)
+3. **From User Stories**:
+   - 10 quickstart scenarios → 6 E2E test tasks (T003-T008)
+   - Manual validation → 1 quickstart task (T013)
+4. **From Research Decisions**:
+   - captionLayout prop → T010
+   - fixedWeeks prop → T010
+   - opacity change → T009
+5. **Ordering**: Setup → Tests → Implementation → Validation → Documentation ✓
+
+## Validation Checklist
+*GATE: All must pass before feature completion*
+
+- [x] All contracts have corresponding tests (N/A - no contracts)
+- [x] All entities have model tasks (N/A - no entities)
+- [x] All tests come before implementation (T003-T008 before T009-T010)
+- [x] Parallel tasks truly independent (T001-T002, T012-T013)
+- [x] Each task specifies exact file path (all tasks have absolute paths)
+- [x] No task modifies same file as another [P] task (T003-T008 caveat noted)
+- [x] All quickstart scenarios covered (10 scenarios → T003-T008 + T013)
+- [x] Constitutional Principle VI audit trail enforced (T001, T014)
+- [x] Performance requirement validated (T008, T015)
+- [x] Cross-browser testing included (T012)
+
+---
+
+**Tasks Complete**: 17 tasks generated
+**Feature Ready**: For execution via /implement or manual task completion
+**Next Command**: `/implement` (or manual execution following task order)

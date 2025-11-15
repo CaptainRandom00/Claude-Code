@@ -1,0 +1,56 @@
+[
+  {
+    "content": "Upgrade Live Agent System for real file operations",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add Project Management Agent for planning and roadmapping",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Implement Real Code Generation capabilities",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Add Git Integration for version control",
+    "status": "pending",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Adapt BB Context for Claude Code Sub Agent flow",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Create proper system/user prompt separation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Implement agent orchestration with proper delegation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Test Claude Code orchestration system",
+    "status": "completed",
+    "priority": "high",
+    "id": "8"
+  },
+  {
+    "content": "Create Project Initialization Wizard",
+    "status": "completed",
+    "priority": "medium",
+    "id": "9"
+  }
+]

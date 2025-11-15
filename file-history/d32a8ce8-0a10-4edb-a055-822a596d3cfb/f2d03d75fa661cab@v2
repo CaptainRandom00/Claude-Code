@@ -1,0 +1,676 @@
+# Quickstart Guide: Byte Bridges Enterprise Website
+
+**Feature**: 001-byte-bridges-enterprise
+**Date**: 2025-11-07
+**For**: Developers implementing the Byte Bridges enterprise website
+
+## Overview
+
+This guide provides step-by-step instructions for setting up, developing, and deploying the Byte Bridges enterprise consultancy website.
+
+## Prerequisites
+
+- **Node.js**: 20.x LTS or higher
+- **PostgreSQL**: 14+ (local or remote)
+- **Git**: For version control
+- **VS Code** (recommended): With TypeScript and ESLint extensions
+- **pnpm/npm/yarn**: Package manager (npm comes with Node.js)
+
+## Quick Setup (5 minutes)
+
+### 1. Clone and Install
+
+```bash
+# Already in the repository
+cd /Users/cedricmukolonga/00\ vibe_projects/byte_bridges
+
+# Install dependencies
+npm install
+
+# Or if using pnpm
+pnpm install
+```
+
+### 2. Database Setup
+
+```bash
+# Start PostgreSQL (if local)
+# macOS with Homebrew:
+brew services start postgresql@14
+
+# Create database
+createdb byte_bridges
+
+# Run migrations
+psql -U cedricmukolonga -d byte_bridges -f database/migrations/001_initial_schema.sql
+psql -U cedricmukolonga -d byte_bridges -f database/migrations/002_blog_posts.sql
+psql -U cedricmukolonga -d byte_bridges -f database/migrations/003_case_studies.sql
+psql -U cedricmukolonga -d byte_bridges -f database/migrations/004_contact_submissions.sql
+psql -U cedricmukolonga -d byte_bridges -f database/migrations/005_functions.sql
+```
+
+### 3. Environment Configuration
+
+```bash
+# Copy example env file
+cp .env.example .env.local
+
+# Edit .env.local with your values
+nano .env.local
+```
+
+**Required Environment Variables:**
+
+```env
+# Database
+DATABASE_URL=postgresql://cedricmukolonga@localhost:5432/byte_bridges
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-here-generate-with-openssl-rand-base64-32
+
+# Email (for contact form)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+EMAIL_FROM=Byte Bridges <noreply@bytebridges.com>
+CONTACT_EMAIL=info@bytebridges.com
+
+# Google Analytics (optional for development)
+NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+
+# Node Environment
+NODE_ENV=development
+```
+
+### 4. Create Admin User
+
+```bash
+# Run the setup script
+node scripts/setup-demo-accounts.js
+
+# Or manually via psql
+psql -U cedricmukolonga -d byte_bridges -c "
+INSERT INTO users (email, password_hash, name, role)
+VALUES (
+  'admin@bytebridges.com',
+  '\$2a\$12\$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5Sz7o4jHJeJz.',
+  'Admin User',
+  'admin'
+);
+"
+# Password: admin123456 (change this immediately!)
+```
+
+### 5. Start Development Server
+
+```bash
+npm run dev
+
+# Server will start at http://localhost:3000
+```
+
+**Verify Setup:**
+- Homepage: http://localhost:3000
+- Admin login: http://localhost:3000/signin
+- API health: http://localhost:3000/api/auth/session
+
+## Project Structure Guide
+
+```
+byte_bridges/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── (public)/          # Public pages
+│   │   │   ├── page.tsx       # Homepage
+│   │   │   ├── services/      # Service pages
+│   │   │   ├── industries/    # Industry pages
+│   │   │   ├── case-studies/  # Case studies
+│   │   │   ├── blog/          # Blog
+│   │   │   ├── contact/       # Contact form
+│   │   │   └── about/         # About/team
+│   │   ├── (admin)/           # Admin pages (protected)
+│   │   │   ├── dashboard/     # Admin dashboard
+│   │   │   ├── blog/          # Blog management
+│   │   │   └── case-studies/  # Case study management
+│   │   ├── api/               # API routes
+│   │   │   ├── auth/          # NextAuth
+│   │   │   ├── blog/          # Blog CRUD
+│   │   │   ├── case-studies/  # Case study CRUD
+│   │   │   └── contact/       # Contact form
+│   │   ├── layout.tsx         # Root layout
+│   │   └── globals.css        # Global styles
+│   ├── components/            # React components
+│   │   ├── ui/               # Reusable UI (Button, Card, Input)
+│   │   ├── layout/           # Header, Footer, Nav
+│   │   ├── forms/            # Form components
+│   │   └── admin/            # Admin-specific components
+│   ├── lib/                  # Utilities
+│   │   ├── db.ts            # Database connection
+│   │   ├── auth.ts          # NextAuth config
+│   │   ├── email.ts         # Email service
+│   │   ├── validation.ts    # Zod schemas
+│   │   └── analytics.ts     # Google Analytics
+│   ├── types/               # TypeScript types
+│   │   ├── database.ts      # DB types
+│   │   ├── api.ts          # API types
+│   │   └── entities.ts     # Entity types
+│   ├── data/               # Static JSON data
+│   │   ├── services.json
+│   │   ├── industries.json
+│   │   └── technologies.json
+│   └── middleware.ts       # Auth middleware
+├── tests/
+│   ├── e2e/               # End-to-end tests
+│   ├── visual/            # Visual regression
+│   └── integration/       # Integration tests
+├── database/
+│   └── migrations/        # SQL migrations
+├── public/               # Static assets
+└── specs/               # Feature specifications
+```
+
+## Development Workflow
+
+### Adding a New Page
+
+```bash
+# 1. Create page file
+mkdir -p src/app/new-page
+touch src/app/new-page/page.tsx
+
+# 2. Basic structure
+cat > src/app/new-page/page.tsx << 'EOF'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Page Title | Byte Bridges',
+  description: 'Page description for SEO'
+}
+
+export default function NewPage() {
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <h1 className="text-4xl font-bold mb-8">Page Title</h1>
+      {/* Your content here */}
+    </div>
+  )
+}
+EOF
+```
+
+### Creating an API Route
+
+```bash
+# 1. Create route handler
+mkdir -p src/app/api/my-endpoint
+touch src/app/api/my-endpoint/route.ts
+
+# 2. Basic structure
+cat > src/app/api/my-endpoint/route.ts << 'EOF'
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
+
+export async function GET(req: Request) {
+  // Optional: Require authentication
+  const session = await getServerSession(authOptions)
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  // Your logic here
+  return NextResponse.json({ data: 'Hello' })
+}
+
+export async function POST(req: Request) {
+  const body = await req.json()
+
+  // Validate with Zod
+  // const result = mySchema.safeParse(body)
+  // if (!result.success) return validation error
+
+  // Your logic here
+  return NextResponse.json({ success: true })
+}
+EOF
+```
+
+### Creating a Component
+
+```bash
+# 1. Create component file
+touch src/components/MyComponent.tsx
+
+# 2. Basic structure
+cat > src/components/MyComponent.tsx << 'EOF'
+'use client' // Only if using hooks/interactivity
+
+import { useState } from 'react'
+
+interface MyComponentProps {
+  title: string
+  className?: string
+}
+
+export function MyComponent({ title, className }: MyComponentProps) {
+  return (
+    <div className={className}>
+      <h2>{title}</h2>
+    </div>
+  )
+}
+EOF
+```
+
+### Database Queries
+
+```typescript
+// src/lib/db.ts already provides query function
+import { query } from '@/lib/db'
+
+// SELECT
+const posts = await query(
+  'SELECT * FROM blog_posts WHERE published = $1 ORDER BY published_at DESC LIMIT $2',
+  [true, 10]
+)
+
+// INSERT
+const result = await query(
+  'INSERT INTO blog_posts (title, content, author_id) VALUES ($1, $2, $3) RETURNING id',
+  [title, content, authorId]
+)
+
+// UPDATE
+await query(
+  'UPDATE blog_posts SET title = $1, updated_at = NOW() WHERE id = $2',
+  [newTitle, postId]
+)
+
+// DELETE (soft delete)
+await query(
+  'UPDATE blog_posts SET deleted_at = NOW() WHERE id = $1',
+  [postId]
+)
+```
+
+## Common Tasks
+
+### Run Tests
+
+```bash
+# All tests
+npm test
+
+# Specific test file
+npm test tests/e2e/blog.spec.ts
+
+# Visual regression tests
+npm run test:visual
+
+# Update snapshots
+npm run test:update-snapshots
+
+# Watch mode
+npm test -- --headed --ui
+```
+
+### Build for Production
+
+```bash
+# Build
+npm run build
+
+# Test production build locally
+npm start
+
+# Check build output
+ls -lh .next/standalone
+```
+
+### Database Operations
+
+```bash
+# Backup database
+npm run db:backup
+
+# List backups
+npm run db:backup:list
+
+# Restore from backup
+npm run db:restore
+
+# Monitor database
+npm run db:monitor
+
+# Create demo accounts
+npm run db:setup
+```
+
+### Linting & Formatting
+
+```bash
+# Run ESLint
+npm run lint
+
+# Fix auto-fixable issues
+npm run lint -- --fix
+
+# Type checking
+npx tsc --noEmit
+```
+
+## Agent Assignments
+
+Based on the project requirements and SpecKit workflow, here are the recommended agent assignments for implementation:
+
+### Frontend Development
+**Agent**: `react-expert`
+- Responsibilities:
+  - All Next.js pages and layouts
+  - React components (UI, forms, cards, admin)
+  - Client-side interactivity
+  - State management with React Query
+  - Framer Motion animations
+
+### Backend/API Development
+**Agent**: `node-expert`
+- Responsibilities:
+  - Next.js API routes (blog, case studies, contact, analytics)
+  - NextAuth configuration
+  - Database query optimization
+  - Email service integration (Nodemailer)
+
+### Database Design & Optimization
+**Agent**: `database-architect`
+- Responsibilities:
+  - PostgreSQL schema design
+  - Migration scripts
+  - Full-text search implementation
+  - Query optimization and indexing
+  - Connection pooling configuration
+
+### Testing
+**Agent**: `qa-engineer`
+- Responsibilities:
+  - Playwright E2E tests
+  - Visual regression tests
+  - Accessibility testing (WCAG 2.1 AA)
+  - Integration tests
+  - Test coverage reporting
+
+### UI/UX & Accessibility
+**Agent**: `ui-designer`
+- Responsibilities:
+  - TailwindCSS configuration
+  - Design system consistency
+  - WCAG 2.1 Level AA compliance
+  - Responsive design patterns
+  - Component library development
+
+### SEO & Performance
+**Agent**: `technical-seo`
+- Responsibilities:
+  - Metadata and sitemap generation
+  - Google Analytics integration
+  - Core Web Vitals optimization
+  - robots.txt configuration
+  - Schema.org markup
+
+### Security & Compliance
+**Agent**: `security-auditor`
+- Responsibilities:
+  - Authentication security review
+  - GDPR/ICO compliance implementation
+  - Data retention policies
+  - SQL injection prevention
+  - Rate limiting on sensitive endpoints
+
+### DevOps & Deployment
+**Agent**: `devops-web`
+- Responsibilities:
+  - Vercel deployment configuration
+  - Environment variable management
+  - CI/CD pipeline setup
+  - Database hosting (Neon/Supabase)
+  - Monitoring and logging
+
+## Integration Scenarios
+
+### Scenario 1: User Visits Homepage
+
+```typescript
+// src/app/page.tsx (Server Component)
+import { query } from '@/lib/db'
+import services from '@/data/services.json'
+import industries from '@/data/industries.json'
+
+export default async function HomePage() {
+  // Fetch dynamic data
+  const [featuredPosts, featuredCases, testimonials] = await Promise.all([
+    query('SELECT * FROM blog_posts WHERE published = true ORDER BY published_at DESC LIMIT 3'),
+    query('SELECT * FROM case_studies WHERE published = true ORDER BY display_order LIMIT 6'),
+    query('SELECT * FROM testimonials WHERE featured = true ORDER BY display_order LIMIT 6')
+  ])
+
+  return (
+    <>
+      <HeroSection />
+      <ServicesSection services={services} />
+      <IndustriesSection industries={industries} />
+      <CaseStudiesSection cases={featuredCases} />
+      <BlogSection posts={featuredPosts} />
+      <TestimonialsSection testimonials={testimonials} />
+      <CTASection />
+    </>
+  )
+}
+```
+
+### Scenario 2: Admin Creates Blog Post
+
+```typescript
+// src/app/api/blog/route.ts
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
+import { query } from '@/lib/db'
+import { blogPostSchema } from '@/lib/validation'
+import { revalidatePath } from 'next/cache'
+
+export async function POST(req: Request) {
+  // 1. Check authentication
+  const session = await getServerSession(authOptions)
+  if (!session) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // 2. Parse and validate
+  const body = await req.json()
+  const result = blogPostSchema.safeParse(body)
+
+  if (!result.success) {
+    return Response.json({
+      error: 'Validation failed',
+      details: result.error.flatten()
+    }, { status: 400 })
+  }
+
+  const data = result.data
+
+  // 3. Generate slug
+  const slug = data.title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+
+  // 4. Calculate reading time
+  const wordCount = data.content.split(/\s+/).length
+  const readingTimeMinutes = Math.ceil(wordCount / 200)
+
+  // 5. Insert to database
+  const [post] = await query(`
+    INSERT INTO blog_posts (
+      slug, title, excerpt, content, author_id, author_name,
+      category, tags, featured_image_url, published, reading_time_minutes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    RETURNING *
+  `, [
+    slug,
+    data.title,
+    data.excerpt || data.content.substring(0, 200),
+    data.content,
+    session.user.id,
+    session.user.name,
+    data.category,
+    data.tags,
+    data.featuredImageUrl,
+    data.published,
+    readingTimeMinutes
+  ])
+
+  // 6. Revalidate blog pages
+  revalidatePath('/blog')
+
+  // 7. Return created post
+  return Response.json(post, { status: 201 })
+}
+```
+
+### Scenario 3: User Submits Contact Form
+
+```typescript
+// src/app/api/contact/route.ts
+import { query } from '@/lib/db'
+import { sendContactNotification, sendConfirmationEmail } from '@/lib/email'
+import { contactFormSchema } from '@/lib/validation'
+import { trackEvent } from '@/lib/analytics'
+
+export async function POST(req: Request) {
+  // 1. Validate
+  const body = await req.json()
+  const result = contactFormSchema.safeParse(body)
+
+  if (!result.success) {
+    return Response.json({
+      error: 'Validation failed',
+      details: result.error.flatten()
+    }, { status: 400 })
+  }
+
+  const data = result.data
+
+  // 2. Rate limiting check (simple IP-based)
+  const clientIp = req.headers.get('x-forwarded-for') || 'unknown'
+  const recentSubmissions = await query(
+    'SELECT COUNT(*) FROM contact_submissions WHERE ip_address = $1 AND created_at > NOW() - INTERVAL \'1 hour\'',
+    [clientIp]
+  )
+
+  if (parseInt(recentSubmissions[0].count) >= 3) {
+    return Response.json({
+      error: 'Too many submissions. Please try again later.'
+    }, { status: 429 })
+  }
+
+  // 3. Insert submission
+  const [submission] = await query(`
+    INSERT INTO contact_submissions (
+      name, email, company, service_interest, budget_range,
+      timeline, project_details, gdpr_consent, ip_address,
+      user_agent, status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    RETURNING id
+  `, [
+    data.name,
+    data.email,
+    data.company,
+    data.serviceInterest,
+    data.budgetRange,
+    data.timeline,
+    data.projectDetails,
+    data.gdprConsent,
+    clientIp,
+    req.headers.get('user-agent'),
+    'new'
+  ])
+
+  // 4. Send emails (async, don't block response)
+  Promise.all([
+    sendContactNotification(data),
+    sendConfirmationEmail(data.email, data.name)
+  ]).catch(err => console.error('Email error:', err))
+
+  // 5. Track analytics event
+  trackEvent('contact_form_submit', 'engagement', data.serviceInterest)
+
+  // 6. Return success
+  return Response.json({
+    success: true,
+    message: 'Thank you for contacting us. We will respond within 24 hours.',
+    submissionId: submission.id
+  }, { status: 201 })
+}
+```
+
+## Troubleshooting
+
+### Database Connection Issues
+
+```bash
+# Check PostgreSQL is running
+psql -U cedricmukolonga -d byte_bridges -c "SELECT version();"
+
+# Check DATABASE_URL format
+echo $DATABASE_URL
+# Should be: postgresql://user:pass@host:port/database
+
+# Test connection from Node
+node -e "const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL }); pool.query('SELECT NOW()', (err, res) => { console.log(err || res.rows); pool.end(); })"
+```
+
+### NextAuth Session Issues
+
+```bash
+# Regenerate secret
+openssl rand -base64 32
+
+# Clear cookies in browser DevTools
+# Application > Cookies > Delete all
+
+# Check session in database (if using database strategy)
+psql -U cedricmukolonga -d byte_bridges -c "SELECT * FROM sessions;"
+```
+
+### Build Errors
+
+```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Clear node_modules and reinstall
+rm -rf node_modules
+npm install
+
+# Type check
+npx tsc --noEmit
+```
+
+## Next Steps
+
+1. ✅ Complete environment setup
+2. ⏳ Run `/speckit.tasks` to generate detailed task breakdown
+3. ⏳ Implement features using assigned agents
+4. ⏳ Run tests and ensure WCAG AA compliance
+5. ⏳ Deploy to Vercel production
+
+---
+
+**Questions?** Refer to:
+- [plan.md](./plan.md) - Overall implementation plan
+- [research.md](./research.md) - Technology decisions
+- [data-model.md](./data-model.md) - Database schema
+- [contracts/](./contracts/) - API specifications

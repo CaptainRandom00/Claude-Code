@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Research MySQL 8.0 features and WordPress compatibility",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Analyze current WordPress database structure with wphw_ prefix",
+    "status": "pending",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Research WordPress-specific optimization patterns",
+    "status": "pending",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Document GDPR compliance requirements for tutoring platform",
+    "status": "pending",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create comprehensive MySQL optimization documentation",
+    "status": "pending",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Include practical SQL examples for tutoring platform use cases",
+    "status": "pending",
+    "priority": "medium",
+    "id": "6"
+  }
+]

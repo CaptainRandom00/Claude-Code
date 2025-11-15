@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create 12-week training plan HTML template file",
+    "status": "completed",
+    "priority": "high",
+    "id": "create-1"
+  },
+  {
+    "content": "Add CSS for A4 two-sided print optimization",
+    "status": "completed",
+    "priority": "high",
+    "id": "create-2"
+  },
+  {
+    "content": "Structure weeks 1-6 on front page with placeholder content",
+    "status": "completed",
+    "priority": "high",
+    "id": "create-3"
+  },
+  {
+    "content": "Structure weeks 7-12 on back page with assessment sections",
+    "status": "completed",
+    "priority": "high",
+    "id": "create-4"
+  },
+  {
+    "content": "Add professional formatting and retail training elements",
+    "status": "completed",
+    "priority": "medium",
+    "id": "create-5"
+  },
+  {
+    "content": "Test print formatting and finalize template",
+    "status": "completed",
+    "priority": "medium",
+    "id": "create-6"
+  }
+]

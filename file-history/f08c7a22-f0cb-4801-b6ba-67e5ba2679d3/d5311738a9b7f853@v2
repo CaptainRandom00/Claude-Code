@@ -1,0 +1,189 @@
+/**
+ * Safari Fallback UI Component (Feature 024: Safari White Screen Fix)
+ *
+ * Provides a visible fallback interface when React fails to mount in Safari.
+ * Handles TLS/HTTPS connection errors and module loading failures gracefully.
+ */
+
+interface SafariFallbackProps {
+  error?: Error | string;
+  browserInfo?: string;
+  safariVersion?: number | null;
+}
+
+export function SafariFallback({ error, browserInfo, safariVersion }: SafariFallbackProps) {
+  const isSafari = /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
+  const errorMessage = error instanceof Error ? error.message : error || 'Unknown error';
+
+  return (
+    <div
+      style={{
+        padding: '40px 20px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: '#ffffff',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '600px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          padding: '40px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        }}
+      >
+        <h1 style={{ fontSize: '2.5em', marginBottom: '20px', fontWeight: '700' }}>
+          {isSafari ? '🧭 Safari Compatibility Issue' : '⚠️ Application Error'}
+        </h1>
+
+        <div style={{ fontSize: '1.1em', lineHeight: '1.6', marginBottom: '30px' }}>
+          {isSafari && (
+            <>
+              <p style={{ marginBottom: '15px' }}>
+                We detected an issue loading the BB Management System in Safari.
+              </p>
+              {safariVersion && safariVersion < 15.0 && (
+                <p
+                  style={{
+                    background: 'rgba(255, 215, 0, 0.2)',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    marginBottom: '15px',
+                  }}
+                >
+                  <strong>⚠️ Safari {safariVersion} Detected</strong><br />
+                  Please upgrade to Safari 15.0 or later for best compatibility.
+                </p>
+              )}
+              <p style={{ marginBottom: '15px', fontSize: '0.9em', opacity: 0.9 }}>
+                This may be caused by:
+              </p>
+              <ul style={{ textAlign: 'left', marginBottom: '20px', paddingLeft: '20px' }}>
+                <li>HTTPS/TLS connection issues</li>
+                <li>Certificate validation problems</li>
+                <li>JavaScript module loading failures</li>
+                <li>Safari privacy settings</li>
+              </ul>
+            </>
+          )}
+
+          {!isSafari && (
+            <p>The application encountered an error during initialization.</p>
+          )}
+
+          {error && (
+            <details style={{ marginTop: '20px', textAlign: 'left' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: '600', marginBottom: '10px' }}>
+                Technical Details
+              </summary>
+              <pre
+                style={{
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '15px',
+                  borderRadius: '8px',
+                  overflow: 'auto',
+                  fontSize: '0.85em',
+                  maxHeight: '200px',
+                }}
+              >
+                {errorMessage}
+              </pre>
+            </details>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '15px 30px',
+              background: '#ffffff',
+              color: '#667eea',
+              border: 'none',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '1em',
+              fontWeight: '600',
+              boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+              transition: 'transform 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            🔄 Reload Page
+          </button>
+
+          {isSafari && (
+            <button
+              onClick={() => {
+                const helpText = `
+Safari Troubleshooting Steps:
+
+1. Check Certificate: Ensure HTTPS certificates are trusted
+2. Clear Cache: Safari → Preferences → Privacy → Manage Website Data → Remove All
+3. Disable Extensions: Safari → Preferences → Extensions
+4. Update Safari: System Preferences → Software Update
+5. Try Chrome/Firefox: Test if the issue is Safari-specific
+
+Browser Info:
+${browserInfo || navigator.userAgent}
+
+Safari Version: ${safariVersion || 'unknown'}
+                `;
+                alert(helpText);
+              }}
+              style={{
+                padding: '15px 30px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                border: '2px solid #ffffff',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '1em',
+                fontWeight: '600',
+                transition: 'transform 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              📖 Troubleshooting Guide
+            </button>
+          )}
+        </div>
+
+        {browserInfo && (
+          <div
+            style={{
+              marginTop: '30px',
+              padding: '15px',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '8px',
+              fontSize: '0.75em',
+              opacity: 0.7,
+            }}
+          >
+            <strong>Browser:</strong> {browserInfo}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default SafariFallback;

@@ -1,0 +1,128 @@
+[
+  {
+    "content": "Fix validation middleware error causing .map() crash on undefined",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-validation-middleware-bug"
+  },
+  {
+    "content": "Fix authentication headers in comment posting requests",
+    "status": "completed",
+    "priority": "medium",
+    "id": "fix-comment-auth-headers"
+  },
+  {
+    "content": "Test comment posting functionality after fixes",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-comment-posting"
+  },
+  {
+    "content": "Replace raw fetch with authenticated API utility in project edit page",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-project-edit-auth"
+  },
+  {
+    "content": "Standardize authentication token storage keys across application",
+    "status": "completed",
+    "priority": "medium",
+    "id": "standardize-token-storage"
+  },
+  {
+    "content": "Test project editing functionality after authentication fix",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-project-edit"
+  },
+  {
+    "content": "Fix subtask status undefined error with null safety checks",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-subtask-status-error"
+  },
+  {
+    "content": "Add defensive programming for subtask properties",
+    "status": "completed",
+    "priority": "medium",
+    "id": "add-subtask-safety"
+  },
+  {
+    "content": "Test subtask display after null safety fixes",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-subtask-fix"
+  },
+  {
+    "content": "Fix task.tags.map TypeError with robust type checking and array conversion",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-task-tags-map-error"
+  },
+  {
+    "content": "Add safe array conversion for task.tags to handle strings, null, undefined",
+    "status": "completed",
+    "priority": "medium",
+    "id": "add-tags-safety-conversion"
+  },
+  {
+    "content": "Test task detail page after tags fix to ensure no more crashes",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-task-tags-fix"
+  },
+  {
+    "content": "Fix database schema issue - missing users table causing authentication failures",
+    "status": "completed",
+    "priority": "high",
+    "id": "fix-database-schema"
+  },
+  {
+    "content": "Run Prisma migrations to ensure all required tables exist",
+    "status": "completed",
+    "priority": "high",
+    "id": "run-prisma-migrations"
+  },
+  {
+    "content": "Verify authentication middleware works after database fix",
+    "status": "completed",
+    "priority": "medium",
+    "id": "verify-auth-middleware"
+  },
+  {
+    "content": "Test project deletion functionality after database and auth fixes",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-project-deletion"
+  },
+  {
+    "content": "Create comprehensive project deletion E2E test suite with full user flow",
+    "status": "completed",
+    "priority": "high",
+    "id": "comprehensive-project-deletion-tests"
+  },
+  {
+    "content": "Create complete task deletion E2E test suite (individual, bulk, with dependencies)",
+    "status": "completed",
+    "priority": "high",
+    "id": "comprehensive-task-deletion-tests"
+  },
+  {
+    "content": "Implement test infrastructure improvements for reliable testing environment",
+    "status": "completed",
+    "priority": "medium",
+    "id": "test-infrastructure-improvements"
+  },
+  {
+    "content": "Add API response validation and database verification to deletion tests",
+    "status": "completed",
+    "priority": "medium",
+    "id": "api-database-validation-tests"
+  },
+  {
+    "content": "Create cross-browser and mobile deletion workflow tests",
+    "status": "completed",
+    "priority": "low",
+    "id": "cross-browser-mobile-tests"
+  }
+]

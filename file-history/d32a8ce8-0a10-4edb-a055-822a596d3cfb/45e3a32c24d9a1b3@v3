@@ -1,0 +1,409 @@
+# Implementation Tasks: Byte Bridges Enterprise Website
+
+**Feature**: 001-byte-bridges-enterprise
+**Branch**: `001-byte-bridges-enterprise`
+**Date**: 2025-11-07
+**Status**: Partially Implemented - Gap Analysis Complete
+
+## Implementation Status
+
+### ✅ Already Completed
+
+The following features are **already implemented** and working:
+
+**Pages (85+ pages)**:
+- [x] Homepage with hero, services, industries, case studies, CTA
+- [x] All 9 service pages (custom software, web dev, mobile, cloud, AI, consulting, security, analytics)
+- [x] All 7 industry pages (healthcare, finance, retail, manufacturing, education, government, ecommerce)
+- [x] 10+ static case study pages
+- [x] 8+ static blog post pages
+- [x] 20+ technology showcase pages
+- [x] About, Team, Careers, Support, Press pages
+- [x] Contact page
+- [x] Auth pages (signin, register, forgot password, reset password, verify email)
+- [x] Admin/Dashboard pages
+- [x] Privacy policy, Terms, Cookies, Security pages
+- [x] Compliance pages (GDPR, ISO-27001, PCI-DSS, etc.)
+
+**Components (30+ components)**:
+- [x] Header with navigation and search
+- [x] Footer with links
+- [x] Services section
+- [x] Industries section
+- [x] Case Studies grid
+- [x] Trust Signals
+- [x] CTA sections
+- [x] Hero variants
+- [x] Search Overlay
+- [x] AI Assistant
+- [x] Budget Calculator
+- [x] ROI Calculator
+- [x] Analytics Dashboard
+- [x] FormField, DataTable UI components
+
+**Backend**:
+- [x] Database connection utility (src/lib/db.ts)
+- [x] NextAuth configuration (src/lib/auth/)
+- [x] API routes: Contact, Auth (register, signin, forgot password, reset password, verify email)
+- [x] API routes: Dashboard (stats, projects, activity)
+- [x] PostgreSQL database with users, sessions tables
+
+**Infrastructure**:
+- [x] Next.js 14 App Router setup
+- [x] TypeScript configuration
+- [x] TailwindCSS styling
+- [x] Framer Motion animations
+- [x] Environment variables setup
+- [x] Git repository initialized
+
+---
+
+## ❌ Missing Features (Implementation Needed)
+
+These are the **gaps** that need to be implemented to meet the specification:
+
+### Critical Priority (P1) - MVP Blockers
+
+#### 1. Database Schema for Dynamic Content
+
+**Current State**: Blog posts and case studies are hardcoded static data
+**Required**: Database-backed dynamic content with admin CMS
+
+- [ ] T001 Create database migration 001_blog_posts.sql at database/migrations/
+- [ ] T002 Create database migration 002_case_studies.sql at database/migrations/
+- [ ] T003 Create database migration 003_testimonials.sql at database/migrations/
+- [ ] T004 Create database migration 004_contact_submissions.sql at database/migrations/
+- [ ] T005 Run migrations to create tables in PostgreSQL
+
+#### 2. Blog Management System
+
+**Current State**: 8 hardcoded blog posts in src/app/blog/page.tsx
+**Required**: Dynamic blog with admin CRUD operations
+
+- [ ] T006 Create GET /api/blog API route at src/app/api/blog/route.ts with pagination
+- [ ] T007 Create POST /api/blog API route for creating blog posts (admin only)
+- [ ] T008 Create GET /api/blog/[slug] API route at src/app/api/blog/[slug]/route.ts
+- [ ] T009 Create PUT /api/blog/[id] API route at src/app/api/blog/[id]/route.ts (admin)
+- [ ] T010 Create DELETE /api/blog/[id] API route (soft delete, admin)
+- [ ] T011 Update src/app/blog/page.tsx to fetch from database instead of static data
+- [ ] T012 Update individual blog post pages to fetch from database
+- [ ] T013 Create admin blog list page at src/app/(admin)/blog/page.tsx
+- [ ] T014 Create admin blog editor at src/app/(admin)/blog/new/page.tsx
+- [ ] T015 Create admin blog edit page at src/app/(admin)/blog/[id]/edit/page.tsx
+- [ ] T016 Create BlogEditor component at src/components/admin/BlogEditor.tsx with rich text
+- [ ] T017 Implement auto slug generation from title in blog API
+- [ ] T018 Implement reading time calculation in blog API
+- [ ] T019 Add cache revalidation on blog create/update/delete
+
+#### 3. Case Study Management System
+
+**Current State**: 10 hardcoded case study pages
+**Required**: Dynamic case studies with admin CRUD operations
+
+- [ ] T020 Create GET /api/case-studies API route at src/app/api/case-studies/route.ts
+- [ ] T021 Create POST /api/case-studies API route (admin only)
+- [ ] T022 Create GET /api/case-studies/[slug] API route
+- [ ] T023 Create PUT /api/case-studies/[id] API route (admin)
+- [ ] T024 Create DELETE /api/case-studies/[id] API route (soft delete, admin)
+- [ ] T025 Update src/app/case-studies/page.tsx to fetch from database
+- [ ] T026 Update individual case study pages to be dynamic with [slug]
+- [ ] T027 Create admin case studies list at src/app/(admin)/case-studies/page.tsx
+- [ ] T028 Create admin case study editor at src/app/(admin)/case-studies/new/page.tsx
+- [ ] T029 Create admin case study edit at src/app/(admin)/case-studies/[id]/edit/page.tsx
+- [ ] T030 Create CaseStudyEditor component at src/components/admin/CaseStudyEditor.tsx
+- [ ] T031 Create ResultsMetricsEditor component at src/components/admin/ResultsMetricsEditor.tsx
+- [ ] T032 Create ImageUpload component at src/components/admin/ImageUpload.tsx
+- [ ] T033 Implement display order management for featured case studies
+
+#### 4. TypeScript Types & Validation
+
+**Current State**: Limited type definitions
+**Required**: Complete type safety with Zod validation
+
+- [ ] T034 Create comprehensive database types at src/types/database.ts
+- [ ] T035 Create API types at src/types/api.ts
+- [ ] T036 Create entity types at src/types/entities.ts
+- [ ] T037 Create Zod validation schemas at src/lib/validation.ts (blog, case study, contact)
+- [ ] T038 Integrate Zod validation in all API routes
+
+---
+
+### High Priority (P2) - Core Features
+
+#### 5. Search Functionality
+
+**Current State**: SearchOverlay exists but not fully functional
+**Required**: Full-text search across blog, case studies, services, industries
+
+- [ ] T039 Implement PostgreSQL full-text search indexes in migrations
+- [ ] T040 Create GET /api/search API route at src/app/api/search/route.ts
+- [ ] T041 Implement search for blog posts using ts_query
+- [ ] T042 Implement search for case studies using ts_query
+- [ ] T043 Implement client-side search for static JSON data (services, industries)
+- [ ] T044 Create search results page at src/app/search/page.tsx
+- [ ] T045 Create SearchResultCard component at src/components/cards/SearchResultCard.tsx
+- [ ] T046 Update SearchOverlay component to call search API
+- [ ] T047 Add search result highlighting with ts_headline
+- [ ] T048 Add search analytics tracking
+
+#### 6. Contact Form Enhancement
+
+**Current State**: Basic contact form exists
+**Required**: Multi-step form with database storage and email notifications
+
+- [ ] T049 Update src/app/api/contact/route.ts to save to database
+- [ ] T050 Implement rate limiting (3 submissions/hour per IP) in contact API
+- [ ] T051 Create email notification service at src/lib/email.ts with Nodemailer
+- [ ] T052 Implement admin notification email on contact submission
+- [ ] T053 Implement confirmation email to user
+- [ ] T054 Convert to multi-step form in src/app/contact/page.tsx
+- [ ] T055 Create ContactFormStep1 component (basic info)
+- [ ] T056 Create ContactFormStep2 component (project details)
+- [ ] T057 Create ContactFormStep3 component (message + GDPR consent)
+- [ ] T058 Add Google Analytics event tracking for form submission
+
+#### 7. Admin Dashboard Enhancement
+
+**Current State**: Basic dashboard exists
+**Required**: Comprehensive admin panel with content management
+
+- [ ] T059 Create admin layout with navigation at src/app/(admin)/layout.tsx
+- [ ] T060 Enhance dashboard page at src/app/(admin)/dashboard/page.tsx with stats
+- [ ] T061 Create contact submissions list at src/app/(admin)/contacts/page.tsx
+- [ ] T062 Create contact submission detail page at src/app/(admin)/contacts/[id]/page.tsx
+- [ ] T063 Add status management for contact submissions (new, in-progress, contacted, etc.)
+- [ ] T064 Create testimonials management at src/app/(admin)/testimonials/page.tsx
+- [ ] T065 Implement data export functionality for contacts (CSV/Excel)
+
+---
+
+### Medium Priority (P3) - Enhancement & Polish
+
+#### 8. Google Analytics & Compliance
+
+**Current State**: Not implemented
+**Required**: GDPR-compliant analytics with consent management
+
+- [ ] T066 Create GoogleAnalytics component at src/components/GoogleAnalytics.tsx
+- [ ] T067 Create CookieBanner component at src/components/CookieBanner.tsx
+- [ ] T068 Integrate Google Analytics into root layout
+- [ ] T069 Implement consent management with localStorage
+- [ ] T070 Add custom event tracking for key actions
+- [ ] T071 Create privacy policy page with detailed cookie policy
+- [ ] T072 Add GA4 configuration with anonymize_ip for GDPR
+
+#### 9. Data Retention & GDPR Compliance
+
+**Current State**: Not implemented
+**Required**: ICO-compliant data retention and right to erasure
+
+- [ ] T073 Add retention_until column to contact_submissions table
+- [ ] T074 Create GDPR delete function in database migrations
+- [ ] T075 Create data retention cleanup script at scripts/data-retention-cleanup.js
+- [ ] T076 Create cron job configuration for monthly cleanup
+- [ ] T077 Add "Delete my data" functionality in admin panel
+- [ ] T078 Implement anonymization on GDPR deletion request
+
+#### 10. SEO & Performance Optimization
+
+**Current State**: Basic metadata exists
+**Required**: Optimized SEO and Core Web Vitals compliance
+
+- [ ] T079 Implement next-sitemap configuration at next-sitemap.config.js
+- [ ] T080 Generate sitemap.xml and robots.txt
+- [ ] T081 Add structured data (JSON-LD) for Organization schema
+- [ ] T082 Add structured data for BlogPosting schema on blog posts
+- [ ] T083 Add structured data for Article schema on case studies
+- [ ] T084 Optimize all images with Next.js Image component
+- [ ] T085 Implement code splitting for admin routes with dynamic()
+- [ ] T086 Add loading states with Suspense for async components
+- [ ] T087 Configure cache headers for static assets
+- [ ] T088 Run Lighthouse audit and fix issues to achieve >90 score
+
+#### 11. Accessibility Audit (WCAG 2.1 AA)
+
+**Current State**: Unknown compliance level
+**Required**: Full WCAG 2.1 Level AA compliance
+
+- [ ] T089 Run axe DevTools audit on all key pages
+- [ ] T090 Fix color contrast issues (4.5:1 minimum)
+- [ ] T091 Add ARIA labels where missing
+- [ ] T092 Ensure keyboard navigation works on all interactive elements
+- [ ] T093 Add focus indicators (outline-2) on all focusable elements
+- [ ] T094 Test with screen reader (VoiceOver/NVDA)
+- [ ] T095 Ensure touch targets are 44x44px minimum
+- [ ] T096 Add skip to main content link
+- [ ] T097 Verify form labels and error messages are accessible
+
+#### 12. Testing Suite
+
+**Current State**: Playwright configured but minimal tests
+**Required**: Comprehensive E2E and visual regression tests
+
+- [ ] T098 Create E2E test for homepage at tests/e2e/homepage.spec.ts
+- [ ] T099 Create E2E test for contact form at tests/e2e/contact.spec.ts
+- [ ] T100 Create E2E test for blog list/detail at tests/e2e/blog.spec.ts
+- [ ] T101 Create E2E test for case studies at tests/e2e/case-studies.spec.ts
+- [ ] T102 Create E2E test for search at tests/e2e/search.spec.ts
+- [ ] T103 Create E2E test for admin auth at tests/e2e/admin-auth.spec.ts
+- [ ] T104 Create E2E test for admin blog management at tests/e2e/admin-blog.spec.ts
+- [ ] T105 Create E2E test for admin case study management at tests/e2e/admin-cases.spec.ts
+- [ ] T106 Update visual regression tests at tests/visual/visual-regression.spec.ts
+- [ ] T107 Generate baseline screenshots with npm run test:update-snapshots
+- [ ] T108 Create accessibility tests with axe-playwright
+
+---
+
+### Low Priority (P4) - Nice to Have
+
+#### 13. Static Data Migration
+
+**Current State**: Services, industries, technologies are hardcoded in components
+**Required**: Move to JSON files for easier maintenance
+
+- [ ] T109 Create src/data/services.json with all service data
+- [ ] T110 Create src/data/industries.json with all industry data
+- [ ] T111 Create src/data/technologies.json with all technology data
+- [ ] T112 Update Services component to import from services.json
+- [ ] T113 Update Industries component to import from industries.json
+- [ ] T114 Update technology pages to use technologies.json
+
+#### 14. Additional Admin Features
+
+**Current State**: Basic admin functionality
+**Required**: Enhanced admin tools
+
+- [ ] T115 Create image upload handler at src/app/api/upload/route.ts
+- [ ] T116 Implement blog post preview before publish
+- [ ] T117 Add bulk actions in admin (delete multiple, publish multiple)
+- [ ] T118 Create admin user management page
+- [ ] T119 Add activity log/audit trail for admin actions
+- [ ] T120 Create analytics dashboard for admin (page views, contact submissions)
+
+#### 15. Documentation & Deployment
+
+**Current State**: Limited documentation
+**Required**: Complete setup and deployment guides
+
+- [ ] T121 Update README.md with comprehensive setup instructions
+- [ ] T122 Create DEPLOYMENT.md with Vercel deployment guide
+- [ ] T123 Create database setup script at scripts/setup-database.js
+- [ ] T124 Create seed data script at scripts/seed-data.js
+- [ ] T125 Document environment variables in .env.example
+- [ ] T126 Create contributing guidelines at CONTRIBUTING.md
+
+---
+
+## Implementation Strategy
+
+### Phase 1: Database Foundation (Week 1)
+**Focus**: Get dynamic content working
+- Complete T001-T005 (Database migrations)
+- Complete T034-T038 (TypeScript types and validation)
+- **Deliverable**: Database schema ready for content
+
+### Phase 2: Blog CMS (Week 2)
+**Focus**: Make blog dynamic with admin management
+- Complete T006-T019 (Blog API + Admin)
+- Test blog CRUD operations
+- **Deliverable**: Working blog management system
+
+### Phase 3: Case Studies CMS (Week 2-3)
+**Focus**: Make case studies dynamic with admin management
+- Complete T020-T033 (Case Studies API + Admin)
+- Test case study CRUD operations
+- **Deliverable**: Working case study management
+
+### Phase 4: Search & Contact (Week 3-4)
+**Focus**: Complete core user features
+- Complete T039-T048 (Search functionality)
+- Complete T049-T058 (Enhanced contact form)
+- **Deliverable**: Functional search and improved lead capture
+
+### Phase 5: Admin Dashboard (Week 4)
+**Focus**: Complete admin experience
+- Complete T059-T065 (Enhanced admin dashboard)
+- **Deliverable**: Comprehensive admin panel
+
+### Phase 6: Compliance & Analytics (Week 5)
+**Focus**: GDPR, analytics, data retention
+- Complete T066-T078 (Analytics + GDPR)
+- **Deliverable**: Compliant website with tracking
+
+### Phase 7: SEO & Performance (Week 5-6)
+**Focus**: Optimization and polish
+- Complete T079-T088 (SEO + Performance)
+- **Deliverable**: Lighthouse >90 score
+
+### Phase 8: Accessibility & Testing (Week 6)
+**Focus**: WCAG compliance and test coverage
+- Complete T089-T108 (Accessibility + Tests)
+- **Deliverable**: WCAG 2.1 AA compliant, tested
+
+### Phase 9: Polish & Launch (Week 6-7)
+**Focus**: Documentation and deployment
+- Complete T109-T126 (Static data, docs, deployment)
+- **Deliverable**: Production-ready website
+
+---
+
+## Task Summary
+
+**Total New Tasks**: 126 (down from 172)
+**Already Complete**: ~85% of frontend pages and components
+
+### By Priority:
+- **P1 (Critical)**: 38 tasks - Database, Blog CMS, Case Study CMS, Types
+- **P2 (High)**: 27 tasks - Search, Contact, Admin Dashboard
+- **P3 (Medium)**: 43 tasks - Analytics, GDPR, SEO, Accessibility, Testing
+- **P4 (Low)**: 18 tasks - Static data migration, extra admin features, docs
+
+### Estimated Timeline:
+- **MVP (P1 only)**: 3-4 weeks
+- **Full Implementation (P1-P3)**: 6-7 weeks
+- **Complete (P1-P4)**: 8 weeks
+
+---
+
+## Dependencies
+
+```
+Database Schema (T001-T005)
+    ↓
+TypeScript Types (T034-T038)
+    ↓
+┌─────────────────┬────────────────────┐
+│                 │                    │
+Blog CMS          Case Study CMS      Contact Enhancement
+(T006-T019)       (T020-T033)         (T049-T058)
+│                 │                    │
+└─────────────────┴────────────────────┘
+    ↓
+Search Functionality (T039-T048)
+    ↓
+Admin Dashboard (T059-T065)
+    ↓
+Analytics & GDPR (T066-T078)
+    ↓
+SEO & Performance (T079-T088)
+    ↓
+Accessibility & Testing (T089-T108)
+    ↓
+Polish & Launch (T109-T126)
+```
+
+---
+
+## Validation Checklist
+
+- [x] Existing work accurately marked as complete
+- [x] Only missing features included in new tasks
+- [x] All tasks follow checklist format (checkbox + ID + description + file path)
+- [x] Tasks organized by priority and dependencies
+- [x] Clear implementation strategy with phases
+- [x] Realistic timeline estimates
+- [x] MVP scope clearly defined (P1 tasks)
+
+**Ready for implementation** ✅
+
+Run `/speckit.implement` to begin executing these tasks.

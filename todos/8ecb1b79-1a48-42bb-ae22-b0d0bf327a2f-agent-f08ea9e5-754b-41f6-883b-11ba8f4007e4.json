@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Examine WordPress database to find saved block content and structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Compare saved block attributes with current block.json schemas",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Identify specific validation errors and attribute mismatches",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check for deprecated attributes or structure changes from old versions",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Determine if block migration or updates are needed",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "content": "Execute Phase 3.1: Setup & Infrastructure (T001-T003)",
+    "status": "completed",
+    "activeForm": "Setting up HTTPS server and dependencies"
+  },
+  {
+    "content": "Execute Phase 3.2: Tests First (T004-T011)",
+    "status": "completed",
+    "activeForm": "Writing TDD tests"
+  },
+  {
+    "content": "Execute Phase 3.3: Core Implementation (T012-T020)",
+    "status": "completed",
+    "activeForm": "Implementing core entities and services"
+  },
+  {
+    "content": "Resolve Chrome white screen issue",
+    "status": "completed",
+    "activeForm": "Fixing Chrome white screen"
+  },
+  {
+    "content": "Verify Safari HTTPS requirements",
+    "status": "completed",
+    "activeForm": "Testing Safari HTTPS compatibility"
+  },
+  {
+    "content": "Document white screen resolution in spec 018",
+    "status": "completed",
+    "activeForm": "Creating implementation report"
+  },
+  {
+    "content": "Clean up multiple development server processes",
+    "status": "completed",
+    "activeForm": "Cleaning up background processes"
+  },
+  {
+    "content": "Fix development server persistence issue",
+    "status": "completed",
+    "activeForm": "Creating persistent dev server scripts"
+  },
+  {
+    "content": "Write feature specification for stock profiles table rearrangement",
+    "status": "completed",
+    "activeForm": "Writing stock profiles table spec"
+  },
+  {
+    "content": "Amend 020 specification to include flexible rows AND column rearrangement",
+    "status": "completed",
+    "activeForm": "Updating comprehensive table enhancement spec"
+  },
+  {
+    "content": "Execute implementation plan for stock profiles table enhancement (020)",
+    "status": "in_progress",
+    "activeForm": "Running plan template with expert agents"
+  },
+  {
+    "content": "Execute Phase 3.4: API Endpoints (T021-T023)",
+    "status": "pending",
+    "activeForm": "Implementing API endpoints"
+  },
+  {
+    "content": "Execute Phase 3.5: Integration (T024-T028)",
+    "status": "pending",
+    "activeForm": "Browser compatibility and integration"
+  },
+  {
+    "content": "Execute Phase 3.6: Polish (T029-T034)",
+    "status": "pending",
+    "activeForm": "Unit tests and optimization"
+  },
+  {
+    "content": "Execute Phase 3.7: Documentation (T035-T037)",
+    "status": "pending",
+    "activeForm": "Documentation and validation"
+  }
+]

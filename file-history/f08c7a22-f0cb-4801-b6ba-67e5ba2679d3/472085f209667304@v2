@@ -1,0 +1,517 @@
+# Data Model: Product Image Management
+
+**Feature**: 025-product-image-management
+**Date**: 2025-10-07
+**Status**: Phase 1 Design
+
+---
+
+## Entity Overview
+
+This feature introduces image management capabilities for product profiles through schema extensions and new type definitions. The design maintains backward compatibility while enabling comprehensive image tracking, compression metadata, and archival workflows.
+
+---
+
+## 1. Product Profile (Extended)
+
+**Table**: `product_profiles` (existing)
+**Changes**: Add 4 new columns for image management
+
+### Schema Extensions
+
+```typescript
+// shared/schema.ts additions
+export const productProfiles = mysqlTable("product_profiles", {
+  // ... existing 14 columns (item_code, description, category, etc.) ...
+
+  // NEW: Image management fields
+  primaryImagePath: varchar("primary_image_path", { length: 500 })
+    .description("Relative path to primary product image (e.g., /uploads/product-images/10033/abc123.webp)"),
+
+  imageMetadata: json("image_metadata")
+    .$type<ProductImage[]>()
+    .default('[]')
+    .description("JSON array of all product images with metadata (max 5 images)"),
+
+  imageCount: int("image_count")
+    .default(0)
+    .notNull()
+    .description("Total number of images uploaded for this product (0-5)"),
+
+  lastImageUpdated: timestamp("last_image_updated", { mode: "string" })
+    .description("Timestamp of last image operation (upload, delete, set primary)"),
+});
+```
+
+### Field Descriptions
+
+| Field | Type | Nullable | Default | Indexed | Description |
+|-------|------|----------|---------|---------|-------------|
+| `primary_image_path` | VARCHAR(500) | Yes | NULL | No | Path to main product image, NULL if no images uploaded |
+| `image_metadata` | JSON | No | `[]` | No | Array of ProductImage objects (max 5 elements) |
+| `image_count` | INT | No | 0 | No | Quick reference for image count queries |
+| `last_image_updated` | TIMESTAMP | Yes | NULL | No | Audit trail for image operations |
+
+### Validation Rules
+
+- **Primary Image Path**:
+  - Must match pattern: `/uploads/product-images/{itemCode}/{hash}.webp`
+  - Must exist in `image_metadata` array (referential integrity)
+  - Set to NULL when last image deleted
+
+- **Image Metadata**:
+  - Array length ≤ 5 (enforced at application layer)
+  - Each element must conform to ProductImage interface
+  - Exactly one image must have `isPrimary: true` if count > 0
+
+- **Image Count**:
+  - Must equal `imageMetadata.length` (maintained by triggers/app logic)
+  - Range: 0-5 (enforced at application layer)
+
+- **Last Image Updated**:
+  - Updated on every image operation (upload, delete, set primary)
+  - ISO 8601 format: `2025-10-07T12:34:56.789Z`
+
+### Example Data
+
+```json
+{
+  "item_code": "10033",
+  "description": "WU CHUNG VEGETARIAN MOCK DUCK",
+  "primary_image_path": "/uploads/product-images/10033/a7f3c2d1e4b5f6.webp",
+  "image_metadata": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "originalName": "mock-duck-front.jpg",
+      "storedName": "a7f3c2d1e4b5f6.webp",
+      "path": "/uploads/product-images/10033/a7f3c2d1e4b5f6.webp",
+      "thumbnailPath": "/uploads/product-images/10033/a7f3c2d1e4b5f6_thumb.webp",
+      "size": 842750,
+      "width": 1200,
+      "height": 1080,
+      "format": "webp",
+      "isPrimary": true,
+      "uploadedAt": "2025-10-07T08:15:30.123Z"
+    },
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "originalName": "mock-duck-back.jpg",
+      "storedName": "b8f4d3e2f5c6g7.webp",
+      "path": "/uploads/product-images/10033/b8f4d3e2f5c6g7.webp",
+      "thumbnailPath": "/uploads/product-images/10033/b8f4d3e2f5c6g7_thumb.webp",
+      "size": 765432,
+      "width": 1200,
+      "height": 1140,
+      "format": "webp",
+      "isPrimary": false,
+      "uploadedAt": "2025-10-07T08:16:45.456Z"
+    }
+  ],
+  "image_count": 2,
+  "last_image_updated": "2025-10-07T08:16:45.456Z"
+}
+```
+
+---
+
+## 2. Product Image (Virtual Entity)
+
+**Storage**: JSON array within `product_profiles.image_metadata`
+**TypeScript Definition**: `shared/types/product-images.ts` (new file)
+
+### Interface Definition
+
+```typescript
+// shared/types/product-images.ts
+export interface ProductImage {
+  /** Unique identifier (UUIDv4) */
+  id: string;
+
+  /** Original filename from user upload (e.g., "product-photo.jpg") */
+  originalName: string;
+
+  /** Hashed filename on disk (e.g., "a7f3c2d1e4b5f6.webp") */
+  storedName: string;
+
+  /** Relative path to original compressed image */
+  path: string;
+
+  /** Relative path to 300x300 thumbnail */
+  thumbnailPath: string;
+
+  /** File size in bytes after WebP compression */
+  size: number;
+
+  /** Image width in pixels (max 1200) */
+  width: number;
+
+  /** Image height in pixels (max 1200) */
+  height: number;
+
+  /** Image format (always 'webp' after processing) */
+  format: 'webp';
+
+  /** Primary image flag (exactly one per product if images exist) */
+  isPrimary: boolean;
+
+  /** Upload timestamp (ISO 8601 format) */
+  uploadedAt: string;
+}
+
+/** Request payload for image upload */
+export interface UploadImageRequest {
+  itemCode: string;
+  files: Express.Multer.File[]; // Multer file objects
+}
+
+/** Response for successful image upload */
+export interface UploadImageResponse {
+  success: true;
+  images: ProductImage[];
+  compressionStats: {
+    originalSize: number;
+    compressedSize: number;
+    reductionPercent: number;
+  }[];
+}
+
+/** Request payload for setting primary image */
+export interface SetPrimaryImageRequest {
+  itemCode: string;
+  imageId: string;
+}
+
+/** Request payload for deleting image */
+export interface DeleteImageRequest {
+  itemCode: string;
+  imageId: string;
+}
+```
+
+### State Transitions
+
+```
+[No Images]
+    ↓ Upload (1-5 files)
+[Has Images] ← Upload More (if count < 5)
+    ↓ Delete (if count > 0)
+[Has Images] or [No Images]
+    ↓ Set Primary (if count > 0)
+[Has Images] (different primary)
+```
+
+### Business Rules
+
+1. **Upload**:
+   - Maximum 5 images per product (enforced before upload)
+   - First uploaded image automatically becomes primary
+   - Generate UUID for each image
+   - Hash filename: MD5(itemCode + description + timestamp)
+   - Compress to WebP at 85% quality
+   - Generate 300x300 thumbnail
+   - Update `imageCount` and `lastImageUpdated`
+
+2. **Set Primary**:
+   - Only one image can be primary at a time
+   - Set all other images' `isPrimary` to false
+   - Set selected image's `isPrimary` to true
+   - Update `primaryImagePath` to new primary image
+   - Update `lastImageUpdated` timestamp
+
+3. **Delete**:
+   - Remove image from `imageMetadata` array
+   - Delete both original and thumbnail files from disk
+   - Decrement `imageCount`
+   - If deleted image was primary, set first remaining image as primary
+   - If no images remain, set `primaryImagePath` to NULL
+   - Update `lastImageUpdated` timestamp
+
+4. **Product Deletion with Images**:
+   - Move entire `{itemCode}/` folder to `/uploads/product-images-archive/`
+   - Create `.archived-{timestamp}.json` with metadata:
+     ```json
+     {
+       "itemCode": "10033",
+       "deletedBy": "user@example.com",
+       "deletedAt": "2025-10-07T10:30:00Z",
+       "imageCount": 3,
+       "reason": "Product discontinued"
+     }
+     ```
+   - Retention period: 1 year from deletion date
+   - Auto-purge: Cron job runs daily to delete archives >365 days old
+
+---
+
+## 3. Image Archive Metadata (File-based)
+
+**Storage**: File system (`/uploads/product-images-archive/{itemCode}/.archived-{timestamp}.json`)
+**Purpose**: Track deleted product images for compliance and recovery
+
+### Schema
+
+```typescript
+// server/types/image-archive.ts (new file)
+export interface ImageArchiveMetadata {
+  /** Product item code */
+  itemCode: string;
+
+  /** User who deleted the product */
+  deletedBy: string;
+
+  /** Deletion timestamp (ISO 8601) */
+  deletedAt: string;
+
+  /** Number of images archived */
+  imageCount: number;
+
+  /** Reason for deletion (optional) */
+  reason?: string;
+
+  /** Original image metadata (for recovery) */
+  images: ProductImage[];
+}
+```
+
+### Example
+
+```json
+{
+  "itemCode": "10033",
+  "deletedBy": "admin@bbmanagement.com",
+  "deletedAt": "2025-10-07T14:22:15.789Z",
+  "imageCount": 3,
+  "reason": "Product discontinued - supplier out of business",
+  "images": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "originalName": "mock-duck-front.jpg",
+      "storedName": "a7f3c2d1e4b5f6.webp",
+      "path": "/uploads/product-images-archive/10033/a7f3c2d1e4b5f6.webp",
+      "thumbnailPath": "/uploads/product-images-archive/10033/a7f3c2d1e4b5f6_thumb.webp",
+      "size": 842750,
+      "width": 1200,
+      "height": 1080,
+      "format": "webp",
+      "isPrimary": true,
+      "uploadedAt": "2025-10-07T08:15:30.123Z"
+    }
+  ]
+}
+```
+
+---
+
+## 4. Database Migration Plan
+
+### Migration Script: `001_add_product_images.sql`
+
+```sql
+-- Add image management columns to product_profiles table
+ALTER TABLE product_profiles
+  ADD COLUMN primary_image_path VARCHAR(500) NULL
+    COMMENT 'Relative path to primary product image',
+  ADD COLUMN image_metadata JSON NOT NULL DEFAULT '[]'
+    COMMENT 'JSON array of product images (max 5)',
+  ADD COLUMN image_count INT NOT NULL DEFAULT 0
+    COMMENT 'Total number of images (0-5)',
+  ADD COLUMN last_image_updated TIMESTAMP NULL
+    COMMENT 'Last image operation timestamp';
+
+-- Add index for queries filtering by image existence
+CREATE INDEX idx_product_profiles_has_images
+  ON product_profiles(image_count)
+  WHERE image_count > 0;
+
+-- Add check constraint for image count range (MySQL 8.0+)
+ALTER TABLE product_profiles
+  ADD CONSTRAINT chk_image_count_range
+  CHECK (image_count >= 0 AND image_count <= 5);
+```
+
+### Rollback Script: `001_add_product_images_rollback.sql`
+
+```sql
+-- Remove image management columns
+ALTER TABLE product_profiles
+  DROP CONSTRAINT IF EXISTS chk_image_count_range,
+  DROP INDEX IF EXISTS idx_product_profiles_has_images,
+  DROP COLUMN last_image_updated,
+  DROP COLUMN image_count,
+  DROP COLUMN image_metadata,
+  DROP COLUMN primary_image_path;
+```
+
+### Migration Strategy
+
+1. **Pre-Migration Backup**:
+   ```bash
+   mysqldump -u root -p BB_Management_System product_profiles > product_profiles_backup_$(date +%Y%m%d).sql
+   ```
+
+2. **Execute Migration**:
+   ```bash
+   mysql -u root -p BB_Management_System < 001_add_product_images.sql
+   ```
+
+3. **Verify Schema**:
+   ```sql
+   DESCRIBE product_profiles;
+   -- Verify 4 new columns exist with correct types
+   ```
+
+4. **Rollback (if needed)**:
+   ```bash
+   mysql -u root -p BB_Management_System < 001_add_product_images_rollback.sql
+   ```
+
+---
+
+## 5. Relationships
+
+```mermaid
+erDiagram
+    PRODUCT_PROFILES ||--o{ PRODUCT_IMAGES : "has (0-5)"
+    PRODUCT_PROFILES ||--o| PRODUCT_IMAGES : "has primary"
+    PRODUCT_IMAGES ||--|| IMAGE_FILES : "stored as"
+    PRODUCT_IMAGES ||--|| THUMBNAIL_FILES : "has thumbnail"
+
+    PRODUCT_PROFILES {
+        varchar item_code PK "Existing field"
+        varchar description "Existing field"
+        varchar primary_image_path "NEW - path to primary image"
+        json image_metadata "NEW - array of ProductImage"
+        int image_count "NEW - count (0-5)"
+        timestamp last_image_updated "NEW - audit timestamp"
+    }
+
+    PRODUCT_IMAGES {
+        string id "UUID (within JSON)"
+        string originalName "User's filename"
+        string storedName "Hashed filename"
+        string path "Relative path"
+        string thumbnailPath "Thumbnail path"
+        int size "Bytes"
+        int width "Pixels"
+        int height "Pixels"
+        string format "Always 'webp'"
+        bool isPrimary "Primary flag"
+        string uploadedAt "ISO timestamp"
+    }
+
+    IMAGE_FILES {
+        string path "File system path"
+        int size "Disk size"
+        string format "WebP"
+    }
+
+    THUMBNAIL_FILES {
+        string path "File system path (300x300)"
+        int size "Disk size"
+        string format "WebP"
+    }
+```
+
+---
+
+## 6. Query Patterns
+
+### Get Product with Images
+
+```typescript
+// Using Drizzle ORM
+const product = await db.select()
+  .from(productProfiles)
+  .where(eq(productProfiles.itemCode, '10033'))
+  .limit(1);
+
+// Access images
+const images = product.imageMetadata; // ProductImage[]
+const primaryPath = product.primaryImagePath; // string | null
+```
+
+### Find Products with Images
+
+```typescript
+const productsWithImages = await db.select()
+  .from(productProfiles)
+  .where(gt(productProfiles.imageCount, 0))
+  .orderBy(desc(productProfiles.lastImageUpdated));
+```
+
+### Update Image Metadata
+
+```typescript
+await db.update(productProfiles)
+  .set({
+    imageMetadata: newImagesArray,
+    imageCount: newImagesArray.length,
+    primaryImagePath: newImagesArray.find(img => img.isPrimary)?.path || null,
+    lastImageUpdated: new Date().toISOString(),
+  })
+  .where(eq(productProfiles.itemCode, itemCode));
+```
+
+---
+
+## 7. Data Integrity Rules
+
+### Application-Level Validation
+
+1. **Image Count Consistency**:
+   - `imageCount` must always equal `imageMetadata.length`
+   - Enforced in service layer before database update
+
+2. **Primary Image Referential Integrity**:
+   - `primaryImagePath` must exist in `imageMetadata` array
+   - Exactly one image must have `isPrimary: true` if count > 0
+   - Zero images must have `isPrimary: true` if count == 0
+
+3. **File System Consistency**:
+   - Every image in `imageMetadata` must have corresponding files on disk
+   - Orphaned files cleaned up by daily maintenance script
+
+4. **Archive Retention**:
+   - Archived images purged automatically after 1 year
+   - Cron job: `0 2 * * * /scripts/purge-old-archives.sh`
+
+### Database-Level Validation
+
+1. **Check Constraint**:
+   ```sql
+   CHECK (image_count >= 0 AND image_count <= 5)
+   ```
+
+2. **JSON Schema Validation** (MySQL 8.0.17+):
+   ```sql
+   -- Future enhancement: Add JSON schema validation
+   ALTER TABLE product_profiles
+     ADD CONSTRAINT chk_image_metadata_schema
+     CHECK (JSON_SCHEMA_VALID('{
+       "type": "array",
+       "maxItems": 5,
+       "items": {
+         "type": "object",
+         "required": ["id", "path", "isPrimary"],
+         "properties": {
+           "id": {"type": "string"},
+           "isPrimary": {"type": "boolean"}
+         }
+       }
+     }', image_metadata));
+   ```
+
+---
+
+## Data Model Status
+
+- [x] Entity schemas defined (Product Profile extensions, ProductImage interface)
+- [x] Validation rules documented (count limits, primary image integrity)
+- [x] State transitions mapped (upload → set primary → delete)
+- [x] Relationships diagrammed (ERD with cardinality)
+- [x] Migration scripts prepared (001_add_product_images.sql)
+- [x] Query patterns documented (Drizzle ORM examples)
+- [x] Archive strategy defined (1-year retention, auto-purge)
+
+**Status**: ✅ COMPLETE
+**Next**: Generate API contracts

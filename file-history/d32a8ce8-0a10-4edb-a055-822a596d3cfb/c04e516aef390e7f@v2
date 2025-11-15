@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/config';
+import { query } from '@/lib/db';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get the current user's session
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Get recent projects with more details
+    const projectsResult = await query(
+      `SELECT
+        p.id,
+        p.name,
+        p.description,
+        p.status,
+        p.budget,
+        p.currency,
+        p.completion_percentage,
+        p.start_date,
+        p.end_date,
+        p.updated_at,
+        p.created_at,
+        COUNT(DISTINCT d.id) as document_count
+       FROM projects p
+       LEFT JOIN documents d ON p.id = d.project_id
+       WHERE p.customer_id = $1
+       GROUP BY p.id
+       ORDER BY p.updated_at DESC
+       LIMIT 10`,
+      [userId]
+    );
+
+    // Format the projects data
+    const projects = projectsResult.rows.map(project => ({
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      budget: parseFloat(project.budget) || 0,
+      currency: project.currency || 'GBP',
+      completionPercentage: parseInt(project.completion_percentage) || 0,
+      startDate: project.start_date,
+      endDate: project.end_date,
+      updatedAt: project.updated_at,
+      createdAt: project.created_at,
+      milestoneCount: parseInt(project.milestone_count) || 0,
+      documentCount: parseInt(project.document_count) || 0,
+      // Calculate days since last update
+      daysSinceUpdate: project.updated_at 
+        ? Math.floor((Date.now() - new Date(project.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+    }));
+
+    // Get project statistics
+    const statsResult = await query(
+      `SELECT 
+        COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_count,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
+        COUNT(*) FILTER (WHERE status = 'on_hold') as on_hold_count,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_count,
+        AVG(completion_percentage) as avg_completion
+       FROM projects
+       WHERE customer_id = $1`,
+      [userId]
+    );
+
+    const stats = {
+      inProgress: parseInt(statsResult.rows[0]?.in_progress_count) || 0,
+      completed: parseInt(statsResult.rows[0]?.completed_count) || 0,
+      onHold: parseInt(statsResult.rows[0]?.on_hold_count) || 0,
+      cancelled: parseInt(statsResult.rows[0]?.cancelled_count) || 0,
+      averageCompletion: parseFloat(statsResult.rows[0]?.avg_completion) || 0
+    };
+
+    return NextResponse.json({
+      projects,
+      stats
+    });
+  } catch (error) {
+    console.error('Dashboard projects error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch projects' },
+      { status: 500 }
+    );
+  }
+}

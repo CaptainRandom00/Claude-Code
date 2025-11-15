@@ -1,0 +1,56 @@
+/**
+ * Metric Widget Component
+ * Feature: 028-build-a-widget
+ *
+ * Displays single numeric value with formatting (per spec.md FR-016)
+ * Supports currency, percentage, and number formats
+ */
+
+import React from 'react';
+import { formatValue } from '@/lib/calculation-engine';
+import type { VisualizationConfig } from '@/types/widget-types';
+
+interface MetricWidgetProps {
+  data: any[];
+  visualizationConfig: VisualizationConfig;
+}
+
+export function MetricWidget({ data, visualizationConfig }: MetricWidgetProps) {
+  // Extract single value from data array
+  const value = data.length > 0 && data[0] ? data[0].value || data[0][Object.keys(data[0])[0]] : 0;
+
+  // Get formatting options from visualization config
+  const format = visualizationConfig.format?.type || 'number';
+  const decimalPlaces = visualizationConfig.format?.decimalPlaces ?? 2;
+  const label = visualizationConfig.label || '';
+  const description = visualizationConfig.description || '';
+
+  // Format the value
+  const formattedValue = formatValue(value, format, decimalPlaces);
+
+  return (
+    <div
+      data-testid="metric-widget"
+      className="flex flex-col items-center justify-center h-full min-h-[200px] text-center"
+    >
+      {/* Main Value */}
+      <div className="text-5xl font-bold text-foreground mb-2">
+        {formattedValue}
+      </div>
+
+      {/* Label */}
+      {label && (
+        <div className="text-lg font-semibold text-muted-foreground mb-1">
+          {label}
+        </div>
+      )}
+
+      {/* Description */}
+      {description && (
+        <div className="text-sm text-muted-foreground max-w-md">
+          {description}
+        </div>
+      )}
+    </div>
+  );
+}

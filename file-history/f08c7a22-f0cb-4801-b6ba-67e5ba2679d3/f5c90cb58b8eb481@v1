@@ -1,0 +1,275 @@
+# Feature Specification: Widget-Based Dashboard Framework
+
+**Feature Branch**: `028-build-a-widget`
+**Created**: 2025-10-11
+**Status**: Draft
+**Input**: Build a widget-based dashboard framework that allows users to create customizable, data-driven dashboards by composing self-contained widgets. Each widget can connect to any available API endpoint in the system, perform calculations on the data, and visualize it according to user configuration. The framework should support: Widget Library with pre-built widget types including metrics, charts, tables, alerts, and progress indicators. Self-Contained Widgets that independently fetch data from configurable API endpoints, perform calculations, and manage state. Flexible Layout System with drag-and-drop widget placement, resize capabilities, and save/load dashboard layouts. Data Calculations Engine supporting aggregations, comparisons, filters, and custom transformations. API Discovery to browse available endpoints. Dashboard Builder UI for visual dashboard creation without writing code. Example use cases include Expiry Management Dashboard showing products expiring this week and unactioned alerts, Sales Performance Dashboard with metrics and trend charts, and Stock Management Dashboard with inventory levels and low stock alerts.
+
+## User Scenarios & Testing
+
+### User Story 1 - View Pre-Built Dashboard with Live Data (Priority: P1)
+
+A store manager opens the system in the morning and navigates to a pre-configured "Store Overview" dashboard that displays current sales, stock levels, and expiry alerts. The dashboard automatically refreshes with the latest data without requiring any configuration or technical knowledge.
+
+**Why this priority**: This delivers immediate value without requiring users to understand dashboard creation. Users can benefit from data visualization from day one. This validates the core widget data fetching and display capabilities.
+
+**Independent Test**: Can be fully tested by creating a default dashboard configuration with 3-4 widgets (sales metric, stock alert, expiry count) and verifying data loads correctly from existing API endpoints. Delivers value by providing instant visibility into store operations.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user has access to the system, **When** they navigate to "Dashboards" section, **Then** they see a default dashboard with at least 3 widgets showing current data
+2. **Given** a dashboard is open, **When** 60 seconds elapse, **Then** widget data automatically refreshes without page reload
+3. **Given** a widget displays sales data, **When** new sales are recorded in the system, **Then** the widget reflects updated totals within 60 seconds
+4. **Given** multiple widgets are on screen, **When** one widget encounters a data error, **Then** other widgets continue functioning normally
+5. **Given** a dashboard is loading, **When** data takes longer than 5 seconds, **Then** widgets show loading indicators and helpful status messages
+
+---
+
+### User Story 2 - Create Custom Dashboard from Template (Priority: P2)
+
+A data analyst wants to monitor expiry management specifically, so they create a new dashboard from an "Expiry Management" template, customize which metrics to display, and save it for daily use. They can access this dashboard alongside pre-built dashboards.
+
+**Why this priority**: Enables users to personalize their experience without deep technical knowledge. Templates provide scaffolding while allowing customization. This validates dashboard creation, saving, and multi-dashboard navigation.
+
+**Independent Test**: Can be tested by providing 2-3 dashboard templates (Sales, Expiry, Inventory), allowing user to select one, customize basic settings (date range, filters), and save with a custom name. Delivers value by letting users focus on their specific responsibilities.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user clicks "Create Dashboard", **When** they select "Expiry Management" template, **Then** a new dashboard is created with expiry-related widgets pre-configured
+2. **Given** a dashboard is created from template, **When** user modifies date range filter, **Then** all widgets respect the new filter without individual configuration
+3. **Given** a user customizes a dashboard, **When** they click "Save", **Then** the dashboard is saved and appears in their dashboard list with chosen name
+4. **Given** a user has multiple dashboards, **When** they navigate between them, **Then** each dashboard retains its configuration and displays correct data
+5. **Given** a user creates a dashboard, **When** they share the dashboard link with a colleague, **Then** colleague sees the same configuration and current data
+
+---
+
+### User Story 3 - Configure Widget Data Source Visually (Priority: P3)
+
+A user building a custom dashboard adds a new "Metric" widget, selects "EPOS Sales" as the data source from a dropdown, chooses "Sum of Total Net" as the calculation, and sees a preview of the result before saving the widget configuration.
+
+**Why this priority**: Empowers users to build truly custom dashboards without coding. This is the core "builder" capability that differentiates this from static dashboards. Requires API discovery and calculation engine to be functional.
+
+**Independent Test**: Can be tested by adding a blank widget to a dashboard, selecting an API endpoint from available options, choosing a calculation type, and verifying the preview shows correct data. Delivers value by enabling non-developers to create data visualizations.
+
+**Acceptance Scenarios**:
+
+1. **Given** a dashboard is in edit mode, **When** user clicks "Add Widget", **Then** they see options for widget types (Metric, Chart, Table, Alert, Progress)
+2. **Given** user selects "Metric" widget type, **When** they click "Configure Data Source", **Then** they see a list of available API endpoints with descriptions
+3. **Given** user selects an API endpoint, **When** they choose a calculation (Sum, Average, Count, Percent Change), **Then** system shows a preview of the calculated result
+4. **Given** user configures filters on data, **When** they add a date range filter, **Then** preview updates to show filtered results
+5. **Given** widget configuration is complete, **When** user saves the widget, **Then** widget appears on dashboard displaying the configured data
+
+---
+
+### User Story 4 - Customize Dashboard Layout (Priority: P3)
+
+A store manager has a large monitor and wants to arrange their dashboard widgets in a specific layout, making the sales chart larger and positioning expiry alerts prominently in the top-right corner. They drag widgets to new positions, resize them, and save the layout.
+
+**Why this priority**: Allows users to optimize their workspace for their specific needs and display setup. While valuable, users can still get value from default layouts, making this a nice-to-have enhancement.
+
+**Independent Test**: Can be tested by opening a dashboard, dragging a widget to a new position, resizing it, and verifying the layout persists after save and reload. Delivers value by supporting different screen sizes and user preferences.
+
+**Acceptance Scenarios**:
+
+1. **Given** a dashboard is in edit mode, **When** user drags a widget to new coordinates, **Then** other widgets automatically reposition to accommodate the change
+2. **Given** a widget is selected, **When** user drags the resize handle, **Then** widget size changes smoothly with minimum and maximum size constraints enforced
+3. **Given** user has modified layout, **When** they save changes, **Then** layout is persisted and restored exactly on next visit
+4. **Given** dashboard is viewed on different screen sizes, **When** layout is smaller than saved dimensions, **Then** widgets automatically reflow to fit available space
+5. **Given** user makes multiple layout changes, **When** they click "Undo", **Then** layout reverts to previous state
+
+---
+
+### User Story 5 - Build Advanced Calculation Widget (Priority: P4)
+
+An analyst needs to track "Week-over-week sales growth percentage" which isn't a pre-built metric. They create a custom metric widget, configure it to fetch last week's sales and this week's sales, apply a percentage change calculation, and display the result with a trend indicator.
+
+**Why this priority**: Addresses advanced use cases and power users. Most users will be satisfied with simpler calculations, making this a future enhancement after core functionality proves valuable.
+
+**Independent Test**: Can be tested by creating a metric widget, configuring it with two time-based queries (this week, last week), selecting "Percent Change" calculation, and verifying correct result. Delivers value by enabling sophisticated business intelligence without custom development.
+
+**Acceptance Scenarios**:
+
+1. **Given** user creates a metric widget, **When** they enable "Comparison Mode", **Then** they can configure two data queries (current period vs comparison period)
+2. **Given** two data sources are configured, **When** user selects "Percent Change" calculation, **Then** widget displays the percentage difference with positive/negative indicator
+3. **Given** a calculation widget is configured, **When** user adds conditional formatting rules (green if positive, red if negative), **Then** widget appearance changes based on calculated value
+4. **Given** a complex widget is created, **When** user saves it as a template, **Then** other users can add the same widget to their dashboards with one click
+
+---
+
+### Edge Cases
+
+- **Widget data source unavailable**: When an API endpoint is down or returns an error, widget displays a user-friendly error message with last successful data timestamp and retry button
+- **Extremely large datasets**: When a widget configuration would return more than 50,000 records, system shows a warning and prompts user to add filters before displaying data
+- **Concurrent dashboard editing**: When two users edit the same dashboard simultaneously, system detects conflict and prompts users to merge changes or keep one version
+- **Widget calculation timeout**: When a complex calculation takes longer than 30 seconds, widget shows a timeout message and offers to run calculation asynchronously with notification on completion
+- **Layout edge cases**: When user manually sets widget positions that overlap, system automatically adjusts positions to prevent overlap while maintaining general layout intent
+- **Data refresh during user interaction**: When widget data refreshes while user is hovering over a chart tooltip, system preserves tooltip state and updates chart smoothly without disrupting interaction
+- **API endpoint removal**: When a previously configured API endpoint is removed from the system, affected widgets show a configuration error and prompt user to reconfigure data source
+- **Browser cache limits**: When local browser cache for offline dashboard access exceeds 50MB, system automatically prunes least-recently-used cached dashboards while maintaining server-side configurations
+- **Mobile viewport**: When dashboard is viewed on mobile device, system automatically switches to single-column stacked layout regardless of saved desktop layout
+
+## Requirements
+
+### Functional Requirements
+
+#### Core Widget System
+
+- **FR-001**: System MUST provide at least 5 widget types: Metric (single value display), Chart (line/bar/candlestick visualizations), Table (data grid with sorting), Alert (notification list), and Progress (gauge/bar indicators)
+- **FR-002**: Each widget MUST independently fetch its own data from a configurable API endpoint without dependencies on other widgets
+- **FR-003**: Widgets MUST display loading states when fetching data and error states when data retrieval fails
+- **FR-004**: Widgets MUST support configurable auto-refresh intervals between 30 seconds and 60 minutes
+- **FR-005**: Widgets MUST support manual refresh triggered by user without full page reload
+
+#### Data & Calculations
+
+- **FR-006**: System MUST support basic aggregation calculations: Sum, Average, Count, Min, Max
+- **FR-007**: System MUST support comparison calculations: Percent Change, Difference, Ratio (comparing current period to previous period)
+- **FR-008**: System MUST support data filtering operations: Where clauses, GroupBy, Sort, Limit
+- **FR-009**: System MUST apply calculations using a calculation engine (server-executed, client-orchestrated) that processes data after fetching from API endpoints without requiring page reloads
+- **FR-010**: Calculation pipeline MUST execute in defined order: Fetch → Filter → Group → Aggregate → Compare
+- **FR-011**: System MUST display calculated values with appropriate formatting based on data type (currency, percentage, number, date)
+
+**Calculation Execution Model**: Calculations execute server-side for performance and security. The calculation engine is "client-orchestrated" in that it's controlled by client actions (widget configuration, parameter changes) and updates without page reloads, but the actual data processing occurs on the server to handle large datasets efficiently (10K+ records per FR-004).
+
+#### Dashboard Management
+
+- **FR-012**: Users MUST be able to create new dashboards with a custom name
+- **FR-013**: Users MUST be able to save dashboard configurations including widget types, positions, sizes, and data source configurations
+- **FR-014**: Users MUST be able to load saved dashboards by name
+- **FR-015**: Users MUST be able to delete dashboards they created
+- **FR-016**: System MUST provide at least 3 pre-built dashboard templates: Sales Performance, Expiry Management, and Stock Overview
+- **FR-017**: System MUST support multiple dashboards per user with ability to switch between them
+- **FR-018**: System MUST preserve dashboard state when user navigates away and returns
+
+#### Layout & Positioning
+
+- **FR-019**: System MUST support drag-and-drop widget positioning within dashboard canvas
+- **FR-020**: System MUST support widget resizing with minimum dimensions of 2x2 grid cells (approximately 200x200px) and maximum dimensions of 12x8 grid cells (approximately 1200x800px)
+- **FR-021**: System MUST prevent widget overlap by automatically adjusting positions when widgets are moved
+- **FR-022**: System MUST support responsive layout that adapts to screen sizes from 320px to 3840px width
+- **FR-023**: Dashboard layouts MUST persist across browser sessions for each user
+
+#### API Integration
+
+- **FR-024**: System MUST provide a mechanism for users to discover available API endpoints
+- **FR-025**: System MUST display metadata for each API endpoint including description, available query parameters, and response schema
+- **FR-026**: Widgets MUST support adding query parameters (filters, date ranges, limits) to API requests
+- **FR-027**: System MUST handle API rate limiting gracefully by showing appropriate messages and retry options
+
+#### Dashboard Builder UI
+
+- **FR-028**: System MUST provide a visual dashboard builder interface accessible without writing code
+- **FR-029**: Dashboard builder MUST include "Edit Mode" where users can add, remove, and configure widgets
+- **FR-030**: Dashboard builder MUST include "View Mode" where users see live data without editing controls
+- **FR-031**: Widget configuration interface MUST show real-time preview of data before saving, with preview updates appearing within 500ms of configuration changes
+- **FR-032**: System MUST support undo/redo operations during dashboard editing sessions
+
+#### Data Security & Permissions
+
+- **FR-033**: Users MUST only see data they are authorized to access based on existing system permissions
+- **FR-034**: Dashboard configurations MUST be private to the creating user unless explicitly shared
+- **FR-035**: System MUST validate user permissions before executing widget data queries
+- **FR-036**: System MUST sanitize all user-generated content (dashboard names, widget titles, custom labels) to prevent XSS attacks
+- **FR-037**: System MUST implement CSRF protection for all state-changing operations (dashboard save, delete, widget configuration)
+- **FR-038**: System MUST validate all widget configuration inputs (API endpoints, calculation parameters, filter values) against a whitelist of allowed values
+- **FR-039**: System MUST encode all data fetched from APIs before rendering in widgets to prevent script injection
+- **FR-040**: System MUST prevent SQL injection by using parameterized queries or safe query builders for all calculation filter operations
+
+#### Accessibility
+
+- **FR-041**: System MUST meet WCAG 2.1 Level AA compliance for all dashboard builder and widget interfaces
+- **FR-042**: Dashboard builder MUST support full keyboard navigation including drag-drop operations (arrow keys to move, Space/Enter to activate, Escape to cancel)
+- **FR-043**: All interactive widget elements MUST provide screen reader announcements for state changes (loading, error, data updated)
+- **FR-044**: System MUST maintain logical focus order during dashboard editing and ensure focus is visible with minimum 3:1 contrast ratio
+- **FR-045**: All widget visualizations MUST meet WCAG color contrast requirements (4.5:1 for normal text, 3:1 for large text and UI components)
+
+#### Error Recovery & Resilience
+
+- **FR-046**: System MUST auto-save dashboard changes every 30 seconds during editing sessions
+- **FR-047**: System MUST detect session expiry and warn users 2 minutes before expiry with option to extend session or save work
+- **FR-048**: System MUST provide "Restore Previous Version" option for dashboards with minimum 5 versions retained for 24 hours minimum (versions older than 24h may be auto-pruned if more than 5 exist; automated cleanup runs hourly via background job per T077)
+- **FR-049**: System MUST recover unsaved dashboard changes after browser crash or unexpected navigation
+- **FR-050**: System MUST provide "Undo Delete" option for accidentally deleted dashboards within 30-day retention period
+
+#### Network & Offline Behavior
+
+- **FR-051**: System MUST detect offline status and display clear indicator when widgets cannot refresh data
+- **FR-052**: System MUST queue widget refresh attempts during offline periods and execute when connection restored
+- **FR-053**: System MUST show degraded experience message when network latency exceeds 5 seconds, offering option to reduce widget refresh frequency
+
+#### UI States & Empty Data
+
+- **FR-054**: Widgets MUST display specific empty state messages when queries return zero results (e.g., "No sales data for selected date range. Try adjusting filters.")
+- **FR-055**: Widgets MUST show skeleton loading placeholders matching final content layout during data fetch
+- **FR-056**: System MUST display onboarding tooltips for first-time dashboard creators highlighting key features (Add Widget, Edit Mode, Save)
+
+#### Resource Limits & Performance Constraints
+
+- **FR-057**: System MUST limit memory consumption to maximum 250MB per dashboard instance (based on 50 widgets × 5MB average per widget)
+- **FR-058**: Widget calculation operations MUST complete within 30 seconds or display timeout message with option to run asynchronously
+- **FR-059**: System MUST limit concurrent API requests to maximum 10 simultaneous requests per dashboard to prevent network saturation
+- **FR-060**: System MUST implement request throttling when CPU usage exceeds 80% for more than 5 consecutive seconds, reducing widget refresh frequency automatically
+- **FR-061**: System MUST limit total network bandwidth consumption to 50MB per minute per dashboard, deferring non-critical widget refreshes when limit approached
+
+### Key Entities
+
+- **Widget**: Represents a self-contained data visualization component with properties including unique identifier, type (metric/chart/table/alert/progress), configuration for data source and calculations, refresh interval, and visual settings
+
+- **WidgetConfiguration**: Defines how a widget fetches and displays data, including API endpoint URL, HTTP method and query parameters, calculation pipeline (filters, aggregations, comparisons), visualization settings (colors, formats, labels), and error handling preferences
+
+- **Dashboard**: A collection of widgets arranged in a layout with properties including unique identifier, user-friendly name, owner/creator, layout configuration (widget positions and sizes), global filters applied to all widgets, and creation/modification timestamps
+
+- **DashboardLayout**: Defines spatial arrangement of widgets including grid system properties (rows, columns, cell size), widget coordinates (x, y positions), widget dimensions (width, height in grid units), responsive breakpoints, and collision detection rules
+
+- **CalculationPipeline**: Ordered sequence of data transformations including filter operations (where clauses, date ranges), grouping operations (group by fields), aggregation functions (sum, average, count), comparison operations (percent change, difference), and sort/limit operations
+
+- **APIMetadata**: Information about available system APIs including endpoint path and HTTP method, human-readable description, required and optional query parameters with types, response schema with field names and types, and rate limiting information
+
+- **WidgetType**: Predefined widget categories with properties including type identifier, display name and description, required configuration fields, supported data formats, default visual settings, and rendering behavior specifications
+
+### Assumptions
+
+- **Performance**: Widget data fetching should complete within 2 seconds for datasets under 10,000 records under normal network conditions
+- **Browser Support**: System will support modern browsers (Chrome, Firefox, Safari, Edge) released within last 2 years
+- **Data Format**: All API endpoints return data in JSON format with consistent structure
+- **Authentication**: Widget data fetching will use existing user authentication tokens/sessions
+- **Storage**: Dashboard configurations are stored server-side as primary storage to support cross-device access, with optional browser-side caching (max 50MB) for offline access and performance optimization
+- **Concurrent Users**: System will support up to 100 users simultaneously building/viewing dashboards
+- **Widget Limits**: Each dashboard will support up to 50 widgets to maintain reasonable performance
+- **API Availability**: All existing system API endpoints will remain available and backward-compatible
+
+## Success Criteria
+
+### Measurable Outcomes
+
+#### User Efficiency
+
+- **SC-001**: Users can create a functional custom dashboard with 3 widgets in under 5 minutes
+- **SC-002**: Users can locate and add a new widget to existing dashboard in under 30 seconds
+- **SC-003**: 90% of users successfully create their first custom dashboard without requiring support or documentation
+- **SC-004**: Widget data refreshes and displays within 2 seconds for datasets containing up to 10,000 records
+
+#### System Performance
+
+- **SC-005**: Dashboard page loads and renders all widgets within 3 seconds on standard broadband connection (10 Mbps)
+- **SC-006**: System supports 100 concurrent users viewing and editing dashboards without performance degradation
+- **SC-007**: Widget layout changes save and persist within 1 second of user action
+- **SC-008**: Dashboard supports displaying up to 50 widgets simultaneously with all refreshing independently
+
+#### Feature Adoption
+
+- **SC-009**: 60% of active users create at least one custom dashboard within first month of feature availability
+- **SC-010**: Average user creates 3 distinct dashboards for different purposes within 3 months of using the feature
+- **SC-011**: 80% of created dashboards are actively used (viewed at least once per week) over a 1-month period
+
+#### Data Accuracy
+
+- **SC-012**: 100% of widget calculations produce mathematically correct results matching manual verification
+- **SC-013**: Widget data matches source API data with zero discrepancies when tested with known datasets
+- **SC-014**: All data filters and date range selections produce expected result sets with no missing or extra records
+
+#### User Satisfaction
+
+- **SC-015**: Post-launch user survey shows 75% satisfaction rating or higher for dashboard creation ease-of-use
+- **SC-016**: Users report saving average of 10 minutes per day by using custom dashboards instead of navigating multiple system screens
+- **SC-017**: Feature receives fewer than 5 user-reported bugs per 100 active users in first month after launch

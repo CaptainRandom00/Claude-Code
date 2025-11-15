@@ -1,0 +1,75 @@
+node_modules/
+.env
+dist/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+
+# Database backups and state files
+database-backups/
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# Development server files
+dev-server.log
+dev-server-https.log
+dev-server.pid
+dev-server-https.pid
+
+# Temporary database files
+*-journal
+*-wal
+*-shm
+
+# Proposals directory for internal review
+proposals/
+
+# Claude Code agent memory and metrics (optional - remove these lines to track in Git)
+.claude/knowledge/
+.claude/metrics/
+.claude/security/audit-*.md
+
+# HTTPS certificates (development only)
+*.pem
+
+# Test file organization - prevent test clutter in root directory
+/test-*.js
+/test-*.cjs
+/test-*.spec.js
+/debug-*.js
+/debug-*.cjs
+/debug-*.png
+/verify-*.js
+/verify-*.cjs
+/run-*.js
+/run-*.sh
+/analyze-*.js
+/analyze-*.cjs
+/investigate-*.js
+/investigate-*.cjs
+/simple-*.js
+/simple-*.cjs
+/final-*.js
+/final-*.cjs
+/final-*.png
+/quick-*.js
+/quick-*.cjs
+/*test*.png
+/*debug*.png
+/step*.png
+/execute-*.js
+/process-*.js
+/process-*.cjs
+/examine-*.js
+/examine-*.cjs
+/manual-*.js
+/playwright-report/
+/test-report-*.json

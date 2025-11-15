@@ -1,0 +1,112 @@
+/**
+ * Metric Widget Component
+ * Feature: 028-build-a-widget (User Story 5 - T093)
+ *
+ * Displays single numeric value with formatting (per spec.md FR-016)
+ * Supports currency, percentage, and number formats
+ * Supports trend indicators (arrows, colors) for comparisons
+ */
+
+import React from 'react';
+import { formatValue } from '@/lib/calculation-engine';
+import { ArrowUp, ArrowDown, TrendingUp, TrendingDown } from 'lucide-react';
+import type { VisualizationConfig } from '@/types/widget-types';
+
+interface MetricWidgetProps {
+  data: any[];
+  visualizationConfig: VisualizationConfig;
+}
+
+export function MetricWidget({ data, visualizationConfig }: MetricWidgetProps) {
+  // Extract single value from data array
+  const record = data.length > 0 && data[0] ? data[0] : {};
+  const value = record.value || record[Object.keys(record)[0]] || 0;
+
+  // Extract comparison data (User Story 5 - T093)
+  const comparisonValue = record._comparison?.value;
+  const comparisonType = record._comparison?.type;
+  const hasComparison = comparisonValue !== undefined;
+
+  // Get formatting options from visualization config
+  const format = visualizationConfig.format?.type || 'number';
+  const decimalPlaces = visualizationConfig.format?.decimalPlaces ?? 2;
+  const label = visualizationConfig.label || '';
+  const description = visualizationConfig.description || '';
+
+  // Format the value
+  const formattedValue = formatValue(value, format, decimalPlaces);
+
+  // Determine trend direction and styling (User Story 5 - T093)
+  let trendColor = 'text-muted-foreground';
+  let trendBgColor = 'bg-muted';
+  let TrendIcon = null;
+
+  if (hasComparison && comparisonValue !== null) {
+    const isPositive = comparisonValue > 0;
+    const isNegative = comparisonValue < 0;
+
+    if (isPositive) {
+      trendColor = 'text-green-600';
+      trendBgColor = 'bg-green-50';
+      TrendIcon = comparisonType === 'ratio' ? TrendingUp : ArrowUp;
+    } else if (isNegative) {
+      trendColor = 'text-red-600';
+      trendBgColor = 'bg-red-50';
+      TrendIcon = comparisonType === 'ratio' ? TrendingDown : ArrowDown;
+    }
+  }
+
+  // Extract conditional formatting (if present)
+  const formatting = record._formatting?.[Object.keys(record._formatting || {})[0]];
+  const customStyle = formatting
+    ? {
+        color: formatting.color,
+        backgroundColor: formatting.backgroundColor,
+      }
+    : {};
+
+  return (
+    <div
+      data-testid="metric-widget"
+      className="flex flex-col items-center justify-center h-full min-h-[200px] text-center"
+    >
+      {/* Main Value */}
+      <div
+        className="text-5xl font-bold mb-2"
+        style={customStyle.color ? customStyle : undefined}
+        data-testid="metric-value"
+      >
+        {formattedValue}
+      </div>
+
+      {/* Trend Indicator (User Story 5 - T093) */}
+      {hasComparison && TrendIcon && (
+        <div
+          className={`flex items-center gap-1 px-3 py-1 rounded-full mb-2 ${trendBgColor}`}
+          data-testid="metric-trend"
+        >
+          <TrendIcon className={`h-4 w-4 ${trendColor}`} />
+          <span className={`text-sm font-semibold ${trendColor}`}>
+            {comparisonType === 'percent_change' && `${comparisonValue > 0 ? '+' : ''}${comparisonValue.toFixed(1)}%`}
+            {comparisonType === 'difference' && `${comparisonValue > 0 ? '+' : ''}${formatValue(comparisonValue, format, decimalPlaces)}`}
+            {comparisonType === 'ratio' && `${comparisonValue.toFixed(2)}x`}
+          </span>
+        </div>
+      )}
+
+      {/* Label */}
+      {label && (
+        <div className="text-lg font-semibold text-muted-foreground mb-1">
+          {label}
+        </div>
+      )}
+
+      {/* Description */}
+      {description && (
+        <div className="text-sm text-muted-foreground max-w-md">
+          {description}
+        </div>
+      )}
+    </div>
+  );
+}

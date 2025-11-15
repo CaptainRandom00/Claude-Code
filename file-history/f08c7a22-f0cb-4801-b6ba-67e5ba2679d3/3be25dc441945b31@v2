@@ -1,0 +1,36 @@
+import { chromium } from 'playwright';
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  console.log('📍 Navigating to dashboard 2...');
+  await page.goto('http://localhost:3000/dashboards/2', { waitUntil: 'networkidle' });
+
+  console.log('⏳ Waiting 8 seconds for widgets to load...');
+  await page.waitForTimeout(8000);
+
+  console.log('📸 Capturing full dashboard...');
+  await page.screenshot({
+    path: 'test-screenshots/chart-widget/working-chart-final.png',
+    fullPage: true
+  });
+
+  // Check for Monthly Sales widget
+  const monthlySales = await page.$('text=Monthly Sales Trend');
+  console.log(`\n✅ "Monthly Sales Trend" widget found: ${monthlySales !== null}`);
+
+  // Check for Recharts SVG
+  const rechartsSvgs = await page.$$('svg.recharts-surface');
+  console.log(`📊 Recharts chart surfaces found: ${rechartsSvgs.length}`);
+
+  // Check for bar chart bars
+  const bars = await page.$$('.recharts-bar-rectangle');
+  console.log(`📊 Bar chart rectangles found: ${bars.length}`);
+
+  console.log('\n✅ Screenshot captured successfully!');
+  console.log('📁 File: test-screenshots/chart-widget/working-chart-final.png');
+
+  await page.waitForTimeout(5000);
+  await browser.close();
+})();

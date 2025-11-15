@@ -1,0 +1,160 @@
+/**
+ * Calculation Builder Component
+ * Feature: 028-build-a-widget (User Story 3 - T063)
+ *
+ * Allows users to configure calculations (Sum, Average, Count, Min, Max)
+ * for widget data processing
+ */
+
+import { useState } from 'react';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+interface CalculationBuilderProps {
+  availableFields: string[];
+  onCalculationChange: (calculation: CalculationConfig) => void;
+}
+
+export interface CalculationConfig {
+  aggregations: Array<{
+    type: string;
+    field?: string;
+    alias: string;
+  }>;
+}
+
+const AGGREGATION_TYPES = [
+  { value: 'sum', label: 'Sum', requiresField: true },
+  { value: 'average', label: 'Average', requiresField: true },
+  { value: 'count', label: 'Count', requiresField: false },
+  { value: 'min', label: 'Min', requiresField: true },
+  { value: 'max', label: 'Max', requiresField: true },
+];
+
+export function CalculationBuilder({ availableFields, onCalculationChange }: CalculationBuilderProps) {
+  const [aggregationType, setAggregationType] = useState<string>('');
+  const [selectedField, setSelectedField] = useState<string>('');
+
+  const handleAggregationChange = (type: string) => {
+    setAggregationType(type);
+
+    const requiresField = AGGREGATION_TYPES.find(a => a.value === type)?.requiresField;
+
+    // If type doesn't require field, emit immediately
+    if (!requiresField) {
+      onCalculationChange({
+        aggregations: [{
+          type,
+          alias: `${type}_value`,
+        }],
+      });
+      return;
+    }
+
+    // If field already selected, emit config
+    if (selectedField) {
+      onCalculationChange({
+        aggregations: [{
+          type,
+          field: selectedField,
+          alias: `${type}_${selectedField}`,
+        }],
+      });
+    }
+  };
+
+  const handleFieldChange = (field: string) => {
+    setSelectedField(field);
+
+    if (aggregationType) {
+      onCalculationChange({
+        aggregations: [{
+          type: aggregationType,
+          field,
+          alias: `${aggregationType}_${field}`,
+        }],
+      });
+    }
+  };
+
+  const selectedAggregation = AGGREGATION_TYPES.find(a => a.value === aggregationType);
+  const showFieldSelector = selectedAggregation?.requiresField && availableFields.length > 0;
+
+  return (
+    <div data-testid="calculation-builder" className="space-y-4">
+      <div>
+        <h3 className="font-semibold text-lg mb-2">Configure Calculation</h3>
+        <p className="text-sm text-muted-foreground">
+          Choose how to aggregate the data
+        </p>
+      </div>
+
+      {/* Aggregation Type Selector */}
+      <div className="space-y-2">
+        <Label htmlFor="aggregation-type">Aggregation Type</Label>
+        <Select
+          value={aggregationType}
+          onValueChange={handleAggregationChange}
+        >
+          <SelectTrigger id="aggregation-type" data-testid="aggregation-type-select">
+            <SelectValue placeholder="Select aggregation type" />
+          </SelectTrigger>
+          <SelectContent>
+            {AGGREGATION_TYPES.map((agg) => (
+              <SelectItem
+                key={agg.value}
+                value={agg.value}
+                data-testid={`aggregation-option-${agg.value}`}
+              >
+                {agg.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Field Selector (for Sum, Average, Min, Max) */}
+      {showFieldSelector && (
+        <div className="space-y-2">
+          <Label htmlFor="aggregation-field">Field to Aggregate</Label>
+          <Select
+            value={selectedField}
+            onValueChange={handleFieldChange}
+          >
+            <SelectTrigger id="aggregation-field" data-testid="aggregation-field-select">
+              <SelectValue placeholder="Select field" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableFields.map((field) => (
+                <SelectItem
+                  key={field}
+                  value={field}
+                  data-testid={`field-option-${field}`}
+                >
+                  {field}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Calculation Summary */}
+      {aggregationType && (
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm font-medium">Calculation Preview:</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {selectedAggregation?.label}
+            {selectedField && ` of ${selectedField}`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

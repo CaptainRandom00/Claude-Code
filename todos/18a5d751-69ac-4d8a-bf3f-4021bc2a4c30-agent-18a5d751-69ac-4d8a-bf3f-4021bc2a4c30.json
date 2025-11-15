@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Fix case quantity conversion in order-management.ts to convert cases to singles",
+    "status": "completed",
+    "id": "14"
+  },
+  {
+    "content": "Remove double multiplication in stock-ordering.tsx weekly sales display",
+    "status": "completed",
+    "id": "15"
+  },
+  {
+    "content": "Clean up redundant weeklySalesSingles calculation",
+    "status": "completed",
+    "id": "16"
+  },
+  {
+    "content": "Test that weekly sales now show correct values",
+    "status": "completed",
+    "id": "17"
+  },
+  {
+    "content": "Debug why case size extraction isn't working for item 1685",
+    "status": "completed",
+    "id": "18"
+  }
+]

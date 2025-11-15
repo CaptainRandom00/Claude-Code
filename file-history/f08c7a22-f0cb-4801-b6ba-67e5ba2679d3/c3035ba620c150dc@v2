@@ -1,0 +1,295 @@
+/**
+ * Template Creation E2E Tests - User Story 2
+ * Feature: 028-build-a-widget
+ *
+ * Test Scenarios:
+ * - Navigate to template gallery
+ * - Select and create dashboard from template
+ * - Customize global filters (date range)
+ * - Save dashboard with custom name
+ * - Verify dashboard appears in list
+ * - Switch between dashboards
+ */
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Template-Based Dashboard Creation - User Story 2', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate to template gallery
+    await page.goto('/dashboards/templates');
+  });
+
+  test('should display template gallery with available templates', async ({ page }) => {
+    // Wait for templates API call to complete
+    await page.waitForResponse(
+      response => response.url().includes('/api/widgets/templates') && response.status() === 200,
+      { timeout: 10000 }
+    );
+
+    // Wait for template gallery to load
+    await expect(page.locator('[data-testid="template-gallery"]')).toBeVisible({ timeout: 10000 });
+
+    // Verify at least 3 templates are displayed
+    const templateCards = page.locator('[data-testid^="template-card-"]');
+    expect(await templateCards.count()).toBeGreaterThanOrEqual(3);
+
+    // Verify template cards have required information
+    const firstTemplate = templateCards.first();
+    await expect(firstTemplate.locator('[data-testid="template-name"]')).toBeVisible();
+    await expect(firstTemplate.locator('[data-testid="template-description"]')).toBeVisible();
+    await expect(firstTemplate.locator('[data-testid="template-preview"]')).toBeVisible();
+  });
+
+  test('should create dashboard from "Expiry Management" template', async ({ page }) => {
+    // Wait for dashboard creation API call
+    const responsePromise = page.waitForResponse(
+      response => response.url().includes('/api/widgets/dashboards/from-template') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    // Click on Expiry Management template
+    await page.click('[data-testid="template-card-expiry-management"]');
+
+    // Wait for API response
+    await responsePromise;
+
+    // Wait for dashboard creation and redirect
+    await page.waitForURL(/\/dashboards\/\d+/, { timeout: 10000 });
+
+    // Verify dashboard was created with expiry widgets
+    await expect(page.locator('[data-testid="dashboard-viewer"]')).toBeVisible();
+
+    // Check for expiry-related widgets
+    const widgets = page.locator('[data-testid^="widget-"]');
+    expect(await widgets.count()).toBeGreaterThan(0);
+
+    // Verify at least one widget contains expiry-related content
+    const widgetTitles = await page.locator('[data-testid="widget-title"]').allTextContents();
+    const hasExpiryWidget = widgetTitles.some(title =>
+      title.toLowerCase().includes('expiry') ||
+      title.toLowerCase().includes('bbd') ||
+      title.toLowerCase().includes('expiration')
+    );
+    expect(hasExpiryWidget).toBeTruthy();
+  });
+
+  test('should modify date range filter and update all widgets', async ({ page }) => {
+    // Wait for template creation API
+    const createResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/widgets/dashboards/from-template') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    // Create dashboard from template
+    await page.click('[data-testid="template-card-sales-performance"]');
+    await createResponsePromise;
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    // Wait for dashboard data to load
+    await page.waitForResponse(
+      response => response.url().includes('/api/widgets/dashboards/') && response.status() === 200,
+      { timeout: 10000 }
+    );
+
+    // Open global filters panel
+    await page.click('[data-testid="global-filters-button"]');
+    await expect(page.locator('[data-testid="global-filters-panel"]')).toBeVisible();
+
+    // Change date range
+    await page.fill('[data-testid="date-range-start"]', '2025-01-01');
+    await page.fill('[data-testid="date-range-end"]', '2025-03-31');
+
+    // Wait for filter update API call
+    const filterResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/widgets/data') && response.status() === 200,
+      { timeout: 10000 }
+    );
+
+    // Apply filters
+    await page.click('[data-testid="apply-filters-button"]');
+
+    // Wait for API call to complete
+    await filterResponsePromise;
+
+    // Verify widgets show loading state or updated data
+    const loadingStates = await page.locator('[data-testid="widget-loading"]').count();
+    const contentStates = await page.locator('[data-testid="widget-content"]').count();
+
+    // Either widgets are loading or showing new content
+    expect(loadingStates + contentStates).toBeGreaterThan(0);
+  });
+
+  test('should save dashboard with custom name', async ({ page }) => {
+    // Wait for template creation
+    const createPromise = page.waitForResponse(
+      response => response.url().includes('/api/widgets/dashboards/from-template') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    // Create dashboard from template
+    await page.click('[data-testid="template-card-sales-performance"]');
+    await createPromise;
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    // Click save button
+    await page.click('[data-testid="save-dashboard-button"]');
+
+    // Wait for save dialog
+    await expect(page.locator('[data-testid="save-dashboard-dialog"]')).toBeVisible();
+
+    // Enter custom name
+    const customName = `My Custom Dashboard ${Date.now()}`;
+    await page.fill('[data-testid="dashboard-name-input"]', customName);
+
+    // Wait for save API call
+    const savePromise = page.waitForResponse(
+      response => response.url().includes('/api/widgets/dashboards') &&
+                  (response.request().method() === 'PUT' || response.request().method() === 'PATCH') &&
+                  response.status() === 200,
+      { timeout: 10000 }
+    );
+
+    // Save
+    await page.click('[data-testid="confirm-save-button"]');
+
+    // Wait for save to complete
+    await savePromise;
+
+    // Wait for save confirmation
+    await expect(page.locator('[data-testid="save-success-message"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify dashboard name updated in header
+    const dashboardTitle = await page.locator('h1').textContent();
+    expect(dashboardTitle).toBe(customName);
+  });
+
+  test('should display saved dashboard in dashboard list', async ({ page }) => {
+    // Create and save a dashboard
+    await page.click('[data-testid="template-card-sales-performance"]');
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    const customName = `Test Dashboard ${Date.now()}`;
+    await page.click('[data-testid="save-dashboard-button"]');
+    await page.fill('[data-testid="dashboard-name-input"]', customName);
+    await page.click('[data-testid="confirm-save-button"]');
+    await page.waitForTimeout(1000);
+
+    // Navigate to dashboard list
+    await page.goto('/dashboards');
+
+    // Verify dashboard appears in list
+    await expect(page.locator('[data-testid="dashboard-list"]')).toBeVisible();
+
+    const dashboardItems = page.locator('[data-testid^="dashboard-item-"]');
+    expect(await dashboardItems.count()).toBeGreaterThan(0);
+
+    // Find the newly created dashboard
+    const dashboardNames = await page.locator('[data-testid="dashboard-item-name"]').allTextContents();
+    expect(dashboardNames).toContain(customName);
+  });
+
+  test('should switch between dashboards and retain configurations', async ({ page }) => {
+    // Navigate to dashboard list
+    await page.goto('/dashboards');
+    await expect(page.locator('[data-testid="dashboard-list"]')).toBeVisible();
+
+    // Get all dashboard items
+    const dashboardItems = page.locator('[data-testid^="dashboard-item-"]');
+    const count = await dashboardItems.count();
+
+    if (count < 2) {
+      // Create second dashboard if only one exists
+      await page.goto('/dashboards/templates');
+      await page.click('[data-testid="template-card-expiry-management"]');
+      await page.waitForURL(/\/dashboards\/\d+/);
+      await page.goto('/dashboards');
+    }
+
+    // Click first dashboard
+    await page.click('[data-testid^="dashboard-item-"]:first-child');
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    const firstDashboardId = page.url().match(/\/dashboards\/(\d+)/)?.[1];
+    const firstDashboardTitle = await page.locator('h1').textContent();
+    const firstWidgetCount = await page.locator('[data-testid^="widget-"]').count();
+
+    // Navigate back and click second dashboard
+    await page.goto('/dashboards');
+    await page.click('[data-testid^="dashboard-item-"]:nth-child(2)');
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    const secondDashboardId = page.url().match(/\/dashboards\/(\d+)/)?.[1];
+    const secondDashboardTitle = await page.locator('h1').textContent();
+    const secondWidgetCount = await page.locator('[data-testid^="widget-"]').count();
+
+    // Verify they are different dashboards
+    expect(firstDashboardId).not.toBe(secondDashboardId);
+    expect(firstDashboardTitle).not.toBe(secondDashboardTitle);
+
+    // Navigate back to first dashboard
+    await page.goto(`/dashboards/${firstDashboardId}`);
+
+    // Verify original configuration retained
+    const titleCheck = await page.locator('h1').textContent();
+    const widgetCountCheck = await page.locator('[data-testid^="widget-"]').count();
+
+    expect(titleCheck).toBe(firstDashboardTitle);
+    expect(widgetCountCheck).toBe(firstWidgetCount);
+  });
+
+  test('should handle template with multiple widget types', async ({ page }) => {
+    // Select Sales Performance template
+    await page.click('[data-testid="template-card-sales-performance"]');
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    // Verify multiple widget types are present
+    const metricWidgets = await page.locator('[data-testid="metric-widget"]').count();
+    const chartWidgets = await page.locator('[data-testid^="chart-widget"]').count();
+    const tableWidgets = await page.locator('[data-testid^="table-widget"]').count();
+    const alertWidgets = await page.locator('[data-testid="alert-widget"]').count();
+
+    // At least 2 different widget types should be present
+    const widgetTypesPresent = [
+      metricWidgets > 0,
+      chartWidgets > 0,
+      tableWidgets > 0,
+      alertWidgets > 0
+    ].filter(Boolean).length;
+
+    expect(widgetTypesPresent).toBeGreaterThanOrEqual(2);
+  });
+
+  test('should show error message if template creation fails', async ({ page }) => {
+    // Intercept API call and return error
+    await page.route('**/api/widgets/dashboards/from-template/*', async (route) => {
+      await route.fulfill({
+        status: 500,
+        body: JSON.stringify({ error: 'Failed to create dashboard from template' })
+      });
+    });
+
+    // Try to create dashboard
+    await page.click('[data-testid="template-card-sales-performance"]');
+
+    // Wait for error message
+    await expect(page.locator('[data-testid="error-message"]')).toBeVisible({ timeout: 5000 });
+
+    const errorText = await page.locator('[data-testid="error-message"]').textContent();
+    expect(errorText).toContain('Failed to create dashboard');
+  });
+
+  test('should display loading state during dashboard creation', async ({ page }) => {
+    // Click template
+    const clickPromise = page.click('[data-testid="template-card-expiry-management"]');
+
+    // Check for loading indicator
+    await expect(page.locator('[data-testid="creating-dashboard-loader"]')).toBeVisible({ timeout: 2000 });
+
+    // Wait for creation to complete
+    await clickPromise;
+    await page.waitForURL(/\/dashboards\/\d+/);
+
+    // Verify loading state is gone
+    await expect(page.locator('[data-testid="creating-dashboard-loader"]')).not.toBeVisible();
+  });
+});

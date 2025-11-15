@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Create Playwright script for WordPress admin investigation",
+    "status": "completed",
+    "activeForm": "Creating Playwright script for WordPress admin investigation"
+  },
+  {
+    "content": "Install Playwright and run comprehensive sidebar menu investigation",
+    "status": "in_progress",
+    "activeForm": "Installing Playwright and running comprehensive sidebar menu investigation"
+  },
+  {
+    "content": "Analyze current sidebar widget configuration in Appearance > Widgets",
+    "status": "pending",
+    "activeForm": "Analyzing current sidebar widget configuration"
+  },
+  {
+    "content": "Document existing menus in Appearance > Menus",
+    "status": "pending",
+    "activeForm": "Documenting existing menus"
+  },
+  {
+    "content": "Test sidebar menu placement functionality",
+    "status": "pending",
+    "activeForm": "Testing sidebar menu placement functionality"
+  },
+  {
+    "content": "Examine The7 theme sidebar settings",
+    "status": "pending",
+    "activeForm": "Examining The7 theme sidebar settings"
+  },
+  {
+    "content": "Verify frontend sidebar display across different page types",
+    "status": "pending",
+    "activeForm": "Verifying frontend sidebar display"
+  },
+  {
+    "content": "Generate comprehensive analysis report with findings and recommendations",
+    "status": "pending",
+    "activeForm": "Generating comprehensive analysis report"
+  }
+]

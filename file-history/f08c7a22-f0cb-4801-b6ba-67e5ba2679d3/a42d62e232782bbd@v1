@@ -1,0 +1,1249 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { 
+  FileText, 
+  Code, 
+  Database,
+  Network,
+  Server,
+  Shield,
+  Upload,
+  Download,
+  ChevronRight,
+  Copy,
+  Check,
+  GitBranch,
+  Layers,
+  Clock,
+  Zap,
+  BarChart3
+} from "lucide-react";
+
+interface ApiEndpoint {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  description: string;
+  auth: boolean;
+  params?: string[];
+  response?: string;
+}
+
+export default function Documentation() {
+  const [activeSection, setActiveSection] = useState("overview");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const handleCopyCode = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const sections = [
+    { id: "overview", title: "Overview", icon: FileText },
+    { id: "architecture", title: "Architecture", icon: Layers },
+    { id: "api-endpoints", title: "API Endpoints", icon: Server },
+    { id: "data-flow", title: "Data Flow", icon: GitBranch },
+    { id: "authentication", title: "Authentication", icon: Shield },
+    { id: "file-uploads", title: "File Uploads", icon: Upload },
+    { id: "sales-analytics", title: "Sales Analytics", icon: BarChart3 },
+    { id: "client-integration", title: "Client Integration", icon: Code },
+    { id: "database", title: "Database Schema", icon: Database },
+  ];
+
+  const apiEndpoints: Record<string, ApiEndpoint[]> = {
+    "Authentication": [
+      { method: "POST", path: "/api/register", description: "Register new user", auth: false },
+      { method: "POST", path: "/api/login", description: "User login", auth: false },
+      { method: "POST", path: "/api/logout", description: "User logout", auth: true },
+      { method: "GET", path: "/api/user", description: "Get current user", auth: true },
+    ],
+    "Dashboard": [
+      { method: "GET", path: "/api/dashboard/overview-metrics", description: "Overview statistics", auth: true },
+      { method: "GET", path: "/api/dashboard/metrics", description: "Main dashboard data", auth: true },
+      { method: "GET", path: "/api/dashboard/top-items", description: "Top stock items", auth: true },
+      { method: "GET", path: "/api/dashboard/activity", description: "Recent activity log", auth: true },
+    ],
+    "Stock Management": [
+      { method: "GET", path: "/api/stock", description: "Stock control data with filters", auth: true, params: ["location", "category", "supplier", "status"] },
+      { method: "GET", path: "/api/stock/brn/dates", description: "Available BRN snapshot dates", auth: true },
+      { method: "GET", path: "/api/inventory", description: "Inventory list", auth: true },
+      { method: "POST", path: "/api/inventory/transfer", description: "Transfer stock between locations", auth: true },
+    ],
+    "Data Upload": [
+      { method: "POST", path: "/api/brn/upload", description: "Upload BRN Excel file (50MB limit)", auth: true },
+      { method: "POST", path: "/api/epos/upload", description: "Upload EPOS sales data (10MB limit)", auth: true },
+      { method: "POST", path: "/api/upload/waste", description: "Upload waste data CSV", auth: true },
+      { method: "GET", path: "/api/brn/snapshots", description: "List BRN snapshots", auth: true },
+    ],
+    "Order Management": [
+      { method: "GET", path: "/api/order-management/recommendations", description: "AI-powered order recommendations", auth: true },
+      { method: "GET", path: "/api/order-management/analytics", description: "Order analytics data", auth: true },
+      { method: "POST", path: "/api/order-management/consolidate", description: "Consolidate orders by supplier", auth: true },
+      { method: "GET", path: "/api/order-management/report/download", description: "Download CSV report", auth: true },
+    ],
+    "Sales Aggregation": [
+      { method: "POST", path: "/api/sales-aggregation/auto-aggregate", description: "Auto-aggregate sales data", auth: true },
+      { method: "GET", path: "/api/sales-aggregation/aggregated-dates", description: "Get available aggregated dates", auth: true },
+      { method: "GET", path: "/api/sales-aggregation/by-date", description: "Get sales by specific date", auth: true, params: ["date"] },
+    ],
+    "Sales Analytics": [
+      { method: "GET", path: "/api/epos-sales", description: "Get EPOS sales data with comprehensive filtering", auth: true, params: ["limit", "startDate", "endDate", "reportDate", "supplier", "category"] },
+      { method: "GET", path: "/api/epos-sales/dates", description: "Get available report dates with record counts", auth: true },
+      { method: "GET", path: "/api/epos-sales/suppliers", description: "Get available suppliers with record counts", auth: true },
+      { method: "GET", path: "/api/epos-sales/categories", description: "Get available categories with record counts", auth: true },
+      { method: "GET", path: "/api/epos-sales/analytics", description: "Get analytics with top items and insights", auth: true, params: ["startDate", "endDate", "reportDate"] },
+      { method: "GET", path: "/api/dashboard/epos-sales-chart", description: "Get chart data for sales trends", auth: true, params: ["days", "startDate", "endDate", "reportDate"] },
+    ],
+    "Case Size Management": [
+      { method: "GET", path: "/api/case-sizes", description: "List all case sizes", auth: true },
+      { method: "PUT", path: "/api/case-sizes/:itemCode", description: "Update case size for item", auth: true },
+      { method: "GET", path: "/api/case-sizes/epos-only", description: "Items only in EPOS", auth: true },
+      { method: "GET", path: "/api/case-sizes/extraction-patterns", description: "Regex extraction patterns", auth: true },
+    ],
+    "Theme Customization": [
+      { method: "GET", path: "/api/theme/colors", description: "Get theme colors", auth: false, params: ["category", "uiElement", "isDarkMode"] },
+      { method: "PUT", path: "/api/theme/colors/:id", description: "Update theme color", auth: true },
+      { method: "GET", path: "/api/theme/css-variables", description: "Get CSS variables", auth: false },
+      { method: "POST", path: "/api/theme/import", description: "Import theme configuration", auth: true },
+    ],
+    "Product Lifecycle Management": [
+      { method: "GET", path: "/api/product-lifecycle/new-products", description: "Get recently discovered products", auth: true, params: ["days", "limit"] },
+      { method: "GET", path: "/api/product-lifecycle/missing-products", description: "Get products not seen in recent uploads", auth: true, params: ["minDays", "limit"] },
+      { method: "GET", path: "/api/product-lifecycle/events", description: "Get product lifecycle events with filtering", auth: true, params: ["itemCode", "eventType", "startDate", "endDate", "limit"] },
+      { method: "GET", path: "/api/product-lifecycle/summary", description: "Get lifecycle statistics summary", auth: true },
+      { method: "POST", path: "/api/product-lifecycle/mark-discontinued", description: "Manually mark products as discontinued", auth: true },
+      { method: "GET", path: "/api/product-lifecycle/alerts", description: "Get product-related alerts", auth: true },
+    ],
+    "Stock Discrepancy Tracking": [
+      { method: "GET", path: "/api/stock-discrepancy/positions", description: "Get daily stock positions with discrepancies", auth: true, params: ["date", "locationCode", "status", "minDiscrepancy", "limit"] },
+      { method: "POST", path: "/api/stock-discrepancy/calculate", description: "Calculate discrepancies for a specific date", auth: true },
+      { method: "GET", path: "/api/stock-discrepancy/patterns", description: "Get identified discrepancy patterns", auth: true, params: ["itemCode", "patternType", "minConfidence", "isActive"] },
+      { method: "POST", path: "/api/stock-discrepancy/analyze-patterns", description: "Analyze historical data for patterns", auth: true },
+      { method: "GET", path: "/api/stock-discrepancy/summary", description: "Get discrepancy summary statistics", auth: true, params: ["startDate", "endDate"] },
+      { method: "POST", path: "/api/stock-discrepancy/positions/:id/note", description: "Add notes to stock positions", auth: true },
+    ],
+  };
+
+  const renderOverview = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="w-5 h-5" />
+            <span>BB Management System API Documentation</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground">
+            The BB Management System provides a comprehensive RESTful API for managing inventory, sales, orders, and business operations. 
+            This documentation covers the complete API architecture, data flow patterns, and integration guidelines.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold text-primary">15</div>
+              <div className="text-sm text-muted-foreground">API Modules</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold text-primary">90+</div>
+              <div className="text-sm text-muted-foreground">Endpoints</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold text-primary">REST</div>
+              <div className="text-sm text-muted-foreground">Architecture</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold text-primary">MySQL</div>
+              <div className="text-sm text-muted-foreground">Database</div>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-muted rounded-lg">
+            <h4 className="font-semibold mb-2">Key Features</h4>
+            <ul className="space-y-1 text-sm">
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Session-based authentication with role management</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Excel file processing for BRN and EPOS data</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>AI-powered order recommendations</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Real-time inventory tracking across locations</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Comprehensive sales analytics with interactive table sorting</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Product lifecycle tracking with automated discovery</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <ChevronRight className="w-4 h-4 text-primary" />
+                <span>Stock discrepancy analysis with pattern recognition</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderArchitecture = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>System Architecture</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-4 bg-muted rounded-lg font-mono text-xs">
+            <pre>{`┌─────────────────────────────────────────────────────────────┐
+│                        Frontend (React)                       │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Components │  │ TanStack     │  │  Services        │   │
+│  │  (TSX)      │  │ Query        │  │  (API Calls)     │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+└────────────────────────────┬────────────────────────────────┘
+                             │ HTTPS
+┌────────────────────────────▼────────────────────────────────┐
+│                     Express.js Server                         │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ Middleware  │  │  Routes      │  │  Authentication  │   │
+│  │ Stack       │  │  (15 modules)│  │  (Passport.js)   │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────┐
+│                      Drizzle ORM                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Schema     │  │ Repositories │  │  Transactions    │   │
+│  │  Definition │  │              │  │                  │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────┐
+│                    MySQL Database                            │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │   Tables    │  │   Indexes    │  │  Stored Procs    │   │
+│  │   (30+)     │  │              │  │  (If any)        │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+└─────────────────────────────────────────────────────────────┘`}</pre>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-3">Technology Stack</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">Frontend</span>
+                  <Badge variant="outline">React 18 + TypeScript</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">State Management</span>
+                  <Badge variant="outline">TanStack Query</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">Backend</span>
+                  <Badge variant="outline">Node.js + Express</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">Database</span>
+                  <Badge variant="outline">MySQL 8.0</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 border rounded">
+                  <span className="text-sm">ORM</span>
+                  <Badge variant="outline">Drizzle ORM</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-3">Key Design Patterns</h4>
+              <div className="space-y-2">
+                <div className="p-3 border rounded">
+                  <div className="font-medium text-sm">Repository Pattern</div>
+                  <div className="text-xs text-muted-foreground">Database abstraction layer</div>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="font-medium text-sm">Service Layer</div>
+                  <div className="text-xs text-muted-foreground">Business logic separation</div>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="font-medium text-sm">Product Discovery Service</div>
+                  <div className="text-xs text-muted-foreground">Automated lifecycle tracking</div>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="font-medium text-sm">Middleware Pipeline</div>
+                  <div className="text-xs text-muted-foreground">Request processing chain</div>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="font-medium text-sm">Time-Series Data</div>
+                  <div className="text-xs text-muted-foreground">Snapshot-based tracking</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Middleware Stack</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[
+              { name: "express.json()", desc: "Parse JSON request bodies" },
+              { name: "express.urlencoded()", desc: "Parse URL-encoded bodies" },
+              { name: "express-session", desc: "Session management (24hr timeout)" },
+              { name: "passport.js", desc: "Authentication (production only)" },
+              { name: "winston logger", desc: "Request/response logging" },
+              { name: "timing middleware", desc: "Performance monitoring" },
+              { name: "requireAuth", desc: "Route-level authentication" },
+            ].map((middleware, idx) => (
+              <div key={idx} className="flex items-center space-x-3 p-2 border rounded">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold">
+                  {idx + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="font-mono text-sm">{middleware.name}</div>
+                  <div className="text-xs text-muted-foreground">{middleware.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderApiEndpoints = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>API Reference</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-6">
+            All API endpoints follow RESTful conventions. The base URL for all endpoints is <code className="bg-muted px-2 py-1 rounded">/api</code>.
+          </p>
+        </CardContent>
+      </Card>
+
+      {Object.entries(apiEndpoints).map(([category, endpoints]) => (
+        <Card key={category}>
+          <CardHeader>
+            <CardTitle className="text-lg">{category}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {endpoints.map((endpoint, idx) => (
+                <div key={idx} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Badge variant={
+                        endpoint.method === "GET" ? "secondary" :
+                        endpoint.method === "POST" ? "default" :
+                        endpoint.method === "PUT" ? "outline" :
+                        "destructive"
+                      }>
+                        {endpoint.method}
+                      </Badge>
+                      <code className="text-sm font-mono">{endpoint.path}</code>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {endpoint.auth && (
+                        <Badge variant="outline" className="text-xs">
+                          <Shield className="w-3 h-3 mr-1" />
+                          Auth Required
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">{endpoint.description}</p>
+                  
+                  {endpoint.params && (
+                    <div className="mt-2">
+                      <span className="text-xs font-semibold">Query Parameters:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {endpoint.params.map(param => (
+                          <Badge key={param} variant="secondary" className="text-xs">
+                            {param}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-3 p-3 bg-muted rounded text-xs font-mono">
+                    <div className="flex items-center justify-between">
+                      <span>Example Request:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => handleCopyCode(
+                          endpoint.method !== 'GET' 
+                            ? `fetch('${endpoint.path}', {
+  method: '${endpoint.method}',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify(data)
+})`
+                            : `fetch('${endpoint.path}', { credentials: "include" })`,
+                          `${category}-${idx}`
+                        )}
+                      >
+                        {copiedCode === `${category}-${idx}` ? (
+                          <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                    <pre className="mt-2 overflow-x-auto">{endpoint.method !== 'GET' 
+                      ? `fetch('${endpoint.path}', {
+  method: '${endpoint.method}',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify(data)
+})`
+                      : `fetch('${endpoint.path}', { credentials: "include" })`}</pre>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const renderDataFlow = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Flow Patterns</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-4 bg-muted rounded-lg">
+            <h4 className="font-semibold mb-3">Request Lifecycle</h4>
+            <div className="font-mono text-xs">
+              <pre>{`1. User Action (Click/Form Submit)
+   └─> React Component
+       └─> TanStack Query Hook
+           └─> API Service Function
+               └─> fetch() with credentials
+                   └─> Express Route Handler
+                       └─> Middleware Chain
+                           └─> Business Logic
+                               └─> Drizzle ORM Query
+                                   └─> MySQL Database
+                                       └─> Response Chain (reverse)`}</pre>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-3">Query Pattern</h4>
+              <div className="p-3 bg-muted rounded font-mono text-xs">
+                <pre>{`// Client-side
+const { data, isLoading } = useQuery({
+  queryKey: ["/api/stock", filters],
+  queryFn: async () => {
+    const res = await fetch(url, {
+      credentials: "include"
+    });
+    return res.json();
+  }
+});`}</pre>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-3">Mutation Pattern</h4>
+              <div className="p-3 bg-muted rounded font-mono text-xs">
+                <pre>{`// Client-side
+const mutation = useMutation({
+  mutationFn: async (data) => {
+    const res = await fetch("/api/endpoint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries(["/api/stock"]);
+  }
+});`}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h4 className="font-semibold mb-3">Data Flow Examples</h4>
+            <div className="space-y-4">
+              <div className="p-4 border rounded">
+                <div className="font-medium mb-2">BRN Stock Upload Flow</div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>1. Excel file selected in UI</div>
+                  <div>2. File uploaded via multipart/form-data</div>
+                  <div>3. Multer processes to memory buffer</div>
+                  <div>4. XLSX library parses Excel data</div>
+                  <div>5. Data validated with Zod schema</div>
+                  <div>6. Bulk insert to brnStockSnapshots table</div>
+                  <div>7. Upload history record created</div>
+                  <div>8. Success response with summary</div>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded">
+                <div className="font-medium mb-2">Order Recommendation Flow</div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>1. Request with analysis parameters</div>
+                  <div>2. Fetch recent sales data (7-30 days)</div>
+                  <div>3. Calculate sales velocity per item</div>
+                  <div>4. Check current stock levels</div>
+                  <div>5. Apply AI recommendation logic</div>
+                  <div>6. Generate urgency scores</div>
+                  <div>7. Return sorted recommendations</div>
+                  <div>8. Cache results for performance</div>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded">
+                <div className="font-medium mb-2">Product Discovery Flow</div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>1. BRN file uploaded with product data</div>
+                  <div>2. Compare items against existing products</div>
+                  <div>3. Detect new products not in database</div>
+                  <div>4. Auto-create suppliers/categories as needed</div>
+                  <div>5. Track missing products (not in upload)</div>
+                  <div>6. Generate lifecycle events for changes</div>
+                  <div>7. Create alerts for significant changes</div>
+                  <div>8. Update product status (new/active/missing)</div>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded">
+                <div className="font-medium mb-2">Stock Discrepancy Analysis Flow</div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>1. Calculate expected stock (opening - sales)</div>
+                  <div>2. Compare with next day's opening stock</div>
+                  <div>3. Identify discrepancies (shortage/overage)</div>
+                  <div>4. Analyze patterns across time/location</div>
+                  <div>5. Calculate confidence scores for patterns</div>
+                  <div>6. Determine possible causes (theft/waste/error)</div>
+                  <div>7. Generate alerts for high-value discrepancies</div>
+                  <div>8. Store patterns for predictive analysis</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderAuthentication = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Authentication System</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start space-x-2">
+              <Shield className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div>
+                <div className="font-semibold text-amber-900 dark:text-amber-100">Development Mode Active</div>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  Authentication is currently bypassed in development. All requests use a mock admin user:
+                </p>
+                <code className="block mt-2 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs">
+                  {`{ id: 1, username: 'dev-user', role: 'Admin' }`}
+                </code>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Production Authentication Flow</h4>
+            <div className="space-y-3">
+              {[
+                { step: "1. Login Request", desc: "POST /api/login with username/password" },
+                { step: "2. Password Verification", desc: "scrypt hash comparison" },
+                { step: "3. Session Creation", desc: "24-hour session cookie set" },
+                { step: "4. Protected Routes", desc: "requireAuth middleware validates session" },
+                { step: "5. Role Checking", desc: "Admin, Manager, Supervisor, Assistant roles" },
+                { step: "6. Logout", desc: "Session destroyed, cookie cleared" },
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-start space-x-3">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{item.step}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-3">User Roles</h4>
+              <div className="space-y-2">
+                <div className="p-3 border rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Admin</span>
+                    <Badge variant="destructive">Full Access</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Complete system control, user management
+                  </p>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Manager</span>
+                    <Badge variant="default">Write Access</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    All features except user management
+                  </p>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Supervisor</span>
+                    <Badge variant="secondary">Limited Write</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    View all, edit inventory and orders
+                  </p>
+                </div>
+                <div className="p-3 border rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Assistant</span>
+                    <Badge variant="outline">Read Only</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    View access to all features
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-3">Session Configuration</h4>
+              <div className="p-3 bg-muted rounded font-mono text-xs">
+                <pre>{`{
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // true in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax'
+  }
+}`}</pre>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFileUploads = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>File Upload System</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded">
+              <Upload className="w-8 h-8 text-primary mb-2" />
+              <h4 className="font-semibold">BRN Stock Files</h4>
+              <p className="text-xs text-muted-foreground mt-1">Excel files up to 50MB</p>
+              <Badge variant="outline" className="mt-2 text-xs">.xlsx, .xls</Badge>
+            </div>
+            <div className="p-4 border rounded">
+              <Upload className="w-8 h-8 text-amber-500 mb-2" />
+              <h4 className="font-semibold">EPOS Sales Data</h4>
+              <p className="text-xs text-muted-foreground mt-1">Excel files up to 10MB</p>
+              <Badge variant="outline" className="mt-2 text-xs">.xlsx, .xls</Badge>
+            </div>
+            <div className="p-4 border rounded">
+              <Upload className="w-8 h-8 text-red-500 mb-2" />
+              <h4 className="font-semibold">Waste Reports</h4>
+              <p className="text-xs text-muted-foreground mt-1">CSV files up to 10MB</p>
+              <Badge variant="outline" className="mt-2 text-xs">.csv</Badge>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Upload Processing Pipeline</h4>
+            <div className="p-4 bg-muted rounded font-mono text-xs">
+              <pre>{`1. File Validation
+   - MIME type checking
+   - File size limits
+   - Extension validation
+
+2. Memory Processing (Multer)
+   - No disk writes
+   - Direct buffer processing
+   - Automatic cleanup
+
+3. Data Parsing
+   - XLSX library for Excel
+   - CSV parser for text files
+   - Column mapping
+
+4. Schema Validation (Zod)
+   - Type checking
+   - Required fields
+   - Data constraints
+
+5. Database Operations
+   - Bulk inserts
+   - Transaction support
+   - Error rollback
+
+6. Response
+   - Success summary
+   - Error details
+   - Processing stats`}</pre>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Example Upload Code</h4>
+            <div className="p-3 bg-muted rounded font-mono text-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span>Frontend Upload</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => handleCopyCode(`const uploadFile = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await fetch('/api/brn/upload', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData
+  });
+  
+  if (!response.ok) {
+    throw new Error('Upload failed');
+  }
+  
+  return response.json();
+};`, 'upload-example')}
+                >
+                  {copiedCode === 'upload-example' ? (
+                    <Check className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
+              <pre>{`const uploadFile = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await fetch('/api/brn/upload', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData
+  });
+  
+  if (!response.ok) {
+    throw new Error('Upload failed');
+  }
+  
+  return response.json();
+};`}</pre>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderClientIntegration = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Client Integration Guide</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h4 className="font-semibold mb-3">TanStack Query Configuration</h4>
+            <div className="p-3 bg-muted rounded font-mono text-xs">
+              <pre>{`// queryClient.ts
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});`}</pre>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-3">API Request Helper</h4>
+              <div className="p-3 bg-muted rounded font-mono text-xs">
+                <pre>{`async function apiRequest(
+  method: string,
+  url: string,
+  data?: any
+) {
+  const config: RequestInit = {
+    method,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  
+  if (data) {
+    config.body = JSON.stringify(data);
+  }
+  
+  const response = await fetch(url, config);
+  
+  if (!response.ok) {
+    throw new Error(\`API error: \${response.status}\`);
+  }
+  
+  return response;
+}`}</pre>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-3">Custom Hook Example</h4>
+              <div className="p-3 bg-muted rounded font-mono text-xs">
+                <pre>{`// useStock.ts
+export function useStock(filters: StockFilters) {
+  return useQuery({
+    queryKey: ['/api/stock', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      
+      const res = await fetch(
+        \`/api/stock?\${params}\`,
+        { credentials: 'include' }
+      );
+      
+      return res.json();
+    },
+  });
+}`}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Error Handling Pattern</h4>
+            <div className="p-3 bg-muted rounded font-mono text-xs">
+              <pre>{`// Error boundary component
+function QueryErrorBoundary({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <ErrorBoundary
+          onReset={reset}
+          fallbackRender={({ error, resetErrorBoundary }) => (
+            <div className="p-4 border border-red-500 rounded">
+              <h3 className="font-semibold text-red-500">Error</h3>
+              <p className="text-sm mt-2">{error.message}</p>
+              <Button onClick={resetErrorBoundary} className="mt-4">
+                Try again
+              </Button>
+            </div>
+          )}
+        >
+          {children}
+        </ErrorBoundary>
+      )}
+    </QueryErrorResetBoundary>
+  );
+}`}</pre>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderSalesAnalytics = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5" />
+            <span>Sales Analytics System</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-muted-foreground">
+            The Sales Analytics system provides comprehensive analysis of EPOS sales data with advanced filtering, 
+            sorting, and visualization capabilities. It processes thousands of sales records with real-time 
+            performance and interactive features.
+          </p>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-3 border rounded text-center">
+              <div className="text-2xl font-bold text-primary">10,000+</div>
+              <div className="text-xs text-muted-foreground">Records Processed</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <div className="text-2xl font-bold text-primary">200+</div>
+              <div className="text-xs text-muted-foreground">Suppliers</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <div className="text-2xl font-bold text-primary">48+</div>
+              <div className="text-xs text-muted-foreground">Date Ranges</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <div className="text-2xl font-bold text-primary">5</div>
+              <div className="text-xs text-muted-foreground">Sortable Columns</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Key Features</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="p-3 border rounded">
+                  <h5 className="font-medium text-sm mb-2">📊 Multi-Tab Interface</h5>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Overview - Key metrics and trends</li>
+                    <li>• Top Items - Best performing products</li>
+                    <li>• Time Analysis - Temporal insights</li>
+                    <li>• Detailed Data - Full sortable table</li>
+                  </ul>
+                </div>
+                <div className="p-3 border rounded">
+                  <h5 className="font-medium text-sm mb-2">🔍 Advanced Filtering</h5>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Timeframe buttons (all, 1d, 7d, 30d, 90d)</li>
+                    <li>• Date range selection (start/end dates)</li>
+                    <li>• Specific report date dropdown</li>
+                    <li>• Supplier and category filtering</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="p-3 border rounded">
+                  <h5 className="font-medium text-sm mb-2">📈 Interactive Charts</h5>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Line charts with smooth animations</li>
+                    <li>• Candlestick charts for detailed analysis</li>
+                    <li>• Chart type toggling (Line/Candlestick)</li>
+                    <li>• Responsive design for all devices</li>
+                  </ul>
+                </div>
+                <div className="p-3 border rounded">
+                  <h5 className="font-medium text-sm mb-2">⚡ Table Sorting (NEW)</h5>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Click headers to sort columns</li>
+                    <li>• Item Code, Description, Qty, Unit Price, Total Net</li>
+                    <li>• Visual indicators (up/down arrows)</li>
+                    <li>• Three-state sorting (asc/desc/none)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Table Sorting Implementation</h4>
+            <div className="p-4 bg-muted rounded">
+              <p className="text-sm text-muted-foreground mb-3">
+                The detailed data table supports interactive sorting on key business columns:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h5 className="font-medium text-sm mb-2">Sortable Columns</h5>
+                  <div className="space-y-2">
+                    {[
+                      { column: "Item Code", type: "Alphanumeric", desc: "Product identification codes" },
+                      { column: "Description", type: "Alphabetical", desc: "Product names (case-insensitive)" },
+                      { column: "Quantity", type: "Numeric", desc: "Sales quantities" },
+                      { column: "Unit Price", type: "Numeric", desc: "Price per unit analysis" },
+                      { column: "Total Net", type: "Numeric", desc: "Revenue analysis" },
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 border rounded text-xs">
+                        <span className="font-medium">{item.column}</span>
+                        <div className="text-right">
+                          <Badge variant="outline" className="text-xs mb-1">{item.type}</Badge>
+                          <div className="text-muted-foreground">{item.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h5 className="font-medium text-sm mb-2">User Experience</h5>
+                  <ul className="text-xs text-muted-foreground space-y-2">
+                    <li className="flex items-start space-x-2">
+                      <ChevronRight className="w-3 h-3 text-primary mt-0.5" />
+                      <span><strong>Click Behavior:</strong> First click = ascending, second = descending, third = clear sort</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <ChevronRight className="w-3 h-3 text-primary mt-0.5" />
+                      <span><strong>Visual Feedback:</strong> Hover effects and arrow indicators show sort direction</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <ChevronRight className="w-3 h-3 text-primary mt-0.5" />
+                      <span><strong>Performance:</strong> Optimized with React useMemo for 10,000+ records</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <ChevronRight className="w-3 h-3 text-primary mt-0.5" />
+                      <span><strong>Accessibility:</strong> Keyboard navigation and screen reader friendly</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Technical Implementation</h4>
+            <div className="p-3 bg-muted rounded font-mono text-xs">
+              <pre>{`// Sorting state management
+const [sortColumn, setSortColumn] = useState<string | null>(null);
+const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+
+// Performance-optimized sorting with useMemo
+const sortedSalesData = useMemo(() => {
+  if (!salesData || !sortColumn || !sortDirection) return salesData;
+  
+  return [...salesData].sort((a, b) => {
+    const aValue = a[sortColumn];
+    const bValue = b[sortColumn];
+    
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+    
+    const comparison = String(aValue).localeCompare(String(bValue));
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+}, [salesData, sortColumn, sortDirection]);`}</pre>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Safari Compatibility</h4>
+            <div className="p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                The Sales Analytics system includes comprehensive Safari compatibility features:
+              </p>
+              <ul className="text-xs text-amber-600 dark:text-amber-400 mt-2 space-y-1">
+                <li>• Date normalization functions for Safari date handling</li>
+                <li>• Cross-browser dropdown compatibility</li>
+                <li>• Optimized rendering for Safari's WebKit engine</li>
+                <li>• Tested and verified on Safari 14+ versions</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderDatabase = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Database Schema Overview</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-3 border rounded text-center">
+              <Database className="w-8 h-8 mx-auto mb-2 text-primary" />
+              <div className="text-2xl font-bold">30+</div>
+              <div className="text-xs text-muted-foreground">Tables</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <Layers className="w-8 h-8 mx-auto mb-2 text-primary" />
+              <div className="text-2xl font-bold">50+</div>
+              <div className="text-xs text-muted-foreground">Indexes</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <Clock className="w-8 h-8 mx-auto mb-2 text-primary" />
+              <div className="text-2xl font-bold">Time-Series</div>
+              <div className="text-xs text-muted-foreground">Data Model</div>
+            </div>
+            <div className="p-3 border rounded text-center">
+              <Zap className="w-8 h-8 mx-auto mb-2 text-primary" />
+              <div className="text-2xl font-bold">10</div>
+              <div className="text-xs text-muted-foreground">Connection Pool</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Core Tables</h4>
+            <div className="space-y-3">
+              {[
+                { table: "users", desc: "User accounts and authentication", fields: ["id", "username", "password", "role", "fullName"] },
+                { table: "products", desc: "Product master data", fields: ["id", "itemCode", "name", "categoryId", "supplierId"] },
+                { table: "inventory", desc: "Current stock levels by location", fields: ["productId", "locationId", "currentStock", "reservedStock"] },
+                { table: "brnStockSnapshots", desc: "Daily BRN stock snapshots", fields: ["date", "itemCode", "quantity", "supplier", "category"] },
+                { table: "eposSalesSummaries", desc: "EPOS sales data", fields: ["date", "itemCode", "quantity", "salesValue", "location"] },
+                { table: "salesOrders", desc: "Sales transactions", fields: ["id", "orderNumber", "customerId", "totalAmount", "status"] },
+                { table: "productLifecycleEvents", desc: "Product discovery and lifecycle tracking", fields: ["productId", "itemCode", "eventType", "eventDate", "details"] },
+                { table: "dailyStockPositions", desc: "Daily stock positions with discrepancy analysis", fields: ["positionDate", "baseItemCode", "locationCode", "openingStock", "discrepancy"] },
+                { table: "discrepancyPatterns", desc: "Identified patterns in stock discrepancies", fields: ["baseItemCode", "patternType", "avgDiscrepancy", "confidenceScore", "alertEnabled"] },
+              ].map((item, idx) => (
+                <div key={idx} className="p-3 border rounded">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <code className="font-mono text-sm font-semibold">{item.table}</code>
+                      <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">{item.fields.length} fields</Badge>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {item.fields.map(field => (
+                      <Badge key={field} variant="secondary" className="text-xs">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-3">Time-Series Design</h4>
+            <div className="p-4 bg-muted rounded">
+              <p className="text-sm text-muted-foreground mb-3">
+                The system uses a snapshot-based time-series model for tracking historical data:
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>BRN Snapshots:</strong> Daily stock levels with date + itemCode composite key</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>EPOS Summaries:</strong> Daily sales aggregations by item and location</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>Stock Movements:</strong> Every inventory transaction with timestamp</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>Order Correlations:</strong> AI recommendations with confidence scores</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>Product Lifecycle:</strong> Automated discovery and missing product tracking</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <ChevronRight className="w-4 h-4 text-primary mt-0.5" />
+                  <span><strong>Discrepancy Analysis:</strong> Pattern recognition for stock variances</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case "overview":
+        return renderOverview();
+      case "architecture":
+        return renderArchitecture();
+      case "api-endpoints":
+        return renderApiEndpoints();
+      case "data-flow":
+        return renderDataFlow();
+      case "authentication":
+        return renderAuthentication();
+      case "file-uploads":
+        return renderFileUploads();
+      case "sales-analytics":
+        return renderSalesAnalytics();
+      case "client-integration":
+        return renderClientIntegration();
+      case "database":
+        return renderDatabase();
+      default:
+        return renderOverview();
+    }
+  };
+
+  return (
+    <div className="flex gap-6">
+      {/* Sidebar Navigation */}
+      <div className="w-64 flex-shrink-0">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Documentation</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <nav className="space-y-1 p-4">
+              {sections.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                      activeSection === section.id
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{section.title}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1">
+        {renderContent()}
+      </div>
+    </div>
+  );
+}

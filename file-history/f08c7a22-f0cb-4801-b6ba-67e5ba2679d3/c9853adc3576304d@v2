@@ -1,0 +1,1278 @@
+import type { Express } from 'express';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
+import { db } from './db';
+import { eposSalesSummaries, uploadHistory } from '@shared/schema';
+import { eposExcelSchema, type InsertEposSalesSummary } from '@shared/schema';
+import { logger } from './utils/logger';
+import { eq, gte, lte, desc, asc, sum, count, avg, and, sql, like, or } from 'drizzle-orm';
+import { CaseSizeManager } from '../modules/inventory-management/case-size-manager/CaseSizeManager';
+import { EposSalesQuerySchema } from './validation/epos-sales-query';
+import type { EposSalesResponse, QueryMetadata } from '../shared/types/sales-analytics';
+import { MAX_SAFE_RECORDS } from '../shared/types/sales-analytics';
+import { z } from 'zod';
+
+// Configure multer for Excel file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+        file.originalname.endsWith('.xlsx')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx) are allowed'));
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+/**
+ * Extract report date from Excel file content
+ * Supports multiple formats in A1 and other cells:
+ * - "Item Sales Summary for EPOS06 from 29/05/2025 to 29/05/2025"
+ * - "Sales Summary 29/05/2025"
+ * - Raw date values in Excel date format
+ * - Any cell containing DD/MM/YYYY or DD-MM-YYYY patterns
+ */
+function extractReportDate(worksheet: any, filename: string): string | null {
+  try {
+    // Check multiple cells for date information, prioritizing A2 based on user feedback
+    const cellsToCheck = ['A2', 'A1', 'B1', 'C1', 'B2', 'C2'];
+    
+    for (const cellRef of cellsToCheck) {
+      const cell = worksheet[cellRef];
+      if (!cell) continue;
+      
+      const cellValue = cell.v || cell.w || '';
+      const cellString = cellValue.toString();
+      
+      // Try to extract date from cell content
+      if (cellString && cellString.trim()) {
+        // Pattern 1: "from DD/MM/YYYY to DD/MM/YYYY"
+        let dateMatch = cellString.match(/from\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+        if (dateMatch) {
+          return dateMatch[1];
+        }
+        
+        // Pattern 2: "DD/MM/YYYY to DD/MM/YYYY"
+        dateMatch = cellString.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s+to\s+\d{1,2}\/\d{1,2}\/\d{4}/i);
+        if (dateMatch) {
+          return dateMatch[1];
+        }
+        
+        // Pattern 3: Any DD/MM/YYYY pattern
+        dateMatch = cellString.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+        if (dateMatch) {
+          return dateMatch[1];
+        }
+        
+        // Pattern 4: DD-MM-YYYY pattern
+        dateMatch = cellString.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+        if (dateMatch) {
+          const [, day, month, year] = dateMatch;
+          return `${day}/${month}/${year}`;
+        }
+      }
+      
+      // Check if it's an Excel date number
+      if (typeof cell.v === 'number' && cell.v > 40000 && cell.v < 50000) {
+        // Excel date serial number - convert to DD/MM/YYYY
+        const excelDate = new Date((cell.v - 25569) * 86400 * 1000);
+        const day = excelDate.getDate().toString().padStart(2, '0');
+        const month = (excelDate.getMonth() + 1).toString().padStart(2, '0');
+        const year = excelDate.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+    }
+    
+    logger.app.error('Could not extract date from any Excel cells', {
+      checkedCells: cellsToCheck.map(ref => ({
+        ref,
+        value: worksheet[ref]?.v || worksheet[ref]?.w || null
+      })),
+      filename
+    });
+    return null;
+  } catch (error) {
+    logger.app.error('Error parsing date from Excel', { error, filename });
+    return null;
+  }
+}
+
+/**
+ * Parse EPOS Excel file according to specifications:
+ * 1. Date from cell A2 (or other cells)
+ * 2. Headers on row 4 (index 3)
+ * 3. Data starts on row 5 (index 4)
+ * 4. Keep only: Item Code, Unit, Description, Total Qty, Total Net, Total Gross
+ */
+function parseEposExcelFile(buffer: Buffer, filename: string): any[] {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Extract report date from Excel file content
+    const reportDate = extractReportDate(worksheet, filename);
+    
+    if (!reportDate) {
+      throw new Error(`Could not extract report date from Excel file: "${filename}"`);
+    }
+    
+    // Convert worksheet to JSON with header row at index 3 (row 4)
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1,
+      range: 3, // Start from row 4 (index 3) for headers
+      defval: null // Use null for empty cells
+    });
+    
+    if (jsonData.length < 2) {
+      throw new Error('Excel file must have headers on row 4 and at least one data row');
+    }
+    
+    // Headers are in the first row of our extracted data (row 4 of Excel)
+    const headers = jsonData[0] as string[];
+    
+    // Find required column indices with flexible matching
+    const requiredColumns = {
+      itemCode: ['Item Code', 'ItemCode', 'Code', 'Item'],
+      unit: ['Unit', 'Units', 'Each'], 
+      description: ['Description', 'Item Description', 'Name', 'Item Name'],
+      totalQty: ['Total Qty', 'Quantity', 'Qty', 'Total Quantity'],
+      totalNet: ['Total Net', 'Net', 'Net Total', 'Total'],
+      totalGross: ['Total Gross', 'Gross', 'Gross Total']
+    };
+    
+    const columnMap: { [key: string]: number } = {};
+    
+    for (const [key, columnOptions] of Object.entries(requiredColumns)) {
+      let index = -1;
+      
+      // Try each possible column name
+      for (const columnName of columnOptions) {
+        index = headers.findIndex(header => 
+          header?.toString().toLowerCase().includes(columnName.toLowerCase())
+        );
+        if (index !== -1) break;
+      }
+      
+      if (index === -1) {
+        logger.app.error(`Column not found for ${key}`, { 
+          headers, 
+          triedColumns: columnOptions,
+          availableHeaders: headers 
+        });
+        throw new Error(`Required column for "${key}" not found. Tried: ${columnOptions.join(', ')}. Available headers: ${headers.join(', ')}`);
+      }
+      columnMap[key] = index;
+    }
+    
+    logger.debug('Found column mapping', { columnMap, headers });
+    
+    // Process data rows (skip header row)
+    const processedData: any[] = [];
+    for (let i = 1; i < jsonData.length; i++) {
+      const row = jsonData[i] as any[];
+      
+      // Skip empty rows
+      if (!row || row.length === 0 || !row[columnMap.itemCode]) {
+        continue;
+      }
+      
+      const processedRow = {
+        reportDate: reportDate,
+        itemCode: row[columnMap.itemCode]?.toString().trim(),
+        unit: row[columnMap.unit]?.toString().trim() || null,
+        description: row[columnMap.description]?.toString().trim(),
+        totalQty: parseFloat(row[columnMap.totalQty] || 0) || 0,
+        totalNet: parseFloat(row[columnMap.totalNet] || 0) || 0,
+        totalGross: parseFloat(row[columnMap.totalGross] || 0) || 0,
+        fileName: filename
+      };
+      
+      // Skip rows with missing essential data
+      if (!processedRow.itemCode || !processedRow.description) {
+        continue;
+      }
+      
+      processedData.push(processedRow);
+    }
+    
+    logger.app.info('Processed EPOS Excel data', { 
+      filename, 
+      totalRows: processedData.length,
+      reportDate 
+    });
+    
+    return processedData;
+  } catch (error) {
+    logger.app.error('Error parsing EPOS Excel file', { filename, error });
+    throw error;
+  }
+}
+
+interface AuthenticatedRequest extends Express.Request {
+  user: { id: number; username: string; role: string; };
+}
+
+export function registerEposRoutes(app: Express) {
+  
+  // Ensure EPOS table exists (temporary until migration works)
+  const ensureEposTable = async () => {
+    try {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS epos_sales_summaries (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          report_date DATE NOT NULL,
+          item_code VARCHAR(50) NOT NULL,
+          unit VARCHAR(50),
+          description VARCHAR(255) NOT NULL,
+          total_qty DECIMAL(10,3) NOT NULL DEFAULT 0,
+          total_net DECIMAL(12,2) NOT NULL DEFAULT 0,
+          total_gross DECIMAL(12,2) NOT NULL DEFAULT 0,
+          file_name VARCHAR(255) NOT NULL,
+          upload_batch VARCHAR(100),
+          uploaded_by INT NOT NULL,
+          uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY epos_report_item_unique (report_date, item_code),
+          INDEX epos_report_date_idx (report_date),
+          INDEX epos_item_code_idx (item_code),
+          INDEX epos_total_net_idx (total_net),
+          INDEX epos_upload_batch_idx (upload_batch)
+        )
+      `);
+      logger.app.info('EPOS table ensured to exist');
+    } catch (error) {
+      logger.app.error('Error creating EPOS table:', error);
+    }
+  };
+  
+  // Upload EPOS Excel file
+  app.post('/api/upload/epos-sales', upload.single('file'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // Ensure EPOS table exists before processing
+      await ensureEposTable();
+      
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      if (!req.file.originalname.toLowerCase().endsWith('.xlsx')) {
+        return res.status(400).json({ 
+          message: 'Invalid file format. Only Excel files (.xlsx) are allowed' 
+        });
+      }
+      
+      // Parse Excel file
+      const rawData = parseEposExcelFile(req.file.buffer, req.file.originalname);
+      
+      if (rawData.length === 0) {
+        return res.status(400).json({ message: 'No valid data found in Excel file' });
+      }
+      
+      // Validate data against schema
+      const validRecords: InsertEposSalesSummary[] = [];
+      const errors: string[] = [];
+      
+      for (let i = 0; i < rawData.length; i++) {
+        try {
+          const validated = eposExcelSchema.parse({
+            ...rawData[i],
+            uploadedBy: req.user.id
+          });
+          
+          // Convert DD/MM/YYYY to YYYY-MM-DD for database
+          const [day, month, year] = validated.reportDate.split('/');
+          const mysqlDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          
+          validRecords.push({
+            reportDate: mysqlDate,
+            itemCode: validated.itemCode,
+            unit: validated.unit,
+            description: validated.description,
+            totalQty: validated.totalQty.toString(),
+            totalNet: validated.totalNet.toString(),
+            totalGross: validated.totalGross.toString(),
+            fileName: req.file.originalname,
+            uploadBatch: `${mysqlDate}_${Date.now()}`,
+            uploadedBy: req.user.id
+          });
+        } catch (error: any) {
+          errors.push(`Row ${i + 5}: ${error.message}`); // +5 because data starts on row 5
+        }
+      }
+      
+      if (validRecords.length === 0) {
+        return res.status(400).json({ 
+          message: 'No valid records found in Excel file',
+          errors: errors.slice(0, 5) // Show first 5 errors
+        });
+      }
+      
+      // Clear existing data for this report date to ensure clean upload
+      const reportDate = validRecords[0].reportDate;
+      await db.delete(eposSalesSummaries)
+        .where(eq(eposSalesSummaries.reportDate, reportDate));
+      
+      // Insert new data with proper error handling for duplicates
+      try {
+        await db.insert(eposSalesSummaries).values(validRecords);
+      } catch (error: any) {
+        if (error.code === 'ER_DUP_ENTRY') {
+          // Handle duplicate key error by using INSERT IGNORE or ON DUPLICATE KEY UPDATE
+          logger.app.warn('Duplicate key detected during EPOS upload, using upsert strategy');
+          
+          // Insert records one by one with ON DUPLICATE KEY UPDATE
+          for (const record of validRecords) {
+            await db.execute(sql`
+              INSERT INTO epos_sales_summaries 
+              (report_date, item_code, unit, description, total_qty, total_net, total_gross, file_name, upload_batch, uploaded_by)
+              VALUES (${record.reportDate}, ${record.itemCode}, ${record.unit}, ${record.description}, 
+                      ${record.totalQty}, ${record.totalNet}, ${record.totalGross}, ${record.fileName}, 
+                      ${record.uploadBatch}, ${record.uploadedBy})
+              ON DUPLICATE KEY UPDATE
+                unit = VALUES(unit),
+                description = VALUES(description),
+                total_qty = VALUES(total_qty),
+                total_net = VALUES(total_net),
+                total_gross = VALUES(total_gross),
+                file_name = VALUES(file_name),
+                upload_batch = VALUES(upload_batch),
+                uploaded_by = VALUES(uploaded_by),
+                uploaded_at = CURRENT_TIMESTAMP
+            `);
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Create upload history record
+      await db.insert(uploadHistory).values({
+        fileName: req.file.originalname,
+        fileType: 'epos_sales',
+        status: validRecords.length === rawData.length ? 'processed' : 'warnings',
+        recordCount: validRecords.length,
+        errorLog: errors.length > 0 ? 
+          `${errors.length} validation errors. First 5: ${errors.slice(0, 5).join('; ')}` : null,
+        uploadedBy: req.user.id
+      });
+
+      // Detect EPOS-only items and create profiles
+      try {
+        const caseSizeManager = new CaseSizeManager();
+        const eposOnlyResult = await caseSizeManager.detectEPOSOnlyItems();
+        
+        if (eposOnlyResult.success && eposOnlyResult.data) {
+          logger.app.info('EPOS-only items detected', {
+            count: eposOnlyResult.data.length,
+            needsReview: eposOnlyResult.data.filter(item => item.needsCaseReview).length
+          });
+        }
+      } catch (eposError) {
+        logger.app.error('Failed to detect EPOS-only items', { error: eposError });
+        // Don't fail the upload if detection fails
+      }
+      
+      res.json({
+        message: 'EPOS sales data uploaded successfully',
+        reportDate: reportDate,
+        recordsProcessed: validRecords.length,
+        totalRecords: rawData.length,
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined
+      });
+      
+    } catch (error) {
+      logger.app.error('EPOS upload error:', error);
+      res.status(500).json({ message: 'Failed to process EPOS Excel file', error: error.message });
+    }
+  });
+  
+  // Get EPOS sales data
+  app.get('/api/epos-sales', async (req, res) => {
+    try {
+      // Validate query parameters with Zod
+      const validatedQuery = EposSalesQuerySchema.parse(req.query);
+      const { startDate, endDate, reportDate, supplier, category, itemCode, sortBy, sortOrder, limit, offset } = validatedQuery;
+
+      logger.app.info('Fetching EPOS sales data', { startDate, endDate, reportDate, supplier, sortBy, sortOrder, limit, offset });
+      
+      // Use direct SQL execution for proper date filtering with supplier JOIN
+      if (reportDate) {
+        const dateToMatch = (reportDate as string).split('T')[0]; // Extract YYYY-MM-DD part
+        
+        // Build SQL with proper column names including BRN category data and fixed duplication
+        let sqlQuery = `
+          SELECT DISTINCT
+            e.id,
+            e.report_date as reportDate,
+            e.item_code as itemCode,
+            e.unit,
+            e.description,
+            e.total_qty as totalQty,
+            e.total_net as totalNet,
+            e.total_gross as totalGross,
+            e.file_name as fileName,
+            e.upload_batch as uploadBatch,
+            e.uploaded_by as uploadedBy,
+            e.uploaded_at as uploadedAt,
+            p.supplier as supplierName,
+            p.supplier as supplierId,
+            (SELECT b2.category FROM brn_stock_snapshots b2 
+             WHERE CASE 
+               WHEN e.item_code REGEXP '[A-Z]' THEN 
+                 SUBSTRING(e.item_code, 1, 
+                   CASE 
+                     WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                     WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                     WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                     ELSE LENGTH(e.item_code)
+                   END
+                 )
+               ELSE e.item_code 
+             END = b2.sage_code
+             ORDER BY b2.snapshot_date DESC LIMIT 1) as categoryName,
+            (SELECT b3.brand FROM brn_stock_snapshots b3 
+             WHERE CASE 
+               WHEN e.item_code REGEXP '[A-Z]' THEN 
+                 SUBSTRING(e.item_code, 1, 
+                   CASE 
+                     WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                     WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                     WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                     ELSE LENGTH(e.item_code)
+                   END
+                 )
+               ELSE e.item_code 
+             END = b3.sage_code
+             ORDER BY b3.snapshot_date DESC LIMIT 1) as brandName
+          FROM epos_sales_summaries e
+          LEFT JOIN product_profiles p ON 
+            CASE 
+              WHEN e.item_code REGEXP '[A-Z]' THEN 
+                SUBSTRING(e.item_code, 1, 
+                  CASE 
+                    WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                    WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                    WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                    ELSE LENGTH(e.item_code)
+                  END
+                )
+              ELSE e.item_code 
+            END = p.item_code
+          WHERE DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) = ?
+        `;
+        
+        const params = [dateToMatch];
+        
+        // Add supplier filter if specified
+        if (supplier && supplier !== 'all') {
+          sqlQuery += ' AND p.supplier = ?';
+          params.push(supplier as string);
+        }
+        
+        // Add category filter if specified
+        if (category && category !== 'all') {
+          sqlQuery += ` AND (SELECT b2.category FROM brn_stock_snapshots b2
+             WHERE CASE
+               WHEN e.item_code REGEXP '[A-Z]' THEN
+                 SUBSTRING(e.item_code, 1,
+                   CASE
+                     WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                     WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                     WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                     ELSE LENGTH(e.item_code)
+                   END
+                 )
+               ELSE e.item_code
+             END = b2.sage_code
+             ORDER BY b2.snapshot_date DESC LIMIT 1) = ?`;
+          params.push(category as string);
+        }
+
+        // Add item code filter if specified
+        if (itemCode && itemCode !== 'all') {
+          const trimmedItemCode = (itemCode as string).trim();
+          if (trimmedItemCode.length <= 4) {
+            // Short code - likely a base code, match both exact and variants
+            sqlQuery += ` AND (e.item_code = ? OR e.item_code LIKE ?)`;
+            params.push(trimmedItemCode, `${trimmedItemCode}%`);
+          } else {
+            // Longer code - exact match only
+            sqlQuery += ` AND e.item_code = ?`;
+            params.push(trimmedItemCode);
+          }
+        }
+        
+        // Build COUNT query (same WHERE clause, no LIMIT/ORDER)
+        let countQuery = `
+          SELECT COUNT(DISTINCT e.id) as total
+          FROM epos_sales_summaries e
+          LEFT JOIN product_profiles p ON
+            CASE
+              WHEN e.item_code REGEXP '[A-Z]' THEN
+                SUBSTRING(e.item_code, 1,
+                  CASE
+                    WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                    WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                    WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                    ELSE LENGTH(e.item_code)
+                  END
+                )
+              ELSE e.item_code
+            END = p.item_code
+          WHERE DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) = ?
+        `;
+
+        let countParams = [dateToMatch];
+        if (supplier && supplier !== 'all') {
+          countQuery += ' AND p.supplier = ?';
+          countParams.push(supplier as string);
+        }
+        if (category && category !== 'all') {
+          countQuery += ` AND (SELECT b2.category FROM brn_stock_snapshots b2
+             WHERE CASE
+               WHEN e.item_code REGEXP '[A-Z]' THEN
+                 SUBSTRING(e.item_code, 1,
+                   CASE
+                     WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                     WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                     WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                     ELSE LENGTH(e.item_code)
+                   END
+                 )
+               ELSE e.item_code
+             END = b2.sage_code
+             ORDER BY b2.snapshot_date DESC LIMIT 1) = ?`;
+          countParams.push(category as string);
+        }
+        if (itemCode && itemCode !== 'all') {
+          const trimmedItemCode = (itemCode as string).trim();
+          if (trimmedItemCode.length <= 4) {
+            countQuery += ` AND (e.item_code = ? OR e.item_code LIKE ?)`;
+            countParams.push(trimmedItemCode, `${trimmedItemCode}%`);
+          } else {
+            countQuery += ` AND e.item_code = ?`;
+            countParams.push(trimmedItemCode);
+          }
+        }
+
+        // Add ORDER BY and LIMIT with OFFSET
+        const effectiveLimit = Math.min(limit, MAX_SAFE_RECORDS);
+        // Map camelCase sortBy to snake_case database columns
+        const sortByColumnMap: Record<string, string> = {
+          totalNet: 'total_net',
+          totalQty: 'total_qty',
+          reportDate: 'report_date'
+        };
+        const dbSortColumn = sortByColumnMap[sortBy] || 'total_net';
+        sqlQuery += ` ORDER BY e.${dbSortColumn} ${sortOrder === 'desc' ? 'DESC' : 'ASC'} LIMIT ${effectiveLimit} OFFSET ${offset}`;
+
+        // Import mysql2 for direct query execution
+        const mysql = await import('mysql2/promise');
+        const connection = await mysql.default.createConnection({
+          host: '127.0.0.1',
+          port: 8889,
+          user: 'root',
+          password: 'root',
+          database: 'BB_Management_System'
+        });
+
+        // Execute COUNT query
+        const [countResult] = await connection.execute(countQuery, countParams) as any;
+        const totalCount = countResult[0]?.total || 0;
+
+        // Execute data query
+        const [salesData] = await connection.execute(sqlQuery, params) as any;
+        await connection.end();
+
+        // Build metadata
+        const hasMore = (offset + salesData.length) < totalCount;
+        const filtered = !!(supplier && supplier !== 'all') || !!(category && category !== 'all') || !!(itemCode && itemCode !== 'all');
+
+        const response: EposSalesResponse = {
+          data: salesData,
+          meta: {
+            totalCount,
+            limit: effectiveLimit,
+            offset,
+            hasMore,
+            filtered
+          }
+        };
+
+        res.json(response);
+        return;
+      }
+      
+      // Build SQL for date range filtering with supplier and category using subqueries to prevent duplication
+      let sqlQuery = `
+        SELECT DISTINCT
+          e.id,
+          e.report_date as reportDate,
+          e.item_code as itemCode,
+          e.unit,
+          e.description,
+          e.total_qty as totalQty,
+          e.total_net as totalNet,
+          e.total_gross as totalGross,
+          e.file_name as fileName,
+          e.upload_batch as uploadBatch,
+          e.uploaded_by as uploadedBy,
+          e.uploaded_at as uploadedAt,
+          p.supplier as supplierName,
+          p.supplier as supplierId,
+          (SELECT b2.category FROM brn_stock_snapshots b2 
+           WHERE CASE 
+             WHEN e.item_code REGEXP '[A-Z]' THEN 
+               SUBSTRING(e.item_code, 1, 
+                 CASE 
+                   WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                   WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                   WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                   ELSE LENGTH(e.item_code)
+                 END
+               )
+             ELSE e.item_code 
+           END = b2.sage_code
+           ORDER BY b2.snapshot_date DESC LIMIT 1) as categoryName,
+          (SELECT b3.brand FROM brn_stock_snapshots b3 
+           WHERE CASE 
+             WHEN e.item_code REGEXP '[A-Z]' THEN 
+               SUBSTRING(e.item_code, 1, 
+                 CASE 
+                   WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                   WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                   WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                   ELSE LENGTH(e.item_code)
+                 END
+               )
+             ELSE e.item_code 
+           END = b3.sage_code
+           ORDER BY b3.snapshot_date DESC LIMIT 1) as brandName
+        FROM epos_sales_summaries e
+        LEFT JOIN product_profiles p ON 
+          CASE 
+            WHEN e.item_code REGEXP '[A-Z]' THEN 
+              SUBSTRING(e.item_code, 1, 
+                CASE 
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code 
+          END = p.item_code
+        WHERE 1=1
+      `;
+      
+      const params = [];
+      
+      // Add date filters with timezone adjustment
+      if (startDate) {
+        sqlQuery += ' AND DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) >= DATE(?)';
+        params.push(startDate as string);
+      }
+      if (endDate) {
+        sqlQuery += ' AND DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) <= DATE(?)';
+        params.push(endDate as string);
+      }
+      if (supplier && supplier !== 'all') {
+        sqlQuery += ' AND p.supplier = ?';
+        params.push(supplier as string);
+      }
+      if (category && category !== 'all') {
+        sqlQuery += ` AND (SELECT b2.category FROM brn_stock_snapshots b2
+           WHERE CASE
+             WHEN e.item_code REGEXP '[A-Z]' THEN
+               SUBSTRING(e.item_code, 1,
+                 CASE
+                   WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                   WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                   WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                   ELSE LENGTH(e.item_code)
+                 END
+               )
+             ELSE e.item_code
+           END = b2.sage_code
+           ORDER BY b2.snapshot_date DESC LIMIT 1) = ?`;
+        params.push(category as string);
+      }
+
+      // Add item code filter if specified
+      if (itemCode && itemCode !== 'all') {
+        const trimmedItemCode = (itemCode as string).trim();
+        if (trimmedItemCode.length <= 4) {
+          // Short code - likely a base code, match both exact and variants
+          sqlQuery += ` AND (e.item_code = ? OR e.item_code LIKE ?)`;
+          params.push(trimmedItemCode, `${trimmedItemCode}%`);
+        } else {
+          // Longer code - exact match only
+          sqlQuery += ` AND e.item_code = ?`;
+          params.push(trimmedItemCode);
+        }
+      }
+      
+      // Build COUNT query (same WHERE clause, no LIMIT/ORDER)
+      let countQuery = `
+        SELECT COUNT(DISTINCT e.id) as total
+        FROM epos_sales_summaries e
+        LEFT JOIN product_profiles p ON
+          CASE
+            WHEN e.item_code REGEXP '[A-Z]' THEN
+              SUBSTRING(e.item_code, 1,
+                CASE
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code
+          END = p.item_code
+        WHERE 1=1
+      `;
+
+      let countParams = [...params]; // Same params as data query
+
+      // Add sorting, limit, and offset to data query
+      const effectiveLimit = Math.min(limit, MAX_SAFE_RECORDS);
+      // Map camelCase sortBy to snake_case database columns
+      const sortByColumnMap: Record<string, string> = {
+        totalNet: 'total_net',
+        totalQty: 'total_qty',
+        reportDate: 'report_date'
+      };
+      const dbSortColumn = sortByColumnMap[sortBy] || 'total_net';
+      sqlQuery += ` ORDER BY e.${dbSortColumn} ${sortOrder === 'desc' ? 'DESC' : 'ASC'} LIMIT ${effectiveLimit} OFFSET ${offset}`;
+
+      // Add same WHERE conditions to count query
+      if (startDate) {
+        countQuery += ' AND DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) >= DATE(?)';
+      }
+      if (endDate) {
+        countQuery += ' AND DATE(DATE_ADD(e.report_date, INTERVAL 1 HOUR)) <= DATE(?)';
+      }
+      if (supplier && supplier !== 'all') {
+        countQuery += ' AND p.supplier = ?';
+      }
+      if (category && category !== 'all') {
+        countQuery += ` AND (SELECT b2.category FROM brn_stock_snapshots b2
+           WHERE CASE
+             WHEN e.item_code REGEXP '[A-Z]' THEN
+               SUBSTRING(e.item_code, 1,
+                 CASE
+                   WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                   WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1
+                   WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                   ELSE LENGTH(e.item_code)
+                 END
+               )
+             ELSE e.item_code
+           END = b2.sage_code
+           ORDER BY b2.snapshot_date DESC LIMIT 1) = ?`;
+      }
+      if (itemCode && itemCode !== 'all') {
+        const trimmedItemCode = (itemCode as string).trim();
+        if (trimmedItemCode.length <= 4) {
+          countQuery += ` AND (e.item_code = ? OR e.item_code LIKE ?)`;
+        } else {
+          countQuery += ` AND e.item_code = ?`;
+        }
+      }
+
+      // Import mysql2 for direct query execution
+      const mysql = await import('mysql2/promise');
+      const connection = await mysql.default.createConnection({
+        host: '127.0.0.1',
+        port: 8889,
+        user: 'root',
+        password: 'root',
+        database: 'BB_Management_System'
+      });
+
+      // Execute COUNT query
+      const [countResult] = await connection.execute(countQuery, countParams) as any;
+      const totalCount = countResult[0]?.total || 0;
+
+      // Execute data query
+      const [salesData] = await connection.execute(sqlQuery, params) as any;
+      await connection.end();
+
+      // Build metadata
+      const hasMore = (offset + salesData.length) < totalCount;
+      const filtered = !!(startDate || endDate || (supplier && supplier !== 'all') || (category && category !== 'all') || (itemCode && itemCode !== 'all'));
+
+      const response: EposSalesResponse = {
+        data: salesData,
+        meta: {
+          totalCount,
+          limit: effectiveLimit,
+          offset,
+          hasMore,
+          filtered
+        }
+      };
+
+      res.json(response);
+      
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.app.warn('Invalid query parameters for /api/epos-sales', error.errors);
+        return res.status(400).json({
+          message: 'Invalid query parameters',
+          errors: error.errors
+        });
+      }
+      logger.app.error('Error fetching EPOS sales data:', error);
+      res.status(500).json({ message: 'Failed to fetch EPOS sales data' });
+    }
+  });
+  
+  // Get EPOS sales analytics
+  app.get('/api/epos-sales/analytics', async (req, res) => {
+    try {
+      const { reportDate } = req.query;
+      
+      if (!reportDate) {
+        return res.status(400).json({ message: 'Report date is required' });
+      }
+      
+      // Get summary analytics for the specified date
+      const analytics = await db
+        .select({
+          totalSales: sum(eposSalesSummaries.totalNet),
+          totalItems: count(eposSalesSummaries.id),
+          avgOrderValue: avg(eposSalesSummaries.totalNet),
+          totalQty: sum(eposSalesSummaries.totalQty)
+        })
+        .from(eposSalesSummaries)
+        .where(eq(eposSalesSummaries.reportDate, reportDate as string));
+      
+      // Get top selling items
+      const topItems = await db
+        .select()
+        .from(eposSalesSummaries)
+        .where(eq(eposSalesSummaries.reportDate, reportDate as string))
+        .orderBy(desc(eposSalesSummaries.totalNet))
+        .limit(10);
+      
+      res.json({
+        summary: analytics[0],
+        topItems: topItems
+      });
+      
+    } catch (error) {
+      logger.app.error('Error fetching EPOS analytics:', error);
+      res.status(500).json({ message: 'Failed to fetch EPOS analytics' });
+    }
+  });
+  
+  // Get available report dates
+  app.get('/api/epos-sales/dates', async (req, res) => {
+    try {
+      const dates = await db
+        .selectDistinct({ 
+          reportDate: eposSalesSummaries.reportDate,
+          recordCount: count(eposSalesSummaries.id)
+        })
+        .from(eposSalesSummaries)
+        .groupBy(eposSalesSummaries.reportDate)
+        .orderBy(desc(eposSalesSummaries.reportDate));
+      
+      res.json(dates);
+      
+    } catch (error) {
+      logger.app.error('Error fetching EPOS report dates:', error);
+      res.status(500).json({ message: 'Failed to fetch report dates' });
+    }
+  });
+  
+  // Clean up duplicate records (keep latest upload batch for each date)
+  app.post('/api/epos-sales/cleanup-duplicates', async (req: AuthenticatedRequest, res) => {
+    try {
+      const { confirmation } = req.body;
+      
+      if (confirmation !== 'CLEANUP_DUPLICATES_CONFIRMED') {
+        return res.status(400).json({ 
+          message: 'Duplicate cleanup requires confirmation. Send "CLEANUP_DUPLICATES_CONFIRMED" in request body.' 
+        });
+      }
+      
+      logger.app.info('Starting EPOS duplicate cleanup...');
+      
+      // Get all unique dates
+      const uniqueDates = await db
+        .selectDistinct({ reportDate: eposSalesSummaries.reportDate })
+        .from(eposSalesSummaries);
+      
+      let totalDeleted = 0;
+      
+      for (const dateRecord of uniqueDates) {
+        const reportDate = dateRecord.reportDate;
+        
+        // Get the latest upload batch for this date
+        const latestBatch = await db
+          .select({ uploadBatch: eposSalesSummaries.uploadBatch })
+          .from(eposSalesSummaries)
+          .where(eq(eposSalesSummaries.reportDate, reportDate))
+          .orderBy(desc(eposSalesSummaries.uploadedAt))
+          .limit(1);
+        
+        if (latestBatch.length > 0) {
+          // Delete all records except the latest batch
+          const deleteResult = await db
+            .delete(eposSalesSummaries)
+            .where(
+              and(
+                eq(eposSalesSummaries.reportDate, reportDate),
+                sql`${eposSalesSummaries.uploadBatch} != ${latestBatch[0].uploadBatch}`
+              )
+            );
+          
+          logger.app.info(`Cleaned up duplicates for ${reportDate}`, { 
+            keptBatch: latestBatch[0].uploadBatch 
+          });
+        }
+      }
+      
+      logger.app.info('EPOS duplicate cleanup completed');
+      
+      res.json({
+        success: true,
+        message: 'Duplicate records cleaned up successfully',
+        processedDates: uniqueDates.length
+      });
+      
+    } catch (error) {
+      logger.app.error('Error cleaning up EPOS duplicates:', error);
+      res.status(500).json({ message: 'Failed to cleanup duplicates', error: error.message });
+    }
+  });
+
+  // Get available suppliers from EPOS sales data
+  app.get('/api/epos-sales/suppliers', async (req, res) => {
+    try {
+      logger.app.info('Fetching available suppliers from EPOS sales data');
+      
+      // Use raw SQL with base item code extraction for proper JOIN
+      const [suppliersData] = await db.execute(sql`
+        SELECT 
+          p.supplier as supplierName,
+          p.supplier as supplierId,
+          COUNT(*) as recordCount
+        FROM epos_sales_summaries e
+        LEFT JOIN product_profiles p ON 
+          CASE 
+            WHEN e.item_code REGEXP '[A-Z]' THEN 
+              SUBSTRING(e.item_code, 1, 
+                CASE 
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code 
+          END = p.item_code
+        WHERE p.supplier IS NOT NULL AND p.supplier != ''
+        GROUP BY p.supplier
+        ORDER BY p.supplier ASC
+      `);
+      
+      logger.app.info(`Found ${suppliersData.length} suppliers with EPOS sales data`);
+      logger.debug('Suppliers data:', suppliersData);
+      
+      // Add "All Suppliers" option at the beginning
+      const allOptions = [
+        { supplierName: 'All Suppliers', supplierId: 'all', recordCount: 0 },
+        ...suppliersData
+      ];
+      
+      res.json(allOptions);
+      
+    } catch (error) {
+      logger.app.error('Error fetching suppliers from EPOS sales:', error);
+      res.status(500).json({ message: 'Failed to fetch suppliers', error: error.message });
+    }
+  });
+
+  // Get available categories from BRN stock data linked to EPOS sales
+  app.get('/api/epos-sales/categories', async (req, res) => {
+    try {
+      logger.app.info('Fetching available categories from BRN data linked to EPOS sales');
+      
+      // Use raw SQL with base item code extraction for proper JOIN
+      const [categoriesData] = await db.execute(sql`
+        SELECT 
+          b.category as categoryName,
+          COUNT(DISTINCT e.item_code) as recordCount
+        FROM epos_sales_summaries e
+        INNER JOIN brn_stock_snapshots b ON 
+          CASE 
+            WHEN e.item_code REGEXP '[A-Z]' THEN 
+              SUBSTRING(e.item_code, 1, 
+                CASE 
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code 
+          END = b.sage_code
+        WHERE b.category IS NOT NULL 
+          AND b.category != '' 
+          AND TRIM(b.category) != ''
+        GROUP BY b.category
+        ORDER BY b.category ASC
+      `);
+      
+      logger.app.info(`Found ${categoriesData.length} categories with EPOS sales data`);
+      logger.debug('Categories data:', categoriesData);
+      
+      // Add "All Categories" option at the beginning (similar to suppliers)
+      const allOptions = [
+        { categoryName: 'All Categories', recordCount: 0 },
+        ...categoriesData
+      ];
+      
+      res.json(allOptions);
+      
+    } catch (error) {
+      logger.app.error('Error fetching categories from BRN/EPOS data:', error);
+      res.status(500).json({ message: 'Failed to fetch categories', error: error.message });
+    }
+  });
+
+  // Get item codes for autocomplete
+  app.get('/api/epos-sales/item-codes', async (req, res) => {
+    try {
+      const { search = '', limit = 20 } = req.query;
+
+      logger.app.info(`Fetching item codes for autocomplete`, { search, limit });
+
+      // Build SQL for searching item codes with descriptions using Drizzle
+      let whereConditions = [];
+
+      if (search && search !== '') {
+        // SECURITY: Sanitize search term and use parameterized queries to prevent SQL injection
+        const searchTerm = (search as string).trim().replace(/[%_\\]/g, '\\$&');
+        if (searchTerm.length > 0) {
+          whereConditions.push(
+            or(
+              eq(eposSalesSummaries.itemCode, searchTerm),
+              like(eposSalesSummaries.itemCode, `${searchTerm}%`),
+              like(eposSalesSummaries.description, `%${searchTerm}%`)
+            )
+          );
+        }
+      }
+
+      const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+      const [itemCodes] = await db.execute(sql`
+        SELECT DISTINCT
+          ${eposSalesSummaries.itemCode} as itemCode,
+          ${eposSalesSummaries.description} as description,
+          COUNT(*) as recordCount,
+          MAX(${eposSalesSummaries.reportDate}) as latestSale,
+          AVG(${eposSalesSummaries.totalNet}) as avgSalesValue
+        FROM ${eposSalesSummaries}
+        ${whereClause ? sql`WHERE ${whereClause}` : sql``}
+        GROUP BY ${eposSalesSummaries.itemCode}, ${eposSalesSummaries.description}
+        ORDER BY
+          CASE WHEN ${eposSalesSummaries.itemCode} = ${search as string} THEN 1 ELSE 2 END,
+          recordCount DESC,
+          ${eposSalesSummaries.itemCode} ASC
+        LIMIT ${parseInt(limit as string)}
+      `);
+
+      res.json(itemCodes);
+
+    } catch (error) {
+      logger.app.error('Error fetching item codes for autocomplete:', error);
+      res.status(500).json({ message: 'Failed to fetch item codes', error: error.message });
+    }
+  });
+
+  // Debug endpoint to check data availability in tables
+  app.get('/api/epos-sales/debug/data-check', async (req, res) => {
+    try {
+      logger.app.info('Running data availability check');
+      
+      // Check EPOS sales summaries count
+      const [eposCount] = await db.execute(sql`SELECT COUNT(*) as count FROM epos_sales_summaries`);
+      
+      // Check product profiles count
+      const [profilesCount] = await db.execute(sql`SELECT COUNT(*) as count FROM product_profiles`);
+      
+      // Check BRN stock snapshots count
+      const [brnCount] = await db.execute(sql`SELECT COUNT(*) as count FROM brn_stock_snapshots`);
+      
+      // Check suppliers in product profiles
+      const [suppliersInProfiles] = await db.execute(sql`
+        SELECT COUNT(DISTINCT supplier) as count 
+        FROM product_profiles 
+        WHERE supplier IS NOT NULL AND supplier != ''
+      `);
+      
+      // Check categories in BRN data
+      const [categoriesInBrn] = await db.execute(sql`
+        SELECT COUNT(DISTINCT category) as count 
+        FROM brn_stock_snapshots 
+        WHERE category IS NOT NULL AND category != '' AND TRIM(category) != ''
+      `);
+      
+      // Check JOIN results with fixed base item code extraction
+      const [joinedSuppliers] = await db.execute(sql`
+        SELECT COUNT(DISTINCT p.supplier) as count
+        FROM epos_sales_summaries e
+        LEFT JOIN product_profiles p ON 
+          CASE 
+            WHEN e.item_code REGEXP '[A-Z]' THEN 
+              SUBSTRING(e.item_code, 1, 
+                CASE 
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code 
+          END = p.item_code
+        WHERE p.supplier IS NOT NULL AND p.supplier != ''
+      `);
+      
+      const [joinedCategories] = await db.execute(sql`
+        SELECT COUNT(DISTINCT b.category) as count
+        FROM epos_sales_summaries e
+        INNER JOIN brn_stock_snapshots b ON 
+          CASE 
+            WHEN e.item_code REGEXP '[A-Z]' THEN 
+              SUBSTRING(e.item_code, 1, 
+                CASE 
+                  WHEN LOCATE('C', e.item_code) > 0 THEN LOCATE('C', e.item_code) - 1
+                  WHEN LOCATE('S', e.item_code) > 0 THEN LOCATE('S', e.item_code) - 1  
+                  WHEN LOCATE('P', e.item_code) > 0 THEN LOCATE('P', e.item_code) - 1
+                  ELSE LENGTH(e.item_code)
+                END
+              )
+            ELSE e.item_code 
+          END = b.sage_code
+        WHERE b.category IS NOT NULL AND b.category != '' AND TRIM(b.category) != ''
+      `);
+      
+      const debugInfo = {
+        tables: {
+          epos_sales_summaries: eposCount[0]?.count || 0,
+          product_profiles: profilesCount[0]?.count || 0,
+          brn_stock_snapshots: brnCount[0]?.count || 0
+        },
+        data_quality: {
+          suppliers_in_profiles: suppliersInProfiles[0]?.count || 0,
+          categories_in_brn: categoriesInBrn[0]?.count || 0,
+          joined_suppliers: joinedSuppliers[0]?.count || 0,
+          joined_categories: joinedCategories[0]?.count || 0
+        }
+      };
+      
+      logger.app.info('Data availability check results:', debugInfo);
+      res.json(debugInfo);
+      
+    } catch (error) {
+      logger.app.error('Error in data availability check:', error);
+      res.status(500).json({ message: 'Failed to check data availability', error: error.message });
+    }
+  });
+
+  // Debug endpoint to check item code patterns
+  app.get('/api/epos-sales/debug/item-codes', async (req, res) => {
+    try {
+      logger.app.info('Checking item code patterns');
+      
+      // Sample EPOS item codes
+      const [eposSample] = await db.execute(sql`
+        SELECT DISTINCT item_code 
+        FROM epos_sales_summaries 
+        ORDER BY item_code 
+        LIMIT 20
+      `);
+      
+      // Sample BRN sage codes
+      const [brnSample] = await db.execute(sql`
+        SELECT DISTINCT sage_code 
+        FROM brn_stock_snapshots 
+        ORDER BY sage_code 
+        LIMIT 20
+      `);
+      
+      // Sample product profile item codes
+      const [profilesSample] = await db.execute(sql`
+        SELECT DISTINCT item_code 
+        FROM product_profiles 
+        ORDER BY item_code 
+        LIMIT 20
+      `);
+      
+      const patterns = {
+        epos_item_codes: eposSample.map(row => row.item_code),
+        brn_sage_codes: brnSample.map(row => row.sage_code),
+        profile_item_codes: profilesSample.map(row => row.item_code)
+      };
+      
+      logger.app.info('Item code patterns:', patterns);
+      res.json(patterns);
+      
+    } catch (error) {
+      logger.app.error('Error checking item code patterns:', error);
+      res.status(500).json({ message: 'Failed to check item code patterns', error: error.message });
+    }
+  });
+
+  // Debug endpoint to check BRN snapshot duplication
+  app.get('/api/epos-sales/debug/brn-duplication', async (req, res) => {
+    try {
+      logger.app.info('Checking BRN snapshot duplication for specific items');
+      
+      // Check how many snapshots exist for sample items
+      const [brnDuplication] = await db.execute(sql`
+        SELECT 
+          sage_code,
+          COUNT(*) as snapshot_count,
+          COUNT(DISTINCT snapshot_date) as unique_dates,
+          MIN(snapshot_date) as first_seen,
+          MAX(snapshot_date) as last_seen
+        FROM brn_stock_snapshots 
+        WHERE sage_code IN ('67', '208', '10033', '100', '1')
+        GROUP BY sage_code
+        ORDER BY snapshot_count DESC
+      `);
+      
+      // Check recent BRN snapshot dates
+      const [recentSnapshots] = await db.execute(sql`
+        SELECT DISTINCT snapshot_date, COUNT(*) as item_count
+        FROM brn_stock_snapshots 
+        GROUP BY snapshot_date 
+        ORDER BY snapshot_date DESC 
+        LIMIT 10
+      `);
+      
+      const duplicationInfo = {
+        sample_items: brnDuplication,
+        recent_snapshots: recentSnapshots,
+        total_brn_records: await db.execute(sql`SELECT COUNT(*) as count FROM brn_stock_snapshots`)
+      };
+      
+      logger.app.info('BRN duplication analysis:', duplicationInfo);
+      res.json(duplicationInfo);
+      
+    } catch (error) {
+      logger.app.error('Error checking BRN duplication:', error);
+      res.status(500).json({ message: 'Failed to check BRN duplication', error: error.message });
+    }
+  });
+}

@@ -1,0 +1,25 @@
+-- Migration: Add Product Image Management
+-- Feature: 025-product-image-management
+-- Date: 2025-10-07
+-- Description: Add image management columns to product_profiles table
+
+-- Add image management columns to product_profiles table
+ALTER TABLE product_profiles
+  ADD COLUMN primary_image_path VARCHAR(500) NULL
+    COMMENT 'Relative path to primary product image',
+  ADD COLUMN image_metadata JSON NOT NULL DEFAULT '[]'
+    COMMENT 'JSON array of product images (max 5)',
+  ADD COLUMN image_count INT NOT NULL DEFAULT 0
+    COMMENT 'Total number of images (0-5)',
+  ADD COLUMN last_image_updated TIMESTAMP NULL
+    COMMENT 'Last image operation timestamp';
+
+-- Add index for queries filtering by image existence
+CREATE INDEX idx_product_profiles_has_images
+  ON product_profiles(image_count)
+  WHERE image_count > 0;
+
+-- Add check constraint for image count range (MySQL 8.0+)
+ALTER TABLE product_profiles
+  ADD CONSTRAINT chk_image_count_range
+  CHECK (image_count >= 0 AND image_count <= 5);

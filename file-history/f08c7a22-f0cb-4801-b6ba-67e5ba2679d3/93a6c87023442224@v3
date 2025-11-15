@@ -1,0 +1,208 @@
+# Feature Specification: Sales Analytics Data Access Enhancement
+
+**Feature Branch**: `027-fix-sales-analytics`
+**Created**: 2025-10-10
+**Status**: Draft
+**Input**: User description: "Fix Sales Analytics record limit and server-side filtering system. Sales Analytics page has a hardcoded 10,000 record limit, preventing users from viewing all sales data. Additionally, filters only work on loaded subset of data rather than querying the full database."
+
+## Execution Flow (main)
+```
+1. Parse user description from Input
+   � Identified: data access limitation, filtering inefficiency
+2. Extract key concepts from description
+   � Actors: Sales analysts, managers viewing sales data
+   � Actions: View sales records, apply filters, adjust visible record count
+   � Data: EPOS sales records, product details, supplier info
+   � Constraints: Performance, browser memory limits
+3. For each unclear aspect:
+   � None - requirements are clear from user input
+4. Fill User Scenarios & Testing section
+   � User flow: Navigate to Sales Analytics � Select filters � Choose record limit � View results
+5. Generate Functional Requirements
+   � Each requirement is testable via UI/API verification
+6. Identify Key Entities
+   � EPOS Sales Record, Filter Criteria, Result Metadata
+7. Run Review Checklist
+   � No implementation details in spec
+   � All requirements testable
+8. Return: SUCCESS (spec ready for planning)
+```
+
+---
+
+## � Quick Guidelines
+-  Focus on WHAT users need and WHY
+- L Avoid HOW to implement (no tech stack, APIs, code structure)
+- =e Written for business stakeholders, not developers
+
+---
+
+## User Scenarios & Testing *(mandatory)*
+
+### Primary User Story
+As a sales analyst, I need to view and analyze all sales records from the EPOS system, not just a limited subset, so I can make accurate business decisions based on complete data. Currently, I can only see 10,000 records at a time, which prevents me from viewing all products when analyzing sales across long time periods or multiple categories.
+
+Additionally, when I apply filters (by date, supplier, category, or item code), I want the system to search through ALL available data in the database, not just the 10,000 records currently loaded in my browser.
+
+### Acceptance Scenarios
+
+**Scenario 1: User selects custom record limit**
+1. **Given** I am viewing the Sales Analytics Detailed Data tab
+2. **When** I select "25,000 records" from the "Records to Load" dropdown
+3. **Then** the system loads exactly 25,000 sales records
+4. **And** displays "Showing 25,000 of [total] records"
+
+**Scenario 2: User applies filter to full dataset**
+1. **Given** the database contains 50,000 total sales records
+2. **And** only 10,000 records are currently loaded
+3. **When** I filter by Item Code "12345"
+4. **Then** the system searches all 50,000 records in the database
+5. **And** displays all matching records up to my selected limit
+6. **And** shows "Showing X of Y total records (filtered)"
+
+**Scenario 3: User loads large dataset with warning**
+1. **Given** I am viewing sales data with current limit of 10,000
+2. **When** I select "50,000 records" from the dropdown
+3. **Then** the system shows warning "� Loading large datasets may impact browser performance"
+4. **And** continues to load after I acknowledge
+5. **And** displays a loading spinner during data fetch
+
+**Scenario 4: User attempts to load all records**
+1. **Given** filters indicate 75,000 total matching records
+2. **When** I select "All Records" option
+3. **Then** system shows confirmation dialog stating "This may load 75,000 records. Continue?"
+4. **When** I confirm
+5. **Then** system loads all records up to maximum safety cap
+6. **And** displays accurate count
+
+**Scenario 5: Server-side filtering with multiple criteria**
+1. **Given** I set Start Date to "2024-01-01" and End Date to "2024-12-31"
+2. **And** I select Supplier "ABC Distributors"
+3. **And** I select Category "Beverages"
+4. **When** filters are applied
+5. **Then** system queries database with all three criteria
+6. **And** counts total matching records
+7. **And** displays "Showing [limit] of [total count] records (filtered)"
+
+**Scenario 6: Performance safeguard - maximum cap exceeded**
+1. **Given** a filter query matches 150,000 records
+2. **When** user selects "All Records"
+3. **Then** system loads maximum 100,000 records
+4. **And** displays warning "Results limited to 100,000 records for performance. Please refine your filters."
+
+### Edge Cases
+- **What happens when filter yields zero results?** Display "No records match your filters (0 of [total] available records)"
+- **What happens when user rapidly changes record limit?** Cancel previous request, only load most recent selection
+- **What happens when database is very slow?** Show loading spinner, allow user to cancel request
+- **What happens when applying filters while data is loading?** Cancel current load, apply filters and reload
+- **What happens if user's browser runs out of memory?** System should respect maximum caps to prevent this
+- **What happens with conflicting filter combinations?** Apply all filters as AND conditions (all must match)
+
+---
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+#### Configurable Record Limits
+- **FR-001**: System MUST provide a "Records to Load" selector with options: 1,000 | 5,000 | 10,000 | 25,000 | 50,000 | All Records
+- **FR-002**: Default selection MUST be 10,000 records to maintain current user experience
+- **FR-003**: System MUST remember user's limit selection within the current session (not across browser restarts)
+- **FR-004**: When user changes limit, system MUST refetch data with new limit applied
+- **FR-005**: System MUST display current limit in the record count indicator (e.g., "10,000 records loaded")
+
+#### Server-Side Filtering
+- **FR-006**: All filters (Item Code, Category, Supplier, Start Date, End Date, Report Date) MUST query the full database, not just client-loaded records
+- **FR-007**: System MUST apply filters FIRST before applying record limit
+- **FR-008**: System MUST count total matching records before limit is applied
+- **FR-009**: System MUST display both loaded count and total count: "Showing X of Y total records"
+- **FR-010**: When filters are active, display MUST indicate filtered state: "Showing X of Y total records (filtered)"
+- **FR-011**: System MUST support combining multiple filters simultaneously (date range + supplier + category + item code)
+
+#### Performance & Safety
+- **FR-012**: When user selects limit >25,000, system MUST show warning: "� Loading large datasets may impact browser performance"
+- **FR-013**: When user selects "All Records", system MUST show confirmation dialog with estimated record count: "This may load [count] records. Continue?"
+- **FR-014**: System MUST display loading spinner during data fetch operations
+- **FR-015**: System MUST enforce maximum safety cap of 100,000 records regardless of user selection
+- **FR-016**: When safety cap is exceeded, system MUST display error: "Results limited to 100,000 records for performance. Please refine your filters."
+
+#### User Experience
+- **FR-017**: System MUST show clear visual indication when data is truncated due to limit (e.g., "Showing first 10,000 of 45,000 records")
+- **FR-018**: System MUST provide "Load More" button as alternative to changing limit dropdown
+- **FR-019**: "Load More" button MUST append next batch of records (incremental loading)
+- **FR-020**: Record count indicator MUST update immediately when limit changes
+- **FR-021**: System MUST allow users to cancel slow-loading requests
+- **FR-022**: System MUST preserve existing sort functionality (sort by column, ascending/descending)
+
+#### Data Accuracy
+- **FR-023**: Total count MUST accurately reflect actual database records matching current filters
+- **FR-024**: System MUST update total count when filters change
+- **FR-025**: Loaded record count MUST match the selected limit (unless total is less than limit)
+- **FR-026**: System MUST display accurate "has more records" indicator when truncated
+
+#### Testing & Verification
+- **FR-027**: System MUST be verified with Playwright E2E tests covering all limit options
+- **FR-028**: Tests MUST verify server-side filtering by comparing results with direct database queries
+- **FR-029**: Tests MUST verify total count accuracy across different filter combinations
+- **FR-030**: Tests MUST verify performance warnings display at correct thresholds
+- **FR-031**: Tests MUST verify "All Records" confirmation dialog behavior
+- **FR-032**: Tests MUST cover datasets of varying sizes: 100, 1,000, 10,000, 50,000+ records
+
+#### Backward Compatibility
+- **FR-033**: System MUST maintain existing caching behavior for performance optimization
+- **FR-034**: Existing filter controls MUST continue to function unchanged
+- **FR-035**: Current sort functionality MUST remain operational
+- **FR-036**: No breaking changes to existing Sales Analytics features
+
+### Key Entities
+
+- **Sales Record**: Individual EPOS sales transaction entry with item details, pricing, quantities, dates, supplier, and category information
+- **Filter Criteria**: User-defined parameters for narrowing sales data (date ranges, item codes, suppliers, categories)
+- **Result Metadata**: Information about query results including total matching records, current limit, loaded count, and whether more records exist
+- **Record Limit Configuration**: User's selected maximum number of records to load (1K, 5K, 10K, 25K, 50K, or All)
+
+---
+
+## Review & Acceptance Checklist
+
+### Content Quality
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+### Requirement Completeness
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+---
+
+## Execution Status
+
+- [x] User description parsed
+- [x] Key concepts extracted
+- [x] Ambiguities marked (none found)
+- [x] User scenarios defined
+- [x] Requirements generated (36 functional requirements)
+- [x] Entities identified
+- [x] Review checklist passed
+
+---
+
+## Success Criteria
+
+The feature is considered successfully implemented when:
+
+1.  Users can select from 6 different record limit options (1K, 5K, 10K, 25K, 50K, All)
+2.  All filters query the full database, not just loaded records
+3.  System displays accurate total count: "Showing X of Y total records"
+4.  Performance warnings appear when selecting >25K records
+5.  Confirmation dialog appears when selecting "All Records"
+6.  Safety cap prevents loading more than 100K records
+7.  All functionality verified by passing Playwright E2E test suite
+8.  No breaking changes to existing Sales Analytics features
+9.  Users can analyze complete datasets without arbitrary 10K limit
+10.  System remains performant and responsive even with large datasets

@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create favicon.ico file in public directory",
+    "status": "completed",
+    "priority": "high",
+    "id": "favicon"
+  },
+  {
+    "content": "Create robots.txt file allowing all crawlers",
+    "status": "completed",
+    "priority": "high",
+    "id": "robots"
+  },
+  {
+    "content": "Create sitemap.xml with main routes",
+    "status": "completed",
+    "priority": "high",
+    "id": "sitemap"
+  },
+  {
+    "content": "Create manifest.json for PWA with Task OS tactical theme",
+    "status": "completed",
+    "priority": "high",
+    "id": "manifest"
+  },
+  {
+    "content": "Create additional logo PNG files if needed",
+    "status": "completed",
+    "priority": "medium",
+    "id": "logo"
+  }
+]

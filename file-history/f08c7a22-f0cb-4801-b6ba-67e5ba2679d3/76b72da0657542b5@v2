@@ -1,0 +1,280 @@
+import { useState, Suspense } from "react";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { DashboardSkeleton } from "@/components/ui/loading-states";
+import { FallbackLayout } from "@/components/ui/fallback-layouts";
+import { useError } from "@/contexts/error-context";
+import Sidebar from "@/components/dashboard/sidebar";
+import DashboardOverview from "@/components/dashboard/dashboard-overview";
+import DataUpload from "@/components/dashboard/data-upload";
+import SalesAnalytics from "@/components/dashboard/sales-analytics";
+import StockControl from "@/components/dashboard/stock-control";
+import WasteManagement from "@/components/dashboard/waste-management";
+import ExpiryTracking from "@/components/dashboard/expiry-tracking";
+import TasksHandover from "@/components/dashboard/tasks-handover";
+import Reports from "@/components/dashboard/reports";
+import StockProfiles from "@/components/dashboard/stock-profiles";
+import SalesAggregation from "@/components/dashboard/sales-aggregation";
+import { CaseSizeManagement } from "@/components/dashboard/case-size-management";
+import { StockOrdering } from "@/components/dashboard/stock-ordering";
+import SettingsLayout from "@/components/dashboard/settings-layout";
+import Documentation from "@/components/dashboard/documentation";
+import BBDDashboard from "@/components/dashboard/bbd-dashboard";
+import { SupplierProfiles } from "@/components/supplier-profiles";
+import { DemoComponent } from "@/dev-tools/demo-component";
+
+export type DashboardTab = 'dashboard' | 'upload' | 'sales' | 'stock' | 'stock-ordering' | 'case-sizes' | 'waste' | 'expiry' | 'tasks' | 'reports' | 'stock-profiles' | 'supplier-profiles' | 'sales-aggregation' | 'settings' | 'documentation' | 'bbd-dashboard' | 'widget-dashboards' | 'widget-builder' | 'widget-templates' | 'devtools-demo';
+
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
+  // Start with sidebar closed on small screens to avoid full-screen overlay
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  const handleNavigate = (tab: string) => {
+    setActiveTab(tab as DashboardTab);
+  };
+
+  const renderContent = () => {
+    const ComponentErrorFallback = ({ error, retry }: { error: Error; retry: () => void }) => (
+      <FallbackLayout
+        type="generic"
+        title="Component Error"
+        message={`${activeTab} component failed to load: ${error.message}`}
+        onRetry={retry}
+        onReload={() => window.location.reload()}
+        showTroubleshooting={true}
+      />
+    );
+
+    const ComponentWrapper = ({ children }: { children: React.ReactNode }) => (
+      <ErrorBoundary fallback={<ComponentErrorFallback error={new Error('Component failed')} retry={() => {}} />}>
+        <Suspense fallback={<DashboardSkeleton showSidebar={false} />}>
+          {children}
+        </Suspense>
+      </ErrorBoundary>
+    );
+
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <ComponentWrapper>
+            <DashboardOverview onNavigate={handleNavigate} />
+          </ComponentWrapper>
+        );
+      case 'upload':
+        return (
+          <ComponentWrapper>
+            <DataUpload />
+          </ComponentWrapper>
+        );
+      case 'sales':
+        return (
+          <ComponentWrapper>
+            <SalesAnalytics />
+          </ComponentWrapper>
+        );
+      case 'stock':
+        return (
+          <ComponentWrapper>
+            <StockControl />
+          </ComponentWrapper>
+        );
+      case 'stock-ordering':
+        return (
+          <ComponentWrapper>
+            <StockOrdering />
+          </ComponentWrapper>
+        );
+      case 'case-sizes':
+        return (
+          <ComponentWrapper>
+            <CaseSizeManagement />
+          </ComponentWrapper>
+        );
+      case 'waste':
+        return (
+          <ComponentWrapper>
+            <WasteManagement />
+          </ComponentWrapper>
+        );
+      case 'expiry':
+        return (
+          <ComponentWrapper>
+            <BBDDashboard />
+          </ComponentWrapper>
+        );
+      case 'tasks':
+        return (
+          <ComponentWrapper>
+            <TasksHandover />
+          </ComponentWrapper>
+        );
+      case 'reports':
+        return (
+          <ComponentWrapper>
+            <Reports />
+          </ComponentWrapper>
+        );
+      case 'stock-profiles':
+        return (
+          <ComponentWrapper>
+            <StockProfiles />
+          </ComponentWrapper>
+        );
+      case 'supplier-profiles':
+        return (
+          <ComponentWrapper>
+            <SupplierProfiles />
+          </ComponentWrapper>
+        );
+      case 'sales-aggregation':
+        return (
+          <ComponentWrapper>
+            <SalesAggregation />
+          </ComponentWrapper>
+        );
+      case 'settings':
+        return (
+          <ComponentWrapper>
+            <SettingsLayout />
+          </ComponentWrapper>
+        );
+      case 'documentation':
+        return (
+          <ComponentWrapper>
+            <Documentation />
+          </ComponentWrapper>
+        );
+      case 'bbd-dashboard':
+        return (
+          <ComponentWrapper>
+            <BBDDashboard />
+          </ComponentWrapper>
+        );
+      case 'devtools-demo':
+        return (
+          <ComponentWrapper>
+            {process.env.NODE_ENV === 'development' ? <DemoComponent /> : <DashboardOverview onNavigate={handleNavigate} />}
+          </ComponentWrapper>
+        );
+      default:
+        return (
+          <ComponentWrapper>
+            <DashboardOverview onNavigate={handleNavigate} />
+          </ComponentWrapper>
+        );
+    }
+  };
+
+  const getPageInfo = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return { title: 'Dashboard Overview', subtitle: 'Monitor your store performance and key metrics' };
+      case 'upload':
+        return { title: 'Data Upload', subtitle: 'Upload sales, stock, and waste data files' };
+      case 'sales':
+        return { title: 'Sales Analytics', subtitle: 'Analyse sales performance and trends' };
+      case 'stock':
+        return { title: 'Stock Control', subtitle: 'Monitor inventory levels and generate orders' };
+      case 'stock-ordering':
+        return { title: 'Stock Ordering', subtitle: 'Generate intelligent stock orders based on sales data' };
+      case 'case-sizes':
+        return { title: 'Case Size Management', subtitle: 'Manage product case sizes and packaging information' };
+      case 'waste':
+        return { title: 'Waste Management', subtitle: 'Track and analyse waste patterns' };
+      case 'expiry':
+        return { title: 'Expiry Management', subtitle: 'Comprehensive expiry tracking: BBD scanning, manual entries, and analytics' };
+      case 'tasks':
+        return { title: 'Tasks & Handover', subtitle: 'Manage team tasks and shift handovers' };
+      case 'reports':
+        return { title: 'Reports', subtitle: 'Generate and schedule automated reports' };
+      case 'stock-profiles':
+        return { title: 'Stock Profiles', subtitle: 'Monitor inventory levels and generate orders' };
+      case 'supplier-profiles':
+        return { title: 'Supplier Profiles', subtitle: 'Manage supplier business rules, contacts, and delivery settings' };
+      case 'sales-aggregation':
+        return { title: 'Sales Aggregation', subtitle: 'Consolidate sales data across item variants' };
+      case 'settings':
+        return { title: 'Settings', subtitle: 'System configuration and color palette reference' };
+      case 'documentation':
+        return { title: 'API Documentation', subtitle: 'Complete API reference and data flow documentation' };
+      case 'bbd-dashboard':
+        return { title: 'Expiry Management', subtitle: 'Comprehensive expiry tracking: BBD scanning, manual entries, and analytics' };
+      case 'devtools-demo':
+        return { title: '🛠️ DevTools Demo', subtitle: 'Development-only component showcasing API dependency tracking' };
+      default:
+        return { title: 'Dashboard Overview', subtitle: 'Monitor your store performance and key metrics' };
+    }
+  };
+
+  const pageInfo = getPageInfo();
+
+  return (
+    <div className="h-screen flex bg-background">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed lg:relative lg:translate-x-0
+        z-50 lg:z-auto
+        transition-transform duration-300 ease-in-out
+      `}>
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 h-screen flex flex-col bg-background min-w-0">
+        {/* Top Bar */}
+        <header className="bg-background shadow-sm border-b border-gray-800 px-4 sm:px-6" style={{paddingTop: '20px', paddingBottom: '20px'}}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-md hover:bg-muted transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl sm:text-2xl font-semibold text-primary truncate">{pageInfo.title}</h2>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">{pageInfo.subtitle}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+              {/* Quick Upload Button */}
+              <button
+                onClick={() => setActiveTab('upload')}
+                className="bg-primary hover:bg-primary/90 text-black font-bold px-2 sm:px-4 py-2 flex items-center space-x-1 sm:space-x-2 transition-colors quick-upload-btn text-xs sm:text-sm"
+              >
+                <span>+</span>
+                <span className="hidden sm:inline">Quick Upload</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6">
+          {renderContent()}
+        </div>
+      </main>
+    </div>
+  );
+}

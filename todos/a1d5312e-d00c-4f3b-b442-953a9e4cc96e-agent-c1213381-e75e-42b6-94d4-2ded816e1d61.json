@@ -1,0 +1,56 @@
+[
+  {
+    "content": "Research WordPress 6.8.1 features, security updates, and tutoring platform requirements",
+    "status": "completed",
+    "priority": "high",
+    "id": "research-wp-6.8.1"
+  },
+  {
+    "content": "Research custom post types for tutoring services, tutors, testimonials, and bookings",
+    "status": "completed",
+    "priority": "high",
+    "id": "custom-post-types"
+  },
+  {
+    "content": "Research Gutenberg blocks development and customization for tutoring platform",
+    "status": "completed",
+    "priority": "high",
+    "id": "gutenberg-blocks"
+  },
+  {
+    "content": "Research security best practices and GDPR compliance for student data",
+    "status": "completed",
+    "priority": "high",
+    "id": "security-gdpr"
+  },
+  {
+    "content": "Research performance optimization and REST API integration patterns",
+    "status": "completed",
+    "priority": "high",
+    "id": "performance-api"
+  },
+  {
+    "content": "Research theme/plugin development best practices and user role management",
+    "status": "completed",
+    "priority": "high",
+    "id": "theme-plugin-dev"
+  },
+  {
+    "content": "Research payment gateway integration and multi-site considerations",
+    "status": "completed",
+    "priority": "high",
+    "id": "payments-multisite"
+  },
+  {
+    "content": "Research testing strategies and common pitfalls for WordPress tutoring platforms",
+    "status": "completed",
+    "priority": "high",
+    "id": "testing-strategies"
+  },
+  {
+    "content": "Compile comprehensive reference guide with checklists and code examples",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "compile-reference"
+  }
+]

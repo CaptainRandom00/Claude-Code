@@ -1,0 +1,104 @@
+/**
+ * Widget Dashboard Layout
+ * Feature: 028-build-a-widget
+ *
+ * Wrapper layout that adds sidebar and header to widget dashboard pages
+ */
+
+import { useState } from 'react';
+import { useLocation } from 'wouter';
+import Sidebar from '@/components/dashboard/sidebar';
+import type { DashboardTab } from '@/pages/dashboard';
+import { Button } from '@/components/ui/button';
+import { Menu } from 'lucide-react';
+
+interface WidgetDashboardLayoutProps {
+  children: React.ReactNode;
+}
+
+export function WidgetDashboardLayout({ children }: WidgetDashboardLayoutProps) {
+  const [location, setLocation] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  // Determine active tab based on current path
+  const getActiveTab = (): DashboardTab => {
+    if (location.startsWith('/dashboards/builder')) return 'widget-builder';
+    if (location.startsWith('/dashboards/templates')) return 'widget-templates';
+    if (location.startsWith('/dashboards/')) return 'widget-dashboards';
+    return 'dashboard';
+  };
+
+  const handleTabChange = (tab: DashboardTab) => {
+    // Navigate to the appropriate route based on the selected tab
+    switch (tab) {
+      case 'widget-dashboards':
+        setLocation('/dashboards/1');
+        break;
+      case 'widget-builder':
+        setLocation('/dashboards/builder');
+        break;
+      case 'widget-templates':
+        setLocation('/dashboards/templates');
+        break;
+      case 'dashboard':
+        setLocation('/');
+        break;
+      default:
+        // For other tabs, navigate to main dashboard with tab parameter
+        setLocation('/');
+        break;
+    }
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Desktop Sidebar */}
+      <div className={`hidden lg:block ${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300`}>
+        <Sidebar
+          activeTab={getActiveTab()}
+          onTabChange={handleTabChange}
+          isOpen={sidebarOpen}
+        />
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setSidebarOpen(false)}>
+          <div className="w-64" onClick={(e) => e.stopPropagation()}>
+            <Sidebar
+              activeTab={getActiveTab()}
+              onTabChange={handleTabChange}
+              isOpen={sidebarOpen}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="h-14 border-b bg-card px-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-semibold">Widget Dashboards</h1>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

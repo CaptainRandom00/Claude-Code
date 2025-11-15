@@ -1,0 +1,265 @@
+/**
+ * Widget Configurator Component
+ * Feature: 028-build-a-widget (User Story 3 - T065)
+ *
+ * Orchestrates API picker, calculation builder, and preview panel
+ * for visual widget configuration
+ */
+
+import { useState } from 'react';
+import { useLocation } from 'wouter';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, ChevronRight, ChevronLeft, Save } from 'lucide-react';
+import { ApiEndpointPicker } from './ApiEndpointPicker';
+import { CalculationBuilder, type CalculationConfig } from './CalculationBuilder';
+import { PreviewPanel } from './PreviewPanel';
+import type { ApiEndpoint } from '@/hooks/use-api-metadata';
+
+interface WidgetConfiguratorProps {
+  widgetType: string;
+  dashboardId?: number;
+  onCancel: () => void;
+}
+
+export function WidgetConfigurator({ widgetType, dashboardId, onCancel }: WidgetConfiguratorProps) {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+
+  // Configuration state
+  const [step, setStep] = useState(1); // 1: Data Source, 2: Calculation, 3: Preview & Save
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
+  const [calculationConfig, setCalculationConfig] = useState<CalculationConfig | null>(null);
+  const [widgetName, setWidgetName] = useState('');
+
+  // Save widget mutation
+  const saveWidgetMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedEndpoint || !calculationConfig) {
+        throw new Error('Configuration incomplete');
+      }
+
+      // Create widget definition
+      const widgetDefResponse = await fetch('/api/widgets/definitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          widgetType,
+          name: widgetName || `${widgetType} Widget`,
+          description: `${selectedEndpoint.endpointPath} - ${calculationConfig.aggregations[0]?.type}`,
+          apiEndpoint: selectedEndpoint.endpointPath,
+          httpMethod: selectedEndpoint.httpMethod,
+          calculationConfig,
+          visualizationConfig: {
+            label: widgetName || `${widgetType} Widget`,
+            format: { type: 'number' },
+          },
+          refreshInterval: 60000,
+          isSystem: false,
+          isActive: true,
+        }),
+      });
+
+      if (!widgetDefResponse.ok) {
+        throw new Error('Failed to create widget definition');
+      }
+
+      const widgetDef = await widgetDefResponse.json();
+
+      // If dashboard ID provided, add widget to dashboard
+      if (dashboardId) {
+        const addResponse = await fetch(`/api/widgets/dashboards/${dashboardId}/widgets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            widgetDefinitionId: widgetDef.id,
+            sortOrder: 0,
+          }),
+        });
+
+        if (!addResponse.ok) {
+          throw new Error('Failed to add widget to dashboard');
+        }
+      }
+
+      return widgetDef;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard', dashboardId] });
+      setLocation(`/dashboards/${dashboardId || 'builder'}`);
+    },
+  });
+
+  const canProceedToStep2 = selectedEndpoint !== null;
+  const canProceedToStep3 = calculationConfig !== null;
+  const canSave = widgetName.trim().length > 0 && selectedEndpoint && calculationConfig;
+
+  return (
+    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 overflow-auto" data-testid="data-source-configurator">
+      <div className="container max-w-6xl mx-auto p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold capitalize">{widgetType} Widget Configuration</h1>
+          <p className="text-muted-foreground mt-2">
+            Configure your widget's data source, calculations, and preview the results
+          </p>
+        </div>
+
+        {/* Step Indicator */}
+        <div className="flex items-center gap-4 mb-8">
+          {[
+            { num: 1, label: 'Data Source', active: step === 1 },
+            { num: 2, label: 'Calculation', active: step === 2 },
+            { num: 3, label: 'Preview & Save', active: step === 3 },
+          ].map((s, idx) => (
+            <div key={s.num} className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
+                    s.active
+                      ? 'bg-primary text-primary-foreground'
+                      : step > s.num
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                  data-testid={s.active ? 'config-step-data-source' : undefined}
+                >
+                  {s.num}
+                </div>
+                <span className={s.active ? 'font-semibold' : 'text-muted-foreground'}>
+                  {s.label}
+                </span>
+              </div>
+              {idx < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Configuration */}
+          <div className="space-y-6">
+            {/* Step 1: Data Source */}
+            {step === 1 && (
+              <ApiEndpointPicker
+                selectedEndpointId={selectedEndpoint?.id || null}
+                onEndpointSelect={setSelectedEndpoint}
+              />
+            )}
+
+            {/* Step 2: Calculation */}
+            {step === 2 && selectedEndpoint && (
+              <CalculationBuilder
+                availableFields={selectedEndpoint.availableFields}
+                onCalculationChange={setCalculationConfig}
+              />
+            )}
+
+            {/* Step 3: Name & Save */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">Widget Details</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Name your widget and save it to the dashboard
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="widget-name">Widget Name</Label>
+                  <Input
+                    id="widget-name"
+                    data-testid="widget-name-input"
+                    value={widgetName}
+                    onChange={(e) => setWidgetName(e.target.value)}
+                    placeholder="Enter widget name"
+                  />
+                </div>
+
+                <div className="p-4 bg-muted rounded-lg space-y-2">
+                  <p className="text-sm font-medium">Configuration Summary:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>Type: <span className="capitalize">{widgetType}</span></li>
+                    <li>Data: {selectedEndpoint?.endpointPath}</li>
+                    <li>Calculation: {calculationConfig?.aggregations[0]?.type}
+                      {calculationConfig?.aggregations[0]?.field && ` of ${calculationConfig.aggregations[0].field}`}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Preview */}
+          <div className="lg:sticky lg:top-6 h-fit">
+            {selectedEndpoint && calculationConfig && (
+              <PreviewPanel
+                apiEndpoint={selectedEndpoint.endpointPath}
+                calculationConfig={calculationConfig}
+                autoPreview={true}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Navigation Footer */}
+        <div className="flex items-center justify-between mt-8 pt-6 border-t">
+          <Button variant="outline" onClick={onCancel} data-testid="cancel-widget-button">
+            Cancel
+          </Button>
+
+          <div className="flex gap-2">
+            {step > 1 && (
+              <Button variant="outline" onClick={() => setStep(step - 1)}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            )}
+
+            {step < 3 && (
+              <Button
+                onClick={() => setStep(step + 1)}
+                disabled={step === 1 ? !canProceedToStep2 : !canProceedToStep3}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+
+            {step === 3 && (
+              <Button
+                onClick={() => saveWidgetMutation.mutate()}
+                disabled={!canSave || saveWidgetMutation.isPending}
+                data-testid="save-widget-button"
+              >
+                {saveWidgetMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Widget
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Success Message */}
+        {saveWidgetMutation.isSuccess && (
+          <div
+            className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
+            data-testid="widget-save-success"
+          >
+            Widget saved successfully!
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

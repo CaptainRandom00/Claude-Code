@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Check for CSS/styling files and Tailwind configuration",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine global styles and component styles",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check for build errors and missing dependencies",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Look for missing imports or broken style references in Industries component",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Verify Tailwind CSS classes are working properly",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

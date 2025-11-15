@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Validate blocker items CHK115-CHK120",
+    "status": "completed",
+    "activeForm": "Validating blocker items CHK115-CHK120"
+  },
+  {
+    "content": "Validate enhanced requirements CHK001-CHK025",
+    "status": "completed",
+    "activeForm": "Validating enhanced requirements CHK001-CHK025"
+  },
+  {
+    "content": "Validate design artifacts CHK026-CHK045",
+    "status": "completed",
+    "activeForm": "Validating design artifacts CHK026-CHK045"
+  },
+  {
+    "content": "Validate implementation plan CHK046-CHK055",
+    "status": "completed",
+    "activeForm": "Validating implementation plan CHK046-CHK055"
+  },
+  {
+    "content": "Validate edge cases and success criteria CHK056-CHK075",
+    "status": "completed",
+    "activeForm": "Validating edge cases and success criteria CHK056-CHK075"
+  },
+  {
+    "content": "Validate dependencies and non-functional requirements CHK076-CHK100",
+    "status": "completed",
+    "activeForm": "Validating dependencies and non-functional requirements CHK076-CHK100"
+  },
+  {
+    "content": "Validate traceability CHK101-CHK114",
+    "status": "completed",
+    "activeForm": "Validating traceability CHK101-CHK114"
+  },
+  {
+    "content": "Generate comprehensive validation report",
+    "status": "in_progress",
+    "activeForm": "Generating comprehensive validation report"
+  }
+]

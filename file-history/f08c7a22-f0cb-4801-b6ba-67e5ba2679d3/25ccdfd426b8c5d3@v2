@@ -1,0 +1,67 @@
+/**
+ * Widget Container Component
+ * Feature: 028-build-a-widget
+ *
+ * Base container for all widget types with error boundary, loading states, and refresh control
+ */
+
+import React from 'react';
+import { WidgetHeader } from './WidgetHeader';
+import { WidgetError } from './WidgetError';
+
+interface WidgetContainerProps {
+  widgetId: number;
+  title: string;
+  loading?: boolean;
+  error?: string | null;
+  lastFetched?: Date | null;
+  onRefresh?: () => void;
+  children: React.ReactNode;
+}
+
+export function WidgetContainer({
+  widgetId,
+  title,
+  loading = false,
+  error = null,
+  lastFetched = null,
+  onRefresh,
+  children,
+}: WidgetContainerProps) {
+  return (
+    <div
+      data-testid={`widget-${widgetId}`}
+      className="bg-card border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col"
+    >
+      {/* Widget Header */}
+      <WidgetHeader
+        title={title}
+        lastFetched={lastFetched}
+        onRefresh={onRefresh}
+        loading={loading}
+      />
+
+      {/* Widget Content */}
+      <div className="flex-1 p-4 overflow-auto">
+        {loading ? (
+          <div data-testid="widget-loading" className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-sm text-muted-foreground">Loading data...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <WidgetError
+            error={error}
+            lastFetched={lastFetched}
+            onRetry={onRefresh}
+          />
+        ) : (
+          <div data-testid="widget-content">
+            {children}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

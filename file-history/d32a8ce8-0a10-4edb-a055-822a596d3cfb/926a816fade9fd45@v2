@@ -1,0 +1,45 @@
+-- Migration: Create testimonials table
+-- Created: 2025-11-08
+
+CREATE TABLE IF NOT EXISTS testimonials (
+  id SERIAL PRIMARY KEY,
+  client_name VARCHAR(255) NOT NULL,
+  client_company VARCHAR(255) NOT NULL,
+  client_role VARCHAR(255),
+  client_photo VARCHAR(500),
+  quote TEXT NOT NULL,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  industry VARCHAR(100),
+  service_related VARCHAR(100), -- Which service this testimonial relates to
+  featured BOOLEAN DEFAULT false, -- Featured testimonials appear on homepage
+  display_order INTEGER DEFAULT 0, -- For manual ordering
+  published BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_testimonials_published ON testimonials(published, display_order);
+CREATE INDEX IF NOT EXISTS idx_testimonials_featured ON testimonials(featured, display_order);
+CREATE INDEX IF NOT EXISTS idx_testimonials_industry ON testimonials(industry);
+CREATE INDEX IF NOT EXISTS idx_testimonials_service ON testimonials(service_related);
+CREATE INDEX IF NOT EXISTS idx_testimonials_rating ON testimonials(rating DESC);
+
+-- Create trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_testimonials_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_testimonials_updated_at
+  BEFORE UPDATE ON testimonials
+  FOR EACH ROW
+  EXECUTE FUNCTION update_testimonials_updated_at();
+
+-- Add comment for documentation
+COMMENT ON TABLE testimonials IS 'Stores client testimonials and feedback';
+COMMENT ON COLUMN testimonials.featured IS 'Featured testimonials are displayed prominently on the homepage';
+COMMENT ON COLUMN testimonials.display_order IS 'Manual ordering for testimonial display (lower numbers appear first)';

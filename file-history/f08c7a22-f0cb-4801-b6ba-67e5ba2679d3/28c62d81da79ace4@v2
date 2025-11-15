@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+import { chromium } from 'playwright';
+
+async function test() {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  await page.goto('http://localhost:3000/dashboards/builder');
+  await page.waitForSelector('[data-testid="dashboard-builder"]');
+  await page.click('[data-testid="add-widget-button"]');
+  await page.waitForTimeout(500);
+  await page.click('[data-testid="widget-type-metric"]');
+  await page.waitForTimeout(2000);
+
+  // Check if element exists
+  const exists = await page.locator('[data-testid="data-source-configurator"]').count();
+  console.log('Element count:', exists);
+
+  if (exists > 0) {
+    // Get computed styles
+    const styles = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="data-source-configurator"]');
+      if (!el) return null;
+
+      const computed = window.getComputedStyle(el);
+      return {
+        display: computed.display,
+        visibility: computed.visibility,
+        opacity: computed.opacity,
+        zIndex: computed.zIndex,
+        position: computed.position,
+        backgroundColor: computed.backgroundColor,
+        color: computed.color,
+        width: computed.width,
+        height: computed.height,
+        top: computed.top,
+        left: computed.left,
+      };
+    });
+
+    console.log('Computed styles:', JSON.stringify(styles, null, 2));
+
+    // Check children
+    const childrenInfo = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="data-source-configurator"]');
+      if (!el) return null;
+
+      return {
+        childCount: el.children.length,
+        innerHTML: el.innerHTML.substring(0, 500),
+        textContent: el.textContent.substring(0, 200),
+      };
+    });
+
+    console.log('Children info:', childrenInfo);
+  }
+
+  await page.waitForTimeout(5000);
+  await browser.close();
+}
+
+test().catch(console.error);

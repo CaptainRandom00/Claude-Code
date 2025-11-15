@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create Puppeteer test script to check site accessibility and identify JavaScript errors",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Check WordPress error logs in wp-content/debug.log and theme directories",
+    "status": "pending",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Examine Docker container logs for WordPress and related services",
+    "status": "pending",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Test site accessibility for main pages (homepage, private tutoring, blog, admin)",
+    "status": "pending",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Check PHP/WordPress status for syntax errors, plugin conflicts, and database issues",
+    "status": "pending",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Compile comprehensive diagnostic report with findings and recommendations",
+    "status": "pending",
+    "priority": "medium",
+    "id": "6"
+  }
+]

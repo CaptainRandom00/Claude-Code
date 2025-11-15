@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Fix Frontend Service - restart Next.js on port 3000",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Verify Docker containers and restart failed services",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Unify backend configuration for production",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Configure single Playwright configuration for production",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Run comprehensive testing with Playwright and Puppeteer",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Validate production environment settings",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "content": "Install Playwright and required dependencies",
+    "status": "completed",
+    "activeForm": "Installing Playwright and required dependencies"
+  },
+  {
+    "content": "Run automated WordPress admin login test",
+    "status": "in_progress",
+    "activeForm": "Running automated WordPress admin login test"
+  },
+  {
+    "content": "Analyze current sidebar widget configuration",
+    "status": "pending",
+    "activeForm": "Analyzing current sidebar widget configuration"
+  },
+  {
+    "content": "Inventory all existing menus and their assignments",
+    "status": "pending",
+    "activeForm": "Inventorying all existing menus and their assignments"
+  },
+  {
+    "content": "Test sidebar menu placement functionality",
+    "status": "pending",
+    "activeForm": "Testing sidebar menu placement functionality"
+  },
+  {
+    "content": "Check The7 theme sidebar configuration options",
+    "status": "pending",
+    "activeForm": "Checking The7 theme sidebar configuration options"
+  },
+  {
+    "content": "Verify frontend sidebar display on key pages",
+    "status": "pending",
+    "activeForm": "Verifying frontend sidebar display on key pages"
+  },
+  {
+    "content": "Check Elementor template overrides affecting sidebars",
+    "status": "pending",
+    "activeForm": "Checking Elementor template overrides affecting sidebars"
+  },
+  {
+    "content": "Compile findings and recommendations report",
+    "status": "pending",
+    "activeForm": "Compiling findings and recommendations report"
+  }
+]

@@ -1,0 +1,515 @@
+# Quickstart Guide: Feature 029 - User Guide Documentation
+
+**Feature**: 029-complete-user-guide
+**Estimated Time**: 5 minutes to add a new feature guide
+**Difficulty**: Beginner
+
+## Overview
+
+This quickstart guide shows you how to add a new user guide for a feature in the BB Management System. Follow these steps to create a complete guide with screenshots and step-by-step instructions.
+
+## Prerequisites
+
+- Node.js and npm installed
+- Development server running (`npm run dev`)
+- Playwright installed for screenshot capture
+- Basic knowledge of React and TypeScript
+
+## Quick Start: Add a New Feature Guide
+
+### Step 1: Create Feature Guide Data (2 minutes)
+
+Create or update the feature guide data in the documentation component:
+
+```typescript
+// client/src/components/dashboard/documentation.tsx
+
+const salesAnalyticsGuide: FeatureGuide = {
+  id: 'sales-analytics',
+  title: 'Sales Analytics',
+  icon: 'BarChart3',
+  overview: {
+    description: 'Track product sales performance, trends, and patterns. View detailed sales data and analyze supplier performance.',
+    targetUsers: ['Store Managers', 'Business Analysts'],
+    benefits: [
+      'Track product sales trends over time',
+      'Identify top-performing products',
+      'Filter by date range and supplier'
+    ],
+    previewScreenshot: 'sales-analytics/01-overview.png'
+  },
+  gettingStarted: {
+    navigation: {
+      steps: [
+        "Click 'Sales Analytics' in the left sidebar",
+        "The sales table will load with recent data"
+      ],
+      screenshot: 'sales-analytics/01-navigation.png'
+    },
+    interfaceOverview: {
+      description: 'The interface consists of filters at the top and a data table below.',
+      screenshot: 'sales-analytics/02-interface.png',
+      keyElements: [
+        { name: 'Date Range Filter', description: 'Select start and end dates' },
+        { name: 'Table View', description: 'Sortable sales data table' }
+      ]
+    }
+  },
+  tasks: [
+    {
+      id: 'filter-by-date',
+      title: 'Filter Sales by Date Range',
+      difficulty: 'beginner',
+      estimatedTime: 2,
+      description: 'Learn how to filter sales data for a specific time period',
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Open Date Range Picker',
+          instructions: ['Click the Date Range button'],
+          screenshots: ['sales-analytics/03-date-picker.png'],
+          expectedResult: 'Calendar picker opens'
+        },
+        {
+          stepNumber: 2,
+          title: 'Select Dates',
+          instructions: ['Click start date', 'Click end date'],
+          screenshots: ['sales-analytics/04-select-dates.png'],
+          expectedResult: 'Table updates with filtered data'
+        }
+      ],
+      tips: ['Use dropdowns for faster navigation']
+    }
+  ],
+  metadata: {
+    difficulty: 'beginner',
+    estimatedReadTime: 5,
+    lastUpdated: '2025-10-19',
+    version: '1.0.0'
+  }
+};
+```
+
+### Step 2: Capture Screenshots (2 minutes)
+
+Create a capture task configuration:
+
+```typescript
+// scripts/capture-user-guide-screenshots.ts
+
+const captureTasks: CaptureTask[] = [
+  {
+    id: 'sales-01',
+    feature: 'sales-analytics',
+    step: 1,
+    description: 'overview',
+    url: '/dashboard?tab=sales',
+    viewport: 'desktop',
+    altText: 'Sales Analytics overview showing data table',
+    caption: 'Sales Analytics main interface'
+  },
+  {
+    id: 'sales-02',
+    feature: 'sales-analytics',
+    step: 2,
+    description: 'date-picker',
+    url: '/dashboard?tab=sales',
+    viewport: 'desktop',
+    actions: [
+      { type: 'click', selector: '[data-testid="date-range-button"]' },
+      { type: 'wait', duration: 300 }
+    ],
+    altText: 'Date range picker calendar open',
+    caption: 'Click Date Range button to open calendar'
+  }
+];
+```
+
+Run the capture script:
+
+```bash
+npm run capture-screenshots
+```
+
+### Step 3: Add to Documentation Component (1 minute)
+
+Import and add your guide to the User Guides section:
+
+```typescript
+// client/src/components/dashboard/documentation.tsx
+
+import { UserGuideSection } from './UserGuideSection';
+
+function renderUserGuides() {
+  const [selectedFeature, setSelectedFeature] = useState<FeatureId>('sales-analytics');
+
+  return (
+    <div className="space-y-6">
+      <FeatureSelector
+        features={allFeatureGuides}
+        selected={selectedFeature}
+        onSelect={setSelectedFeature}
+      />
+
+      <UserGuideSection
+        {...salesAnalyticsGuide}
+        onSectionChange={(section) => console.log('Section:', section)}
+        onTaskExpand={(taskId) => console.log('Task:', taskId)}
+      />
+    </div>
+  );
+}
+```
+
+## Complete Example: Widget Builder Guide
+
+Here's a complete example for the Widget Builder feature:
+
+```typescript
+const widgetBuilderGuide: FeatureGuide = {
+  id: 'widget-builder',
+  title: 'Widget Builder',
+  icon: 'Sparkles',
+  overview: {
+    description: 'Create custom widgets to display key metrics and visualizations. Build metric, table, and chart widgets with advanced calculations.',
+    targetUsers: ['Business Analysts', 'Dashboard Designers', 'Store Managers'],
+    benefits: [
+      'Create custom metrics from any data source',
+      'Build interactive charts and tables',
+      'Apply filters and calculations',
+      'Reuse widgets across dashboards'
+    ],
+    prerequisites: ['Data uploaded via Data Upload feature'],
+    previewScreenshot: 'widget-builder/01-overview.png'
+  },
+  gettingStarted: {
+    navigation: {
+      steps: [
+        "Click 'Widget Builder' in the sidebar",
+        "Click 'Create New Widget' button"
+      ],
+      screenshot: 'widget-builder/01-navigation.png'
+    },
+    interfaceOverview: {
+      description: 'The Widget Builder uses a step-by-step wizard: Data Source → Calculation → Preview → Save.',
+      screenshot: 'widget-builder/02-wizard.png',
+      keyElements: [
+        { name: 'Data Source Panel', description: 'Select API endpoint for widget data' },
+        { name: 'Calculation Builder', description: 'Configure aggregations and filters' },
+        { name: 'Preview Panel', description: 'See widget output in real-time' },
+        { name: 'Configuration Panel', description: 'Set formatting and display options' }
+      ]
+    }
+  },
+  tasks: [
+    {
+      id: 'create-metric-widget',
+      title: 'Create a Metric Widget',
+      difficulty: 'beginner',
+      estimatedTime: 5,
+      description: 'Build a simple metric widget showing total product count',
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Select Data Source',
+          instructions: [
+            'Click the Data Source dropdown',
+            'Select "Product Profiles" endpoint',
+            'Click Next'
+          ],
+          screenshots: ['widget-builder/03-select-source.png'],
+          expectedResult: 'Calculation step appears',
+          note: 'Data source determines available fields'
+        },
+        {
+          stepNumber: 2,
+          title: 'Configure Calculation',
+          instructions: [
+            'Select "Count" from aggregation dropdown',
+            'Leave field empty for total count',
+            'Click Next'
+          ],
+          screenshots: ['widget-builder/04-configure-calc.png'],
+          expectedResult: 'Preview shows calculated value'
+        },
+        {
+          stepNumber: 3,
+          title: 'Preview Widget',
+          instructions: [
+            'Review the calculated value',
+            'Check formatting options',
+            'Click Next to continue'
+          ],
+          screenshots: ['widget-builder/05-preview.png'],
+          expectedResult: 'Save step appears',
+          tips: 'Preview updates in real-time as you change settings'
+        },
+        {
+          stepNumber: 4,
+          title: 'Save Widget',
+          instructions: [
+            'Enter widget name: "Total Products"',
+            'Add optional description',
+            'Click "Save Widget"'
+          ],
+          screenshots: ['widget-builder/06-save.png'],
+          expectedResult: 'Success message, redirects to widget list',
+          note: 'Widget is now available for dashboards'
+        }
+      ],
+      tips: [
+        'Start with simple Count aggregations to learn the interface',
+        'Use Preview to verify calculations before saving',
+        'Give widgets descriptive names for easy identification'
+      ],
+      commonErrors: [
+        {
+          error: 'Preview shows "No data"',
+          solution: 'Ensure data source has records. Check Data Upload feature.'
+        },
+        {
+          error: 'Save button disabled',
+          solution: 'Widget name is required. Enter a name in the final step.'
+        }
+      ],
+      relatedTasks: ['create-chart-widget', 'add-filters']
+    },
+    {
+      id: 'create-chart-widget',
+      title: 'Create a Chart Widget',
+      difficulty: 'intermediate',
+      estimatedTime: 8,
+      description: 'Build a chart widget showing sales by supplier',
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Select Data Source',
+          instructions: [
+            'Choose "Sales Analytics" endpoint',
+            'Click Next'
+          ],
+          screenshots: ['widget-builder/07-chart-source.png']
+        },
+        {
+          stepNumber: 2,
+          title: 'Configure Chart Calculation',
+          instructions: [
+            'Select "Group By" aggregation',
+            'Choose "supplier" as group field',
+            'Select "Sum" for value',
+            'Choose "sales_amount" field'
+          ],
+          screenshots: ['widget-builder/08-chart-calc.png'],
+          expectedResult: 'Preview shows bar chart with sales by supplier'
+        },
+        {
+          stepNumber: 3,
+          title: 'Customize Chart',
+          instructions: [
+            'Select chart type (bar, line, pie)',
+            'Configure colors if desired',
+            'Set axis labels'
+          ],
+          screenshots: ['widget-builder/09-chart-customize.png']
+        },
+        {
+          stepNumber: 4,
+          title: 'Save Chart Widget',
+          instructions: [
+            'Name: "Sales by Supplier"',
+            'Click Save'
+          ],
+          screenshots: ['widget-builder/10-chart-save.png']
+        }
+      ],
+      tips: [
+        'Bar charts work best for comparing categories',
+        'Pie charts are good for showing proportions',
+        'Line charts show trends over time'
+      ]
+    }
+  ],
+  commonTasks: [
+    {
+      name: 'Quick Metric',
+      description: 'Create a simple count metric',
+      quickSteps: [
+        'Select data source',
+        'Choose Count aggregation',
+        'Save with name'
+      ],
+      taskId: 'create-metric-widget'
+    },
+    {
+      name: 'Add Filters',
+      description: 'Filter widget data',
+      quickSteps: [
+        'Open Filter panel in Calculation step',
+        'Add filter condition',
+        'Preview filtered results'
+      ]
+    }
+  ],
+  troubleshooting: [
+    {
+      issue: 'Widget shows "No data available"',
+      symptoms: [
+        'Preview is empty',
+        'Widget displays zero or blank'
+      ],
+      causes: [
+        'Data source has no records',
+        'Filters exclude all data',
+        'Calculation field doesn\'t exist'
+      ],
+      solution: [
+        'Check data source has records in Data Upload',
+        'Review filter conditions',
+        'Verify field name in calculation'
+      ],
+      screenshots: ['troubleshooting/no-data.png']
+    },
+    {
+      issue: 'Save button is disabled',
+      symptoms: [
+        'Cannot click Save Widget button',
+        'Button appears grayed out'
+      ],
+      solution: [
+        'Ensure widget name is filled in',
+        'Complete all required steps',
+        'Check for validation errors'
+      ]
+    }
+  ],
+  relatedFeatures: ['widget-dashboards', 'widget-templates'],
+  metadata: {
+    difficulty: 'intermediate',
+    estimatedReadTime: 12,
+    lastUpdated: '2025-10-19',
+    version: '1.0.0'
+  }
+};
+```
+
+## Screenshot Naming Convention
+
+Follow this naming pattern for screenshots:
+
+```
+{feature}/{step:02d}-{description}.{ext}
+
+Examples:
+- widget-builder/01-overview.png
+- widget-builder/02-wizard.png
+- sales-analytics/03-date-picker.png
+- stock-profiles/05-edit-popup.png
+```
+
+## File Locations
+
+```
+client/src/components/dashboard/
+  documentation.tsx          # Main documentation component
+  UserGuideSection.tsx       # User guide display component
+  ScreenshotViewer.tsx       # Screenshot viewer with zoom
+
+public/docs/
+  screenshots/
+    {feature}/               # Feature-specific screenshots
+      {step}-{description}.png
+      {step}-{description}.webp
+      {step}-{description}.avif
+    metadata.json            # Screenshot metadata
+
+scripts/
+  capture-user-guide-screenshots.ts  # Playwright capture script
+  generate-manifest.ts               # Generate manifest.json
+```
+
+## Testing Your Guide
+
+1. **Visual Check**: Navigate to Documentation → User Guides
+2. **Screenshot Links**: Verify all screenshots display correctly
+3. **Navigation**: Test section tabs (Overview, Tasks, Troubleshooting)
+4. **Search**: Ensure guide appears in search results
+5. **Mobile**: Check responsive layout on tablet/mobile viewports
+
+## Common Issues
+
+### Screenshots not displaying
+- Verify file paths match `public/docs/screenshots/{feature}/` structure
+- Check filename matches exactly (case-sensitive)
+- Ensure WebP/AVIF variants exist or fallback to PNG
+
+### Task steps not expanding
+- Verify `task.id` is unique within feature
+- Check `steps` array is populated
+- Ensure `TaskStep` objects have `stepNumber` starting at 1
+
+### Search not finding guide
+- Regenerate search index with `npm run generate-manifest`
+- Verify feature is in `manifest.json`
+- Check keywords include common search terms
+
+## Next Steps
+
+1. **Add More Tasks**: Expand your guide with additional common workflows
+2. **Capture Mobile Screenshots**: Add tablet/mobile viewport screenshots
+3. **Add Annotations**: Use annotation overlays to highlight UI elements
+4. **Write Troubleshooting**: Document common errors and solutions
+5. **Test with Users**: Gather feedback on guide clarity
+
+## Full Example Script
+
+Here's a complete script to add a new feature guide:
+
+```bash
+# 1. Create screenshots directory
+mkdir -p public/docs/screenshots/my-feature
+
+# 2. Run capture script
+npm run capture-screenshots -- --feature=my-feature
+
+# 3. Optimize images
+npm run optimize-screenshots -- --feature=my-feature
+
+# 4. Generate metadata
+npm run generate-metadata -- --feature=my-feature
+
+# 5. Update manifest
+npm run generate-manifest
+
+# 6. Test in browser
+npm run dev
+# Navigate to Documentation → User Guides → My Feature
+```
+
+## Resources
+
+- **Type Definitions**: See `specs/029-complete-user-guide/contracts/`
+- **Data Model**: See `specs/029-complete-user-guide/data-model.md`
+- **Research**: See `specs/029-complete-user-guide/research.md`
+- **Spec**: See `specs/029-complete-user-guide/spec.md`
+
+## Tips for Writing Great Guides
+
+1. **Be Concise**: 2-3 sentences for descriptions, clear numbered steps
+2. **Show, Don't Tell**: Use screenshots for every significant step
+3. **Anticipate Errors**: Include common mistakes in troubleshooting
+4. **Provide Context**: Explain *why* a step is needed, not just *how*
+5. **Test Everything**: Complete each task yourself before documenting
+
+## Accessibility Checklist
+
+- [ ] All screenshots have descriptive alt text
+- [ ] Headings use proper hierarchy (h1 → h2 → h3)
+- [ ] Links have meaningful text (not "click here")
+- [ ] Color is not the only indicator (use icons + text)
+- [ ] Keyboard navigation works (test with Tab key)
+
+---
+
+**Time to complete**: 5 minutes
+**Difficulty**: Beginner
+**Last updated**: 2025-10-19

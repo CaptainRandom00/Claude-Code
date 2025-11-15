@@ -1,0 +1,84 @@
+# BB Management System - Claude Code Context
+
+## Current Development Focus: Product Profiles Schema Update (011-stock-profiles)
+
+### Immediate Context
+- **Branch**: 011-stock-profiles
+- **Status**: Schema alignment to fix pagination errors
+- **Problem**: "Cannot convert undefined or null to object" error due to schema mismatch
+- **Goal**: Align Drizzle ORM schema with actual database structure
+
+### Recent Changes (2025-09-20)
+- Deep debugged pagination implementation error
+- Identified schema mismatch between ORM definition and database
+- Schema includes non-existent fields: p1_price, p2_price, original_data, etc.
+- Database has only basic product fields
+- **Current Solution**: Update schema to match actual database structure
+
+### Technology Stack
+- **Backend**: Node.js, Express.js, Drizzle ORM, MySQL
+- **Frontend**: React 18, TypeScript, TanStack Query, shadcn/ui, Tailwind CSS
+- **Database**: MySQL with existing product_profiles table (10,088 records)
+- **Testing**: Jest, Playwright, @testing-library/react
+
+### Performance Requirements
+- Page load time: <500ms (PR-004)
+- Profile updates: <1s (PR-001)
+- Support 10,000+ products (PR-003)
+- API response time: <200ms (Constitution requirement)
+
+### Key Files for Schema Update
+- `/shared/schema.ts` - Main schema file requiring updates
+- `/server/services/product-profile-service.ts` - Service layer using schema
+- `/specs/011-stock-profiles/` - Implementation planning documentation
+- `/server/routes-product-profiles.ts` - API endpoints
+
+### Database Schema Reality (Confirmed)
+Actual `product_profiles` table columns:
+- `item_code`, `description`, `category`, `supplier`
+- `packing_size`, `units_per_case`, `unit_type`, `is_active`
+- `last_updated`, `created_at`, `updated_at`
+- `case_quantity`, `case_unit_description`, `case_source`
+
+### Schema Update Strategy
+- Remove non-existent fields from Drizzle schema
+- Update service layer to handle minimal field set
+- Test pagination functionality after schema fix
+- No database changes needed - align ORM to reality
+
+## ✅ COMPLETED: Playwright Migration (2025-09-21)
+
+### Migration Summary (Task 017)
+- **Status**: COMPLETED AND VALIDATED
+- **Migration**: Puppeteer → Playwright for PDF generation
+- **Branch**: 016-api-documentation-and (completed in this branch)
+- **Impact**: Zero breaking changes, service interface preserved
+
+### Technical Changes
+- **Dependencies**: Playwright v1.49.0 replaces Puppeteer
+- **Service**: `/server/services/pdf-generator.ts` completely rewritten
+- **Types**: New Playwright configuration and error handling types
+- **Performance**: <5% regression (within constitutional requirements)
+- **Testing**: TDD approach with comprehensive test suite
+
+### Validation Results
+✅ Server startup successful (no dependency errors)
+✅ PDF generation service functional
+✅ Enhanced error handling operational
+✅ Performance benchmarks within thresholds
+✅ Type definitions and configuration working
+
+### Migration Architecture
+- **Browser Engine**: Chromium via Playwright (was Puppeteer)
+- **Configuration**: Enhanced with validation and security options
+- **Error Handling**: Comprehensive error mapping and logging
+- **Resource Management**: Improved cleanup and memory management
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+
+
+      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.

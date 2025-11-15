@@ -1,0 +1,267 @@
+# Implementation Plan: Byte Bridges Enterprise Website
+
+**Branch**: `001-byte-bridges-enterprise` | **Date**: 2025-11-07 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/001-byte-bridges-enterprise/spec.md`
+
+## Summary
+
+Build a professional enterprise consultancy website for Byte Bridges featuring service showcases, industry expertise pages, case studies library, blog/knowledge hub, client testimonials, and admin content management. The site must be fully responsive, WCAG 2.1 Level AA compliant, integrate with Google Analytics, and provide secure authentication for administrators to manage blog posts and case studies. Technical approach: Next.js 14 with TypeScript, PostgreSQL database, NextAuth for authentication, TailwindCSS for styling, and Playwright for testing.
+
+## Technical Context
+
+**Language/Version**: TypeScript 5.3 with Next.js 14.1.0 (React 18.2)
+**Primary Dependencies**: Next.js, NextAuth, PostgreSQL (pg), TailwindCSS, React Query, Zod, Nodemailer
+**Storage**: PostgreSQL database for dynamic content (users, blog posts, case studies, contact submissions, testimonials)
+**Testing**: Playwright for E2E and visual regression tests, Jest/React Testing Library for unit tests
+**Target Platform**: Web (responsive design for desktop, tablet, mobile browsers)
+**Project Type**: Web application (Next.js App Router with API routes)
+**Performance Goals**:
+- Lighthouse score >90 (Performance, Accessibility, SEO, Best Practices)
+- First Contentful Paint <1.5s
+- Time to Interactive <3.5s
+- Core Web Vitals: LCP <2.5s, FID <100ms, CLS <0.1
+
+**Constraints**:
+- WCAG 2.1 Level AA compliance (mandatory)
+- ICO data retention guidelines compliance
+- Google Analytics integration (GDPR-compliant)
+- Single configurable admin email for contact form submissions
+- Multi-step contact form with validation
+
+**Scale/Scope**:
+- ~15-20 static/dynamic pages
+- Expected traffic: 1,000-5,000 monthly visitors
+- Admin users: 1-5 concurrent administrators
+- Content volume: 50-100 blog posts, 20-50 case studies initially
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+**Constitution Status**: Template constitution detected - no specific project principles defined yet.
+
+Since the constitution is not yet customized for this project, we'll apply general best practices:
+
+✅ **Simplicity First**: Using standard Next.js patterns, minimal custom abstractions
+✅ **Security**: NextAuth for authentication, environment variables for secrets, SQL injection prevention via parameterized queries
+✅ **Testability**: Playwright for E2E tests, component-level testing capability
+✅ **Maintainability**: TypeScript for type safety, clear separation of concerns (pages, components, API routes, lib)
+✅ **Accessibility**: WCAG 2.1 Level AA compliance built-in from start
+
+**No constitutional violations detected** - proceeding with standard Next.js best practices.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/001-byte-bridges-enterprise/
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command)
+├── data-model.md        # Phase 1 output (/speckit.plan command)
+├── quickstart.md        # Phase 1 output (/speckit.plan command)
+├── contracts/           # Phase 1 output (/speckit.plan command)
+│   ├── api-auth.yaml
+│   ├── api-blog.yaml
+│   ├── api-case-studies.yaml
+│   └── api-contact.yaml
+└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+```
+
+### Source Code (repository root)
+
+```text
+src/
+├── app/                      # Next.js App Router pages
+│   ├── (public)/            # Public-facing pages
+│   │   ├── page.tsx         # Homepage
+│   │   ├── services/        # Service pages
+│   │   ├── industries/      # Industry expertise pages
+│   │   ├── case-studies/    # Case studies library
+│   │   ├── blog/            # Blog/knowledge hub
+│   │   ├── about/           # About/team page
+│   │   ├── contact/         # Contact form page
+│   │   └── technology/      # Technology stack page
+│   ├── (admin)/             # Admin pages (protected)
+│   │   ├── dashboard/       # Admin dashboard
+│   │   ├── blog/            # Blog management
+│   │   └── case-studies/    # Case study management
+│   ├── api/                 # API routes
+│   │   ├── auth/            # NextAuth endpoints
+│   │   ├── blog/            # Blog CRUD
+│   │   ├── case-studies/    # Case study CRUD
+│   │   ├── contact/         # Contact form submission
+│   │   └── analytics/       # Analytics endpoints
+│   ├── layout.tsx           # Root layout
+│   └── globals.css          # Global styles
+├── components/              # React components
+│   ├── ui/                  # Reusable UI components
+│   ├── layout/              # Layout components (Header, Footer, Nav)
+│   ├── forms/               # Form components
+│   ├── cards/               # Card components
+│   └── admin/               # Admin-specific components
+├── lib/                     # Utility libraries
+│   ├── db.ts                # Database connection
+│   ├── auth.ts              # NextAuth configuration
+│   ├── email.ts             # Email service (Nodemailer)
+│   ├── validation.ts        # Zod schemas
+│   └── analytics.ts         # Google Analytics helpers
+├── types/                   # TypeScript type definitions
+│   ├── database.ts          # Database types
+│   ├── api.ts               # API types
+│   └── entities.ts          # Entity types
+├── data/                    # Static data
+│   ├── services.json        # Service descriptions
+│   ├── industries.json      # Industry information
+│   └── testimonials.json    # Client testimonials
+└── middleware.ts            # Next.js middleware (auth protection)
+
+tests/
+├── e2e/                     # End-to-end tests
+│   ├── auth.spec.ts         # Authentication flows
+│   ├── contact.spec.ts      # Contact form
+│   ├── blog.spec.ts         # Blog functionality
+│   └── case-studies.spec.ts # Case studies
+├── visual/                  # Visual regression tests
+│   └── visual-regression.spec.ts
+└── integration/             # Integration tests
+    └── database.spec.ts     # Database operations
+
+public/
+├── images/                  # Static images
+├── icons/                   # Icons and logos
+└── robots.txt               # SEO
+
+database/
+└── migrations/              # SQL migration scripts
+    ├── 001_initial_schema.sql
+    ├── 002_blog_posts.sql
+    ├── 003_case_studies.sql
+    └── 004_contact_submissions.sql
+```
+
+**Structure Decision**: Web application structure using Next.js 14 App Router. Organized by feature with route groups for public vs admin pages. Clear separation between presentation (components), business logic (lib), data access (api routes), and testing (tests). Static data in JSON files, dynamic content in PostgreSQL.
+
+## Complexity Tracking
+
+> **Fill ONLY if Constitution Check has violations that must be justified**
+
+_No complexity justifications needed_ - using standard Next.js patterns and established libraries.
+
+## Progress Tracking
+
+- [x] Initial Constitution Check (no violations)
+- [x] Phase 0: Research complete
+- [x] Phase 1: Design artifacts generated (data-model.md, contracts/, quickstart.md)
+- [x] Agent context updated (CLAUDE.md)
+- [x] Post-Design Constitution Check (still no violations)
+- [ ] Phase 2: Task breakdown ready (via /speckit.tasks)
+
+## Phase 0: Research & Technology Decisions
+
+*See [research.md](./research.md) for detailed findings*
+
+### Key Technology Choices
+
+1. **Framework**: Next.js 14 with App Router
+   - Server and client components
+   - API routes for backend
+   - Built-in image optimization
+   - SEO-friendly out of the box
+
+2. **Authentication**: NextAuth v4
+   - Credentials provider for admin login
+   - Session management
+   - Middleware for route protection
+
+3. **Database**: PostgreSQL
+   - Relational data model
+   - ACID compliance
+   - Full-text search capability
+   - JSON column support for flexible schemas
+
+4. **Styling**: TailwindCSS + Framer Motion
+   - Utility-first CSS
+   - Built-in accessibility features
+   - Responsive design utilities
+   - Animations for polish
+
+5. **Forms**: React Hook Form + Zod
+   - Type-safe validation
+   - Multi-step form support
+   - Excellent DX
+
+6. **Testing**: Playwright
+   - E2E testing
+   - Visual regression
+   - Cross-browser support
+   - Accessibility testing
+
+7. **Analytics**: Google Analytics 4
+   - Via next/script for optimization
+   - GDPR-compliant consent management
+   - Custom event tracking
+
+8. **Email**: Nodemailer
+   - Contact form notifications
+   - Configurable SMTP
+   - Template support
+
+## Phase 1: Data Model & Contracts
+
+*See [data-model.md](./data-model.md) for entity details*
+*See [contracts/](./contracts/) for API specifications*
+*See [quickstart.md](./quickstart.md) for integration guide*
+
+### Entity Summary
+
+- **User**: Admin authentication and authorization
+- **BlogPost**: Content management for articles
+- **CaseStudy**: Client project showcases
+- **ContactSubmission**: Contact form data with ICO compliance
+- **Testimonial**: Client feedback
+- **Service**: Service offerings (static data)
+- **Industry**: Industry expertise (static data)
+- **Technology**: Technology stack (static data)
+
+### API Endpoint Summary
+
+- `POST /api/auth/signin` - Admin login
+- `POST /api/auth/signout` - Admin logout
+- `GET /api/blog` - List blog posts (paginated, filtered)
+- `POST /api/blog` - Create blog post (admin)
+- `PUT /api/blog/[id]` - Update blog post (admin)
+- `DELETE /api/blog/[id]` - Delete blog post (admin)
+- `GET /api/case-studies` - List case studies (filtered)
+- `POST /api/case-studies` - Create case study (admin)
+- `PUT /api/case-studies/[id]` - Update case study (admin)
+- `DELETE /api/case-studies/[id]` - Delete case study (admin)
+- `POST /api/contact` - Submit contact form
+- `GET /api/analytics/summary` - Analytics summary (admin)
+
+## Next Steps
+
+1. ✅ Complete this plan document
+2. ✅ Generate `research.md` (Phase 0)
+3. ✅ Generate `data-model.md` (Phase 1)
+4. ✅ Generate `contracts/` API specifications (Phase 1)
+   - api-auth.yaml (NextAuth endpoints)
+   - api-blog.yaml (Blog CRUD)
+   - api-case-studies.yaml (Case study CRUD)
+   - api-contact.yaml (Contact form submission)
+5. ✅ Generate `quickstart.md` (Phase 1) with agent assignments
+6. ✅ Update agent context (CLAUDE.md)
+7. ⏳ Run `/speckit.tasks` to generate detailed task breakdown (Phase 2)
+8. ⏳ Execute implementation with assigned agents (Phase 3-4):
+   - **react-expert**: Frontend pages and components
+   - **node-expert**: API routes and backend logic
+   - **database-architect**: PostgreSQL schema and optimization
+   - **qa-engineer**: Playwright tests and accessibility
+   - **ui-designer**: TailwindCSS and WCAG AA compliance
+   - **technical-seo**: Metadata, analytics, sitemap
+   - **security-auditor**: Auth security and GDPR compliance
+   - **devops-web**: Vercel deployment and CI/CD
+
+---
+
+*This plan follows the SpecKit workflow. Constitution check passed. Ready for Phase 0 research.*

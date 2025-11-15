@@ -1,0 +1,52 @@
+/**
+ * @file quick-calendar-check.spec.ts
+ * @description Quick verification that calendar dropdowns exist and are styled
+ */
+
+import { test, expect } from '@playwright/test';
+
+test('verify calendar dropdowns are present and styled', async ({ page }) => {
+  // Navigate directly to Sales Aggregation
+  await page.goto('http://localhost:3000/dashboard');
+
+  // Click Sales Aggregation button
+  await page.click('button:has-text("Sales Aggregation")');
+
+  // Wait for calendar to be visible (reduced timeout)
+  await page.waitForSelector('[role="grid"]', { timeout: 5000 });
+
+  // Check for select dropdowns
+  const dropdowns = page.locator('select');
+  const count = await dropdowns.count();
+
+  console.log(`Found ${count} dropdown(s)`);
+
+  // Take screenshot
+  await page.screenshot({
+    path: 'calendar-verification.png',
+    fullPage: false
+  });
+
+  console.log('✅ Screenshot saved: calendar-verification.png');
+
+  // Basic assertions
+  expect(count).toBeGreaterThanOrEqual(2);
+
+  // Check if month dropdown exists and is visible
+  if (count >= 1) {
+    const firstDropdown = dropdowns.first();
+    const isVisible = await firstDropdown.isVisible();
+    console.log(`Month dropdown visible: ${isVisible}`);
+    expect(isVisible).toBe(true);
+  }
+
+  // Check if year dropdown exists and is visible
+  if (count >= 2) {
+    const secondDropdown = dropdowns.nth(1);
+    const isVisible = await secondDropdown.isVisible();
+    console.log(`Year dropdown visible: ${isVisible}`);
+    expect(isVisible).toBe(true);
+  }
+
+  console.log('✅ Calendar dropdowns verified');
+});

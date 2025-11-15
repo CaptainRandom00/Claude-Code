@@ -1,0 +1,25 @@
+import { test, expect } from '@playwright/test';
+
+test('Simple HTTPS connection test', async ({ page }) => {
+  console.log('Attempting to navigate to https://localhost:3000...');
+
+  try {
+    await page.goto('https://localhost:3000', {
+      timeout: 10000,
+      waitUntil: 'domcontentloaded'
+    });
+
+    console.log('✅ Page loaded!');
+
+    const title = await page.title();
+    console.log(`Page title: ${title}`);
+
+    const html = await page.content();
+    console.log(`HTML length: ${html.length}`);
+
+    expect(html.length).toBeGreaterThan(100);
+  } catch (error) {
+    console.error('❌ Failed to load page:', error);
+    throw error;
+  }
+});

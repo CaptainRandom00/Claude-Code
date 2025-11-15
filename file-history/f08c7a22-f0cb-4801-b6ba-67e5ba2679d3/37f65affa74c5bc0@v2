@@ -1,0 +1,91 @@
+# BB Management System - Claude Code Context
+
+## Current Development Focus: Feature 026 - Calendar Navigation and Date Alignment Fix
+
+### Immediate Context
+- **Branch**: 026-fix-sales-aggregation
+- **Status**: Implementation complete - Ready for testing and validation
+- **Feature**: Fix missing month/year navigation and date misalignment in Sales Aggregation calendar
+- **Goal**: Add dropdown navigation controls and ensure dates align with day-of-week headers
+
+### Implementation Complete (2025-10-10)
+- ✅ Added month/year dropdown navigation (`captionLayout="dropdown-buttons"`)
+- ✅ Fixed date alignment with consistent 6-week grid (`fixedWeeks={true}`)
+- ✅ Increased navigation button visibility (opacity: 50% → 100%)
+- ✅ Preserved existing blue highlighting for aggregated dates
+- ✅ Created comprehensive E2E test suite (6 Playwright tests)
+- ⏳ Awaiting test execution (requires dev server running)
+
+### Recent Changes (2025-10-10)
+- Modified `client/src/components/ui/calendar.tsx` - navigation button opacity
+- Modified `client/src/components/dashboard/sales-aggregation.tsx` - added calendar props
+- Created `tests/playwright/sales-calendar-navigation.spec.ts` - E2E test suite
+- Created comprehensive audit trail in `specs/026-fix-sales-aggregation/audit/`
+
+### Technology Stack
+- **Backend**: Node.js, Express.js, Drizzle ORM, MySQL
+- **Frontend**: React 18, TypeScript, TanStack Query, shadcn/ui, Tailwind CSS
+- **Database**: MySQL with existing product_profiles table (10,088 records)
+- **Testing**: Jest, Playwright, @testing-library/react
+
+### Performance Requirements
+- Page load time: <500ms (PR-004)
+- Profile updates: <1s (PR-001)
+- Support 10,000+ products (PR-003)
+- API response time: <200ms (Constitution requirement)
+
+### Key Files for Schema Update
+- `/shared/schema.ts` - Main schema file requiring updates
+- `/server/services/product-profile-service.ts` - Service layer using schema
+- `/specs/011-stock-profiles/` - Implementation planning documentation
+- `/server/routes-product-profiles.ts` - API endpoints
+
+### Database Schema Reality (Confirmed)
+Actual `product_profiles` table columns:
+- `item_code`, `description`, `category`, `supplier`
+- `packing_size`, `units_per_case`, `unit_type`, `is_active`
+- `last_updated`, `created_at`, `updated_at`
+- `case_quantity`, `case_unit_description`, `case_source`
+
+### Schema Update Strategy
+- Remove non-existent fields from Drizzle schema
+- Update service layer to handle minimal field set
+- Test pagination functionality after schema fix
+- No database changes needed - align ORM to reality
+
+## ✅ COMPLETED: Playwright Migration (2025-09-21)
+
+### Migration Summary (Task 017)
+- **Status**: COMPLETED AND VALIDATED
+- **Migration**: Puppeteer → Playwright for PDF generation
+- **Branch**: 016-api-documentation-and (completed in this branch)
+- **Impact**: Zero breaking changes, service interface preserved
+
+### Technical Changes
+- **Dependencies**: Playwright v1.49.0 replaces Puppeteer
+- **Service**: `/server/services/pdf-generator.ts` completely rewritten
+- **Types**: New Playwright configuration and error handling types
+- **Performance**: <5% regression (within constitutional requirements)
+- **Testing**: TDD approach with comprehensive test suite
+
+### Validation Results
+✅ Server startup successful (no dependency errors)
+✅ PDF generation service functional
+✅ Enhanced error handling operational
+✅ Performance benchmarks within thresholds
+✅ Type definitions and configuration working
+
+### Migration Architecture
+- **Browser Engine**: Chromium via Playwright (was Puppeteer)
+- **Configuration**: Enhanced with validation and security options
+- **Error Handling**: Comprehensive error mapping and logging
+- **Resource Management**: Improved cleanup and memory management
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+
+
+      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.

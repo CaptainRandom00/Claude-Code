@@ -1,0 +1,242 @@
+/**
+ * @file product-image-gallery.spec.ts
+ * @description E2E tests for product image gallery in edit modal (Feature 025)
+ * @feature 025-product-image-management
+ */
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Product Image Gallery in Edit Modal', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate to dashboard
+    await page.goto('http://localhost:3000/dashboard', { waitUntil: 'domcontentloaded' });
+
+    // Click Stock Profiles tab
+    await page.click('button:has-text("Stock Profiles")');
+
+    // Wait for the grid to load
+    await page.waitForSelector('table', { timeout: 10000 });
+  });
+
+  test('should display image gallery at top of modal with images', async ({ page }) => {
+    // Click on the first row to open edit modal
+    const firstRow = page.locator('table tbody tr').first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
+    await firstRow.click();
+
+    // Wait for edit modal to open
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+
+    // Wait for images to load
+    await page.waitForTimeout(1000);
+
+    // Check if image gallery exists (horizontal container with thumbnails)
+    const galleryContainer = page.locator('.border-b.pb-4.mb-4');
+
+    // If there are images, the gallery should be visible
+    const hasImages = await galleryContainer.isVisible().catch(() => false);
+
+    if (hasImages) {
+      // Verify gallery is positioned before the form sections
+      const galleryBox = await galleryContainer.boundingBox();
+      const basicInfoCard = await page.locator('text=Basic Information').locator('..').locator('..').boundingBox();
+
+      expect(galleryBox).not.toBeNull();
+      expect(basicInfoCard).not.toBeNull();
+
+      // Gallery should be above Basic Information section
+      if (galleryBox && basicInfoCard) {
+        expect(galleryBox.y).toBeLessThan(basicInfoCard.y);
+      }
+
+      // Verify thumbnails are horizontal (flex-shrink-0)
+      const thumbnails = page.locator('.flex-shrink-0.group.cursor-pointer');
+      const thumbnailCount = await thumbnails.count();
+
+      expect(thumbnailCount).toBeGreaterThan(0);
+      expect(thumbnailCount).toBeLessThanOrEqual(5); // Max 5 images
+
+      // Verify thumbnail size (80x80px)
+      const firstThumbnail = thumbnails.first();
+      const thumbnailBox = await firstThumbnail.locator('.w-20.h-20').boundingBox();
+
+      expect(thumbnailBox).not.toBeNull();
+      if (thumbnailBox) {
+        expect(thumbnailBox.width).toBeCloseTo(80, 5);
+        expect(thumbnailBox.height).toBeCloseTo(80, 5);
+      }
+
+      console.log(`✓ Gallery displays ${thumbnailCount} thumbnails at top of modal`);
+    } else {
+      console.log('✓ No images to display (expected for products without images)');
+    }
+  });
+
+  test('should display primary badge on primary image', async ({ page }) => {
+    // Open edit modal for product with images (10033)
+    await page.click('button:has-text("Stock Profiles")');
+    await page.waitForTimeout(1000);
+
+    // Search for product 10033
+    const searchInput = page.locator('input[type="search"]').or(page.locator('input[placeholder*="Search"]'));
+    await searchInput.fill('10033');
+    await page.waitForTimeout(500);
+
+    // Click on the row
+    const productRow = page.locator('table tbody tr').first();
+    await productRow.click();
+
+    // Wait for modal
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1000);
+
+    // Check for primary badge in gallery
+    const primaryBadge = page.locator('.border-b.pb-4.mb-4').locator('text=/Primary/i').first();
+    const hasPrimary = await primaryBadge.isVisible().catch(() => false);
+
+    if (hasPrimary) {
+      // Verify badge is visible
+      await expect(primaryBadge).toBeVisible();
+
+      // Verify badge styling (yellow background)
+      const badgeElement = await primaryBadge.locator('..');
+      const bgClass = await badgeElement.getAttribute('class');
+      expect(bgClass).toContain('bg-yellow-100');
+
+      console.log('✓ Primary badge displayed correctly');
+    } else {
+      console.log('✓ No primary image set (expected if no images or no primary)');
+    }
+  });
+
+  test('should open carousel when clicking gallery thumbnail', async ({ page }) => {
+    // Navigate and open modal
+    await page.click('button:has-text("Stock Profiles")');
+    await page.waitForTimeout(1000);
+
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1000);
+
+    // Check if thumbnails exist in gallery
+    const thumbnail = page.locator('.border-b.pb-4.mb-4 .flex-shrink-0.group.cursor-pointer').first();
+    const hasThumbnails = await thumbnail.isVisible().catch(() => false);
+
+    if (hasThumbnails) {
+      // Click first thumbnail
+      await thumbnail.click();
+      await page.waitForTimeout(500);
+
+      // Carousel should have action buttons
+      const deleteButton = page.locator('button:has-text("Delete")');
+      const setPrimaryButton = page.locator('button:has-text("Set as Primary")');
+
+      const hasCarousel = await deleteButton.isVisible().catch(() => false) ||
+                         await setPrimaryButton.isVisible().catch(() => false);
+
+      expect(hasCarousel).toBeTruthy();
+      console.log('✓ Carousel opened when clicking thumbnail');
+    } else {
+      console.log('✓ No thumbnails to click (expected for products without images)');
+    }
+  });
+
+  test('should show horizontal scrollable gallery for multiple images', async ({ page }) => {
+    // Navigate to product with multiple images
+    await page.click('button:has-text("Stock Profiles")');
+    await page.waitForTimeout(1000);
+
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1000);
+
+    // Check gallery container
+    const galleryScroll = page.locator('.border-b.pb-4.mb-4 .flex.items-center.gap-2.overflow-x-auto');
+    const hasGallery = await galleryScroll.isVisible().catch(() => false);
+
+    if (hasGallery) {
+      // Verify overflow-x-auto class for horizontal scrolling
+      const containerClass = await galleryScroll.getAttribute('class');
+      expect(containerClass).toContain('overflow-x-auto');
+
+      // Verify thumbnails are laid out horizontally
+      const thumbnails = galleryScroll.locator('.flex-shrink-0');
+      const count = await thumbnails.count();
+
+      expect(count).toBeGreaterThan(0);
+      console.log(`✓ Horizontal scrollable gallery with ${count} images`);
+    } else {
+      console.log('✓ No gallery to scroll (expected for products without images)');
+    }
+  });
+
+  test('should display gallery before form sections', async ({ page }) => {
+    // Open modal
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1000);
+
+    // Get vertical positions
+    const dialogHeader = page.locator('text=Modify product details');
+    const basicInfo = page.locator('text=Basic Information');
+    const productImages = page.locator('text=/Product Images.*2\\/5/'); // Matches "Product Images 2/5"
+
+    const headerBox = await dialogHeader.boundingBox();
+    const basicInfoBox = await basicInfo.boundingBox();
+    const productImagesBox = await productImages.boundingBox();
+
+    expect(headerBox).not.toBeNull();
+    expect(basicInfoBox).not.toBeNull();
+    expect(productImagesBox).not.toBeNull();
+
+    // Verify order: Header → Gallery → Basic Info → Product Images section
+    if (headerBox && basicInfoBox && productImagesBox) {
+      expect(basicInfoBox.y).toBeGreaterThan(headerBox.y);
+      expect(productImagesBox.y).toBeGreaterThan(basicInfoBox.y);
+
+      console.log('✓ Gallery positioned correctly between header and form');
+    }
+  });
+
+  test('should update gallery after image upload', async ({ page }) => {
+    // This test requires uploading an image
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+
+    // Scroll to Product Images section
+    await page.evaluate(() => {
+      const element = document.querySelector('text=Product Images');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    await page.waitForTimeout(500);
+
+    // Count thumbnails before
+    const galleryBefore = page.locator('.border-b.pb-4.mb-4 .flex-shrink-0.group.cursor-pointer');
+    const countBefore = await galleryBefore.count();
+
+    // Check if upload is available (not at max)
+    const maxReached = await page.locator('text=Maximum 5 images reached').isVisible().catch(() => false);
+
+    if (!maxReached) {
+      // Note: Actual file upload would require a test image file
+      // For now, we verify the structure is correct
+      const uploadZone = page.locator('text=Drag images here or click to browse');
+      expect(await uploadZone.isVisible()).toBeTruthy();
+
+      console.log(`✓ Gallery ready for uploads (${countBefore} current images)`);
+    } else {
+      console.log('✓ Maximum images reached, upload disabled as expected');
+    }
+  });
+});

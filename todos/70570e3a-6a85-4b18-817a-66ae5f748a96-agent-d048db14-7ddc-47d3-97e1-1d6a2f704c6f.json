@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Create comprehensive security overview documentation (security-overview.html)",
+    "status": "completed",
+    "priority": "high",
+    "id": "security-overview-html"
+  },
+  {
+    "content": "Create secure deployment guide documentation (secure-deployment.html)",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "secure-deployment-html"
+  },
+  {
+    "content": "Create compliance guide documentation (compliance-guide.html)",
+    "status": "pending",
+    "priority": "high",
+    "id": "compliance-guide-html"
+  },
+  {
+    "content": "Create incident response documentation (incident-response.html)",
+    "status": "pending",
+    "priority": "high",
+    "id": "incident-response-html"
+  }
+]

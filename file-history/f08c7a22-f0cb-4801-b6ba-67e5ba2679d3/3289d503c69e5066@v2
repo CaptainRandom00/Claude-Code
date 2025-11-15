@@ -1,0 +1,416 @@
+# Data Model: Sales Analytics Data Access Enhancement
+
+**Feature**: 027-fix-sales-analytics
+**Date**: 2025-10-10
+**Purpose**: Define data structures for configurable record limits and server-side filtering
+
+---
+
+## Existing Database Schema (No Changes Required)
+
+### epos_sales_summaries Table
+
+**Current Structure** (maintained as-is):
+```sql
+CREATE TABLE epos_sales_summaries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  report_date DATE NOT NULL,
+  item_code VARCHAR(50) NOT NULL,
+  unit VARCHAR(20),
+  description TEXT,
+  total_qty DECIMAL(10,2),
+  total_net DECIMAL(10,2),
+  total_gross DECIMAL(10,2),
+  file_name VARCHAR(255),
+  upload_batch VARCHAR(100),
+  uploaded_by VARCHAR(100),
+  uploaded_at TIMESTAMP,
+  -- Joined from brn_stock_snapshots in queries
+  supplier VARCHAR(255),  -- Not in table, computed via JOIN
+  category VARCHAR(255)   -- Not in table, computed via JOIN
+);
+```
+
+**New Index** (Performance Optimization):
+```sql
+CREATE INDEX idx_epos_filters
+ON epos_sales_summaries (report_date, supplier, category, item_code, total_net);
+```
+
+**Rationale**: No schema modifications needed. Feature focuses on query optimization and response format enhancement.
+
+---
+
+## TypeScript Type Definitions
+
+### API Response Types
+
+```typescript
+// shared/types/sales-analytics.ts
+
+/**
+ * Metadata about query results
+ * Returned with all /api/epos-sales responses
+ */
+export interface QueryMetadata {
+  /** Total number of records matching filters (before LIMIT applied) */
+  totalCount: number;
+
+  /** The limit value used for this query (1000-100000 or "all") */
+  limit: number;
+
+  /** Starting offset for pagination (0-based) */
+  offset: number;
+
+  /** True if more records are available beyond current offset+limit */
+  hasMore: boolean;
+
+  /** True if any filters were applied to the query */
+  filtered: boolean;
+}
+
+/**
+ * Enhanced EPOS sales API response with metadata
+ * Replaces simple array response
+ */
+export interface EposSalesResponse {
+  /** Array of sales records (length <= limit, max 100000) */
+  data: EposSalesRecord[];
+
+  /** Query metadata for pagination and UI display */
+  meta: QueryMetadata;
+}
+
+/**
+ * Individual EPOS sales record
+ * (Unchanged from existing type)
+ */
+export interface EposSalesRecord {
+  id: number;
+  reportDate: string;  // ISO date format
+  itemCode: string;
+  unit?: string;
+  description?: string;
+  totalQty?: number;
+  totalNet: number;
+  totalGross?: number;
+  fileName?: string;
+  uploadBatch?: string;
+  uploadedBy?: string;
+  uploadedAt?: string;
+  supplierName?: string;  // From JOIN with brn_stock_snapshots
+  categoryName?: string;  // From JOIN with brn_stock_snapshots
+}
+```
+
+### Frontend State Types
+
+```typescript
+// client/src/types/sales-analytics.ts
+
+/**
+ * Supported record limit values
+ */
+export type RecordLimit = 1000 | 5000 | 10000 | 25000 | 50000 | 'all';
+
+/**
+ * Record limit option for UI dropdown
+ */
+export interface LimitOption {
+  value: RecordLimit;
+  label: string;
+  requiresWarning: boolean;      // Show performance warning >25K
+  requiresConfirmation: boolean; // Show confirmation dialog for 'all'
+}
+
+/**
+ * Record limit configuration for dropdown component
+ */
+export const LIMIT_OPTIONS: LimitOption[] = [
+  { value: 1000, label: '1,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 5000, label: '5,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 10000, label: '10,000 records', requiresWarning: false, requiresConfirmation: false },
+  { value: 25000, label: '25,000 records', requiresWarning: true, requiresConfirmation: false },
+  { value: 50000, label: '50,000 records', requiresWarning: true, requiresConfirmation: false },
+  { value: 'all', label: 'All Records', requiresWarning: true, requiresConfirmation: true }
+];
+
+/**
+ * Safety cap constant (enforced server-side and client-side)
+ */
+export const MAX_SAFE_RECORDS = 100000;
+
+/**
+ * Filter state for Sales Analytics
+ * (Extended with limit and offset)
+ */
+export interface SalesFilters {
+  startDate?: string;
+  endDate?: string;
+  reportDate?: string;
+  supplier?: string;
+  category?: string;
+  itemCode?: string;
+  sortBy: 'totalNet' | 'totalQty' | 'reportDate';
+  sortOrder: 'asc' | 'desc';
+  limit: RecordLimit;   // NEW: Configurable limit
+  offset: number;       // NEW: For "Load More" pagination
+}
+```
+
+###Backend Validation Types
+
+```typescript
+// server/types/epos-api.ts
+
+import { z } from 'zod';
+
+/**
+ * Zod schema for /api/epos-sales query parameters
+ * Validates all request inputs including new limit/offset params
+ */
+export const EposSalesQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  supplier: z.string().min(1).max(255).optional(),
+  category: z.string().min(1).max(255).optional(),
+  itemCode: z.string().min(1).max(50).optional(),
+  sortBy: z.enum(['totalNet', 'totalQty', 'reportDate']).default('totalNet'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  limit: z.union([
+    z.number().int().min(1).max(100000),
+    z.literal('all')
+  ]).transform(val => val === 'all' ? 100000 : val).default(10000),
+  offset: z.number().int().min(0).default(0)
+});
+
+export type EposSalesQuery = z.infer<typeof EposSalesQuerySchema>;
+
+/**
+ * Internal query result type (before response formatting)
+ */
+export interface QueryResult {
+  records: EposSalesRecord[];
+  totalCount: number;
+  appliedLimit: number;
+  appliedOffset: number;
+}
+```
+
+---
+
+## Data Flow
+
+### Request Flow (Frontend → Backend)
+
+```
+User Action: Change limit to 25,000
+        ↓
+useRecordLimit hook updates state: { limit: 25000, offset: 0 }
+        ↓
+TanStack Query refetch triggered with new params
+        ↓
+HTTP GET /api/epos-sales?limit=25000&offset=0&[other filters]
+        ↓
+Backend Zod validation (EposSalesQuerySchema)
+        ↓
+Extract query logic to service layer (epos-analytics-service.ts)
+        ↓
+Build SQL queries:
+  1. COUNT(*) FROM epos_sales_summaries WHERE [filters]
+  2. SELECT * FROM epos_sales_summaries WHERE [filters] LIMIT 25000 OFFSET 0
+        ↓
+Execute queries (use composite index for performance)
+        ↓
+Format response: { data: [...], meta: { totalCount, limit, offset, hasMore, filtered } }
+        ↓
+Return EposSalesResponse to frontend
+```
+
+### Response Flow (Backend → Frontend)
+
+```
+Backend returns: { data: EposSalesRecord[], meta: QueryMetadata }
+        ↓
+TanStack Query caches response (staleTime: 60s, cacheTime: 5min)
+        ↓
+Frontend receives data via useQuery hook
+        ↓
+Calculate display text:
+  - If meta.filtered: "Showing 25,000 of {totalCount} records (filtered)"
+  - If not filtered: "Showing 25,000 of {totalCount} records"
+        ↓
+Update UI:
+  - Data table with 25,000 rows
+  - "Load More" button (if meta.hasMore === true)
+  - Performance warning (if limit > 25000)
+```
+
+### "Load More" Flow (Incremental Loading)
+
+```
+User clicks "Load More" button
+        ↓
+useInfiniteQuery.fetchNextPage() called
+        ↓
+HTTP GET /api/epos-sales?limit=25000&offset=25000&[same filters]
+        ↓
+Backend returns next batch: { data: [...25000 more records], meta: {...} }
+        ↓
+TanStack Query appends data to existing cache
+        ↓
+Frontend displays 50,000 total records (25K + 25K)
+        ↓
+Update display: "Showing 50,000 of {totalCount} records"
+        ↓
+"Load More" button remains if meta.hasMore === true
+```
+
+---
+
+## State Management
+
+### Frontend State (React Component)
+
+```typescript
+// client/src/components/dashboard/sales-analytics.tsx
+
+const SalesAnalytics: React.FC = () => {
+  // Record limit state (persisted in component, not URL)
+  const [recordLimit, setRecordLimit] = useState<RecordLimit>(10000); // Default 10K
+  const [offset, setOffset] = useState(0);
+
+  // Filter state (existing)
+  const [filters, setFilters] = useState<SalesFilters>({
+    sortBy: 'totalNet',
+    sortOrder: 'desc',
+    limit: recordLimit,
+    offset: offset,
+    // ... other filter fields
+  });
+
+  // TanStack Query for data fetching
+  const { data, refetch, isLoading } = useQuery({
+    queryKey: ['epos-sales', filters],
+    queryFn: () => fetchEposSales(filters),
+    staleTime: 60000,
+    cacheTime: 300000
+  });
+
+  // Handle limit change
+  const handleLimitChange = async (newLimit: RecordLimit) => {
+    if (newLimit === 'all') {
+      const confirmed = await showConfirmationDialog(data?.meta.totalCount || 0);
+      if (!confirmed) return;
+    }
+
+    if (newLimit > 25000) {
+      showPerformanceWarning();
+    }
+
+    setRecordLimit(newLimit);
+    setOffset(0); // Reset offset when limit changes
+    setFilters(prev => ({ ...prev, limit: newLimit, offset: 0 }));
+  };
+
+  // ... rest of component
+};
+```
+
+### Backend State (Service Layer)
+
+```typescript
+// server/services/epos-analytics-service.ts
+
+export class EposAnalyticsService {
+  /**
+   * Query EPOS sales data with filtering, counting, and pagination
+   * @returns QueryResult with records, totalCount, appliedLimit, appliedOffset
+   */
+  async querySalesData(params: EposSalesQuery): Promise<QueryResult> {
+    const { limit, offset, ...filters } = params;
+
+    // Build WHERE clause from filters
+    const whereClause = this.buildWhereClause(filters);
+    const whereParams = this.extractWhereParams(filters);
+
+    // COUNT query (same filters, no LIMIT)
+    const countQuery = `SELECT COUNT(*) as total FROM epos_sales_summaries ${whereClause}`;
+    const [countResult] = await db.query(countQuery, whereParams);
+    const totalCount = countResult[0].total;
+
+    // Apply safety cap
+    const effectiveLimit = Math.min(limit, MAX_SAFE_RECORDS);
+
+    // Data query with LIMIT and OFFSET
+    const dataQuery = `
+      SELECT * FROM epos_sales_summaries
+      ${whereClause}
+      ORDER BY ${params.sortBy} ${params.sortOrder}
+      LIMIT ? OFFSET ?
+    `;
+    const dataParams = [...whereParams, effectiveLimit, offset];
+    const records = await db.query(dataQuery, dataParams);
+
+    return {
+      records,
+      totalCount,
+      appliedLimit: effectiveLimit,
+      appliedOffset: offset
+    };
+  }
+
+  // ... helper methods
+}
+```
+
+---
+
+## Validation Rules
+
+### Input Validation (Server-Side)
+
+| Parameter | Type | Constraints | Default |
+|-----------|------|-------------|---------|
+| limit | number \| 'all' | 1-100000 or 'all' → 100000 | 10000 |
+| offset | number | >= 0 | 0 |
+| startDate | string | YYYY-MM-DD format | none |
+| endDate | string | YYYY-MM-DD format | none |
+| reportDate | string | YYYY-MM-DD format | none |
+| supplier | string | 1-255 chars | none |
+| category | string | 1-255 chars | none |
+| itemCode | string | 1-50 chars | none |
+| sortBy | enum | 'totalNet' \| 'totalQty' \| 'reportDate' | 'totalNet' |
+| sortOrder | enum | 'asc' \| 'desc' | 'desc' |
+
+### Business Rules
+
+1. **Safety Cap Enforcement**:
+   - If limit > 100000: Cap at 100000 and set meta.limit = 100000
+   - Return error message in response if cap was applied
+
+2. **Offset Validation**:
+   - If offset >= totalCount: Return empty data array, meta.hasMore = false
+   - No error thrown (valid edge case)
+
+3. **Filter Combination**:
+   - All filters are AND conditions
+   - If no filters applied: meta.filtered = false
+   - Empty filter values ignored (not treated as filter criteria)
+
+4. **Metadata Calculation**:
+   - hasMore = (offset + data.length) < totalCount
+   - filtered = any filter parameter provided (excluding limit/offset/sort)
+
+---
+
+## Summary
+
+**Schema Changes**: None (index addition only)
+**New Types**: 6 TypeScript interfaces
+**Validation**: Zod schema for all API inputs
+**State Management**: React state + TanStack Query
+**Performance**: Composite index ensures <200ms queries
+
+**Next Phase**: Phase 1 continued - Generate API contracts and quickstart scenarios

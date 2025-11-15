@@ -1,0 +1,526 @@
+# Implementation Tasks: Byte Bridges Enterprise Website
+
+**Feature**: 001-byte-bridges-enterprise
+**Branch**: `001-byte-bridges-enterprise`
+**Date**: 2025-11-07
+
+## Overview
+
+This document provides the complete, executable task breakdown for implementing the Byte Bridges enterprise consultancy website. Tasks are organized by user story to enable independent implementation and incremental delivery.
+
+## User Story Mapping
+
+| Story | Priority | Requirements | Description |
+|-------|----------|--------------|-------------|
+| US1 | P1 | FR-001, FR-002, FR-004 | Homepage with services, industries, testimonials |
+| US2 | P1 | FR-003 | Case studies library with filtering |
+| US3 | P1 | FR-005, FR-006 | Multi-step contact form with email |
+| US4 | P2 | FR-007, FR-010 | Blog/knowledge hub with admin management |
+| US5 | P2 | FR-009 | Admin authentication |
+| US6 | P2 | FR-011 | Case study admin management |
+| US7 | P2 | FR-008 | Global search functionality |
+| US8 | P3 | FR-012 | Technology stack showcase |
+| US9 | P3 | FR-013, FR-014, FR-015, FR-016 | Responsive design, analytics, accessibility, compliance |
+
+## MVP Scope
+
+**Minimum Viable Product** (first deployment): US1 + US3 + US5
+- Homepage showcasing services and industries
+- Contact form for lead generation
+- Basic admin authentication
+
+**Phase 2** additions: US2 + US4 + US6
+- Case studies library
+- Blog with content management
+
+**Phase 3** enhancements: US7 + US8 + US9
+- Search functionality
+- Technology showcase
+- Performance & compliance optimization
+
+---
+
+## Phase 1: Project Setup
+
+**Goal**: Initialize project structure, dependencies, and configuration
+
+- [ ] T001 Create database migration directory at database/migrations/
+- [ ] T002 [P] Create TypeScript types directory at src/types/
+- [ ] T003 [P] Create static data directory at src/data/
+- [ ] T004 [P] Set up environment variables template at .env.example
+- [ ] T005 Create database migration 001_initial_schema.sql for users table
+- [ ] T006 Create database migration 002_blog_posts.sql for blog_posts table
+- [ ] T007 Create database migration 003_case_studies.sql for case_studies table
+- [ ] T008 Create database migration 004_contact_submissions.sql for contact_submissions and testimonials tables
+- [ ] T009 Create database migration 005_functions.sql for GDPR delete and search functions
+- [ ] T010 Create database connection utility at src/lib/db.ts with connection pooling
+- [ ] T011 Create TypeScript database types at src/types/database.ts
+- [ ] T012 [P] Create API types at src/types/api.ts
+- [ ] T013 [P] Create entity types at src/types/entities.ts
+- [ ] T014 Update .gitignore with Next.js, TypeScript, and environment patterns
+- [ ] T015 [P] Create ESLint ignore file at .eslintignore
+- [ ] T016 [P] Create Prettier ignore file at .prettierignore (if .prettierrc exists)
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Goal**: Build shared infrastructure required by all user stories
+
+- [ ] T017 Create Zod validation schemas at src/lib/validation.ts (blog, case study, contact form schemas)
+- [ ] T018 Create NextAuth configuration at src/lib/auth/config.ts with credentials provider
+- [ ] T019 Create auth middleware at src/middleware.ts for route protection
+- [ ] T020 Create email service at src/lib/email.ts with Nodemailer
+- [ ] T021 Create Google Analytics helper at src/lib/analytics.ts
+- [ ] T022 Create root layout at src/app/layout.tsx with metadata API
+- [ ] T023 Create global styles at src/app/globals.css with TailwindCSS base
+- [ ] T024 Update Tailwind config at tailwind.config.ts with WCAG AA compliant colors
+- [ ] T025 [P] Create base UI components directory at src/components/ui/
+- [ ] T026 [P] Create Button component at src/components/ui/Button.tsx with accessibility
+- [ ] T027 [P] Create Card component at src/components/ui/Card.tsx
+- [ ] T028 [P] Create Input component at src/components/ui/Input.tsx with ARIA labels
+- [ ] T029 Create Header component at src/components/layout/Header.tsx with navigation
+- [ ] T030 Create Footer component at src/components/layout/Footer.tsx
+- [ ] T031 Create SEO metadata helper at src/lib/metadata.ts
+- [ ] T032 Create API error handler utility at src/lib/api-utils.ts
+
+---
+
+## Phase 3: User Story 1 - Homepage Showcase (P1)
+
+**Story**: As a potential client, I need to see services, industries, and testimonials on the homepage
+
+**Test Criteria**:
+- Homepage loads and displays all 6 services
+- All 6 industries are shown with descriptions
+- Featured testimonials carousel works
+- Page is WCAG 2.1 AA compliant
+- Lighthouse score >90
+
+### Implementation Tasks
+
+- [ ] T033 [US1] Create services static data at src/data/services.json with all 6 services
+- [ ] T034 [US1] Create industries static data at src/data/industries.json with all 6 industries
+- [ ] T035 [US1] Create testimonials schema and seed data in database
+- [ ] T036 [US1] Create homepage at src/app/page.tsx with hero section
+- [ ] T037 [US1] Create ServicesSection component at src/components/ServicesSection.tsx
+- [ ] T038 [US1] Create IndustriesSection component at src/components/IndustriesSection.tsx
+- [ ] T039 [US1] Create TestimonialsCarousel component at src/components/TestimonialsCarousel.tsx with Framer Motion
+- [ ] T040 [US1] Create CTASection component at src/components/CTASection.tsx
+- [ ] T041 [US1] Implement homepage data fetching (server component) in src/app/page.tsx
+- [ ] T042 [US1] Add SEO metadata to homepage with Open Graph tags
+- [ ] T043 [US1] Create individual service pages at src/app/services/[slug]/page.tsx
+- [ ] T044 [US1] Create individual industry pages at src/app/industries/[slug]/page.tsx
+- [ ] T045 [US1] Verify WCAG AA compliance with axe DevTools on homepage
+
+---
+
+## Phase 4: User Story 3 - Contact Form (P1)
+
+**Story**: As a visitor, I want to submit a contact form with my project details
+
+**Test Criteria**:
+- Multi-step form (3 steps) works correctly
+- Form validation shows clear error messages
+- Submission sends email to admin
+- User receives confirmation email
+- GDPR consent is required and tracked
+- Rate limiting prevents spam (max 3 submissions/hour per IP)
+
+### Implementation Tasks
+
+- [ ] T046 [US3] Create multi-step contact form component at src/components/forms/ContactForm.tsx with React Hook Form
+- [ ] T047 [US3] Create form step 1: BasicInfo component at src/components/forms/ContactFormStep1.tsx
+- [ ] T048 [US3] Create form step 2: ProjectDetails component at src/components/forms/ContactFormStep2.tsx
+- [ ] T049 [US3] Create form step 3: Message component at src/components/forms/ContactFormStep3.tsx
+- [ ] T050 [US3] Create contact page at src/app/contact/page.tsx
+- [ ] T051 [US3] Create POST /api/contact route at src/app/api/contact/route.ts
+- [ ] T052 [US3] Implement contact form validation with Zod in API route
+- [ ] T053 [US3] Implement rate limiting check (IP-based, 3/hour) in contact API
+- [ ] T054 [US3] Implement database insertion for contact_submissions table
+- [ ] T055 [US3] Implement email notification to admin using Nodemailer
+- [ ] T056 [US3] Implement confirmation email to user
+- [ ] T057 [US3] Add Google Analytics event tracking for form submission
+- [ ] T058 [US3] Create success confirmation component at src/components/ContactSuccess.tsx
+- [ ] T059 [US3] Test contact form end-to-end with Playwright at tests/e2e/contact.spec.ts
+
+---
+
+## Phase 5: User Story 5 - Admin Authentication (P1 for MVP)
+
+**Story**: As an admin, I need to securely log in to manage content
+
+**Test Criteria**:
+- Admin can sign in with email and password
+- Session persists across page refreshes
+- Protected routes redirect to sign-in if unauthenticated
+- Session expires after 7 days
+- Failed login attempts are rate-limited
+
+### Implementation Tasks
+
+- [ ] T060 [US5] Create admin sign-in page at src/app/signin/page.tsx
+- [ ] T061 [US5] Create sign-in form component at src/components/forms/SignInForm.tsx
+- [ ] T062 [US5] Implement NextAuth API routes at src/app/api/auth/[...nextauth]/route.ts
+- [ ] T063 [US5] Create session provider wrapper at src/components/SessionProvider.tsx
+- [ ] T064 [US5] Update root layout to include SessionProvider
+- [ ] T065 [US5] Create auth error page at src/app/auth/error/page.tsx
+- [ ] T066 [US5] Create admin dashboard layout at src/app/(admin)/layout.tsx with auth check
+- [ ] T067 [US5] Create admin dashboard page at src/app/(admin)/dashboard/page.tsx
+- [ ] T068 [US5] Create user setup script at scripts/setup-demo-accounts.js for creating initial admin
+- [ ] T069 [US5] Test authentication flow with Playwright at tests/e2e/auth.spec.ts
+
+---
+
+## Phase 6: User Story 2 - Case Studies Library (P1)
+
+**Story**: As a visitor, I want to browse case studies filtered by industry and service
+
+**Test Criteria**:
+- Case studies list page loads with all published cases
+- Filter by industry works correctly
+- Filter by service type works correctly
+- Individual case study pages display all details
+- Results metrics are displayed properly
+- Testimonial quotes from case studies are shown
+
+### Implementation Tasks
+
+- [ ] T070 [US2] Create case studies list page at src/app/case-studies/page.tsx
+- [ ] T071 [US2] Create case study card component at src/components/cards/CaseStudyCard.tsx
+- [ ] T072 [US2] Create case study filter component at src/components/CaseStudyFilters.tsx
+- [ ] T073 [US2] Create GET /api/case-studies route at src/app/api/case-studies/route.ts
+- [ ] T074 [US2] Implement case study filtering logic (industry, service) in API route
+- [ ] T075 [US2] Create individual case study page at src/app/case-studies/[slug]/page.tsx
+- [ ] T076 [US2] Create GET /api/case-studies/[slug] route at src/app/api/case-studies/[slug]/route.ts
+- [ ] T077 [US2] Create case study hero component at src/components/CaseStudyHero.tsx
+- [ ] T078 [US2] Create results metrics component at src/components/ResultsMetrics.tsx
+- [ ] T079 [US2] Create image gallery component at src/components/ImageGallery.tsx with Next.js Image
+- [ ] T080 [US2] Add SEO metadata generation for case study pages
+- [ ] T081 [US2] Test case study filtering with Playwright at tests/e2e/case-studies.spec.ts
+
+---
+
+## Phase 7: User Story 4 - Blog/Knowledge Hub (P2)
+
+**Story**: As a visitor, I want to read technical articles and thought leadership content
+
+**Test Criteria**:
+- Blog list page shows published posts with pagination
+- Filter by category works
+- Filter by tags works
+- Individual blog posts render Markdown content correctly
+- Reading time estimate is accurate
+- View count increments on each view
+
+### Implementation Tasks
+
+- [ ] T082 [US4] Create blog list page at src/app/blog/page.tsx
+- [ ] T083 [US4] Create blog post card component at src/components/cards/BlogPostCard.tsx
+- [ ] T084 [US4] Create blog category filter component at src/components/BlogCategoryFilter.tsx
+- [ ] T085 [US4] Create GET /api/blog route at src/app/api/blog/route.ts with pagination
+- [ ] T086 [US4] Implement blog post filtering (category, tag) in API route
+- [ ] T087 [US4] Create individual blog post page at src/app/blog/[slug]/page.tsx
+- [ ] T088 [US4] Create GET /api/blog/[slug] route at src/app/api/blog/[slug]/route.ts
+- [ ] T089 [US4] Implement view count increment (async, non-blocking) in blog API
+- [ ] T090 [US4] Create Markdown renderer component at src/components/MarkdownContent.tsx
+- [ ] T091 [US4] Create blog post hero component at src/components/BlogPostHero.tsx
+- [ ] T092 [US4] Add reading time calculation utility at src/lib/reading-time.ts
+- [ ] T093 [US4] Add SEO metadata generation for blog posts
+- [ ] T094 [US4] Create blog sidebar with categories and tags at src/components/BlogSidebar.tsx
+- [ ] T095 [US4] Test blog pagination and filtering with Playwright at tests/e2e/blog.spec.ts
+
+### Admin Management Tasks
+
+- [ ] T096 [US4] Create admin blog list page at src/app/(admin)/blog/page.tsx
+- [ ] T097 [US4] Create admin blog editor page at src/app/(admin)/blog/new/page.tsx
+- [ ] T098 [US4] Create admin blog edit page at src/app/(admin)/blog/[id]/edit/page.tsx
+- [ ] T099 [US4] Create blog editor component at src/components/admin/BlogEditor.tsx with rich text
+- [ ] T100 [US4] Create POST /api/blog route at src/app/api/blog/route.ts for creating posts
+- [ ] T101 [US4] Implement auto slug generation from title in blog POST API
+- [ ] T102 [US4] Create PUT /api/blog/[id] route at src/app/api/blog/[id]/route.ts for updates
+- [ ] T103 [US4] Create DELETE /api/blog/[id] route at src/app/api/blog/[id]/route.ts for soft delete
+- [ ] T104 [US4] Implement blog post publish/unpublish toggle
+- [ ] T105 [US4] Add cache revalidation on blog post create/update/delete
+- [ ] T106 [US4] Test admin blog management with Playwright at tests/e2e/admin-blog.spec.ts
+
+---
+
+## Phase 8: User Story 6 - Case Study Admin Management (P2)
+
+**Story**: As an admin, I want to create, edit, and delete case studies
+
+**Test Criteria**:
+- Admin can create new case studies with all fields
+- Admin can edit existing case studies
+- Admin can delete case studies (soft delete)
+- Results metrics are properly saved as JSON
+- Gallery images are uploaded and stored
+- Published/unpublished toggle works
+- Display order can be set for homepage showcase
+
+### Implementation Tasks
+
+- [ ] T107 [US6] Create admin case studies list page at src/app/(admin)/case-studies/page.tsx
+- [ ] T108 [US6] Create admin case study editor page at src/app/(admin)/case-studies/new/page.tsx
+- [ ] T109 [US6] Create admin case study edit page at src/app/(admin)/case-studies/[id]/edit/page.tsx
+- [ ] T110 [US6] Create case study editor component at src/components/admin/CaseStudyEditor.tsx
+- [ ] T111 [US6] Create results metrics editor component at src/components/admin/ResultsMetricsEditor.tsx
+- [ ] T112 [US6] Create image upload component at src/components/admin/ImageUpload.tsx
+- [ ] T113 [US6] Create POST /api/case-studies route at src/app/api/case-studies/route.ts for creating
+- [ ] T114 [US6] Create PUT /api/case-studies/[id] route at src/app/api/case-studies/[id]/route.ts for updates
+- [ ] T115 [US6] Create DELETE /api/case-studies/[id] route at src/app/api/case-studies/[id]/route.ts for soft delete
+- [ ] T116 [US6] Implement display order management in case study admin
+- [ ] T117 [US6] Add cache revalidation on case study create/update/delete
+- [ ] T118 [US6] Test admin case study management with Playwright at tests/e2e/admin-case-studies.spec.ts
+
+---
+
+## Phase 9: User Story 7 - Search Functionality (P2)
+
+**Story**: As a user, I want to search across all content types (services, industries, case studies, blog posts)
+
+**Test Criteria**:
+- Search bar in header accepts queries
+- Search results page shows results from all content types
+- Results are ranked by relevance
+- Empty search shows helpful message
+- Search highlights matching text
+- Search is performant (<500ms for typical queries)
+
+### Implementation Tasks
+
+- [ ] T119 [US7] Create search overlay component at src/components/SearchOverlay.tsx with keyboard shortcuts
+- [ ] T120 [US7] Integrate search overlay into Header component
+- [ ] T121 [US7] Create search results page at src/app/search/page.tsx
+- [ ] T122 [US7] Create search result card component at src/components/cards/SearchResultCard.tsx
+- [ ] T123 [US7] Create GET /api/search route at src/app/api/search/route.ts
+- [ ] T124 [US7] Implement PostgreSQL full-text search for blog posts in search API
+- [ ] T125 [US7] Implement PostgreSQL full-text search for case studies in search API
+- [ ] T126 [US7] Implement client-side search for services (JSON data) in search API
+- [ ] T127 [US7] Implement client-side search for industries (JSON data) in search API
+- [ ] T128 [US7] Add search result ranking by relevance and recency
+- [ ] T129 [US7] Add search result highlighting with ts_headline
+- [ ] T130 [US7] Create empty state component at src/components/EmptySearchResults.tsx
+- [ ] T131 [US7] Add search analytics tracking
+- [ ] T132 [US7] Test search functionality with Playwright at tests/e2e/search.spec.ts
+
+---
+
+## Phase 10: User Story 8 - Technology Stack Showcase (P3)
+
+**Story**: As an IT decision maker, I want to see the technologies and expertise levels
+
+**Test Criteria**:
+- Technology stack page displays all technologies
+- Technologies are grouped by category (frontend, backend, database, cloud, mobile, devops, AI/ML)
+- Proficiency level is clearly indicated (expert, advanced, proficient)
+- Related services are linked for each technology
+- Page is visually engaging with logos and descriptions
+
+### Implementation Tasks
+
+- [ ] T133 [US8] Create technologies static data at src/data/technologies.json
+- [ ] T134 [US8] Create technology stack page at src/app/technology/page.tsx
+- [ ] T135 [US8] Create technology category section component at src/components/TechCategorySection.tsx
+- [ ] T136 [US8] Create technology card component at src/components/cards/TechCard.tsx with logo
+- [ ] T137 [US8] Create proficiency badge component at src/components/ProficiencyBadge.tsx
+- [ ] T138 [US8] Add technology page SEO metadata
+- [ ] T139 [US8] Test technology page rendering with Playwright
+
+---
+
+## Phase 11: User Story 9 - Polish & Compliance (P3)
+
+**Story**: As a user, I expect the site to be fast, accessible, compliant, and work on all devices
+
+**Test Criteria**:
+- Lighthouse score >90 on all core pages
+- WCAG 2.1 Level AA compliance verified
+- Google Analytics tracking works
+- Cookie consent banner appears and functions
+- Data retention policy is enforced (2-year retention for contacts)
+- Responsive design works on mobile, tablet, desktop
+- Core Web Vitals meet targets (LCP <2.5s, FID <100ms, CLS <0.1)
+
+### Implementation Tasks
+
+- [ ] T140 [US9] Create Google Analytics component at src/components/GoogleAnalytics.tsx
+- [ ] T141 [US9] Create cookie consent banner at src/components/CookieBanner.tsx with local storage
+- [ ] T142 [US9] Integrate Google Analytics into root layout
+- [ ] T143 [US9] Create privacy policy page at src/app/privacy/page.tsx
+- [ ] T144 [US9] Create terms of service page at src/app/terms/page.tsx
+- [ ] T145 [US9] Implement data retention cleanup cron job at scripts/data-retention-cleanup.js
+- [ ] T146 [US9] Add sitemap generation configuration at next-sitemap.config.js
+- [ ] T147 [US9] Create robots.txt at public/robots.txt
+- [ ] T148 [US9] Add structured data (JSON-LD) for Organization schema
+- [ ] T149 [US9] Optimize images with Next.js Image component across all pages
+- [ ] T150 [US9] Implement code splitting for admin routes with dynamic imports
+- [ ] T151 [US9] Add loading states with Suspense for async server components
+- [ ] T152 [US9] Configure cache headers for static assets
+- [ ] T153 [US9] Run Lighthouse audit on all core pages and fix issues
+- [ ] T154 [US9] Run axe accessibility audit and fix all violations
+- [ ] T155 [US9] Test responsive design on mobile, tablet, desktop with Playwright
+- [ ] T156 [US9] Create visual regression tests at tests/visual/visual-regression.spec.ts
+- [ ] T157 [US9] Update visual regression baselines with npm run test:update-snapshots
+
+---
+
+## Final Phase: Cross-Cutting & Documentation
+
+**Goal**: Complete remaining cross-cutting concerns and documentation
+
+- [ ] T158 Create about/team page at src/app/about/page.tsx
+- [ ] T159 Create 404 error page at src/app/not-found.tsx
+- [ ] T160 Create 500 error page at src/app/error.tsx
+- [ ] T161 Add error boundary handling across all pages
+- [ ] T162 Create loading skeletons for data fetching at src/components/skeletons/
+- [ ] T163 Add toast notifications with react-hot-toast
+- [ ] T164 Create database backup script at scripts/db-backup.js
+- [ ] T165 Create database restore script at scripts/db-restore.js
+- [ ] T166 Update README.md with setup instructions
+- [ ] T167 Create deployment guide at docs/DEPLOYMENT.md
+- [ ] T168 Run full test suite with npm test
+- [ ] T169 Fix any failing tests
+- [ ] T170 Build production bundle with npm run build
+- [ ] T171 Test production build locally with npm start
+- [ ] T172 Deploy to Vercel and verify deployment
+
+---
+
+## Dependency Graph
+
+```
+Phase 1 (Setup)
+  ↓
+Phase 2 (Foundational) ← Must complete before any user stories
+  ↓
+┌──────────────┬──────────────┬──────────────┐
+│              │              │              │
+▼              ▼              ▼              ▼
+US1: Homepage  US3: Contact  US5: Auth      US8: Tech Stack
+(Independent)  (Independent) (Blocks US4,6) (Independent)
+               │
+               │ Requires US5
+               ▼
+       ┌───────┴────────┐
+       │                │
+       ▼                ▼
+    US4: Blog      US6: Case Study Admin
+    (Independent)  (Independent)
+       │
+       │ Can leverage blog/case data
+       ▼
+    US2: Case Studies Library
+    (Independent, but better with data)
+       │
+       │ Benefits from having content
+       ▼
+    US7: Search
+    (Independent)
+       │
+       ▼
+    US9: Polish
+    (Applies to all)
+```
+
+## Parallel Execution Opportunities
+
+### Phase 1 (Setup)
+- T002, T003 can run in parallel (different directories)
+- T005-T009 can run sequentially (database migrations order matters)
+- T011-T013, T015-T016 can run in parallel (different files)
+
+### Phase 2 (Foundational)
+- T025-T028 can run in parallel (independent UI components)
+
+### Phase 3 (US1 - Homepage)
+- T033-T034 can run in parallel (independent JSON files)
+- T037-T040 can run in parallel (independent components)
+
+### Phase 4 (US3 - Contact)
+- T047-T049 can run in parallel (independent form step components)
+
+### Phase 6 (US2 - Case Studies)
+- T071-T072 can run in parallel (independent components)
+- T077-T079 can run in parallel (independent components)
+
+### Phase 7 (US4 - Blog)
+- T083-T084 can run in parallel (independent components)
+- T096-T098 can be created in parallel (different admin pages)
+
+## Implementation Strategy
+
+### MVP First (Recommended Launch Order)
+
+**Week 1-2: Core Infrastructure + Homepage**
+- Complete Phase 1 (Setup)
+- Complete Phase 2 (Foundational)
+- Complete Phase 3 (US1 - Homepage)
+- **Deliverable**: Working homepage showcasing services and industries
+
+**Week 3: Lead Generation**
+- Complete Phase 4 (US3 - Contact Form)
+- Complete Phase 5 (US5 - Admin Auth)
+- **Deliverable**: Contact form collecting leads + admin access
+
+**Week 4-5: Content Management**
+- Complete Phase 6 (US2 - Case Studies)
+- Complete Phase 7 (US4 - Blog)
+- Complete Phase 8 (US6 - Admin Case Study Management)
+- **Deliverable**: Full content management system
+
+**Week 6: Enhancement & Launch**
+- Complete Phase 9 (US7 - Search)
+- Complete Phase 10 (US8 - Tech Stack)
+- Complete Phase 11 (US9 - Polish)
+- Complete Final Phase (Cross-cutting)
+- **Deliverable**: Production-ready site with all features
+
+### Incremental Deployment
+
+1. **Deploy MVP** (US1 + US3 + US5): Homepage + Contact + Auth
+2. **Deploy Phase 2** (+ US2 + US4 + US6): Add content
+3. **Deploy Final** (+ US7 + US8 + US9): Full feature set
+
+Each deployment is independently valuable and can collect user feedback.
+
+---
+
+## Task Summary
+
+- **Total Tasks**: 172
+- **Setup Phase**: 16 tasks
+- **Foundational Phase**: 16 tasks
+- **US1 (Homepage)**: 13 tasks
+- **US2 (Case Studies)**: 12 tasks
+- **US3 (Contact)**: 14 tasks
+- **US4 (Blog)**: 25 tasks (incl. admin)
+- **US5 (Auth)**: 10 tasks
+- **US6 (Case Study Admin)**: 12 tasks
+- **US7 (Search)**: 14 tasks
+- **US8 (Tech Stack)**: 7 tasks
+- **US9 (Polish)**: 18 tasks
+- **Final Phase**: 15 tasks
+
+**Parallel Opportunities**: ~30 tasks can be executed in parallel
+**Estimated Duration**: 6 weeks with single developer, 3-4 weeks with team
+
+---
+
+## Validation Checklist
+
+- [x] All tasks follow checklist format (checkbox + ID + labels + description + file path)
+- [x] Tasks organized by user story for independent implementation
+- [x] Each user story has clear test criteria
+- [x] Dependencies are explicitly documented
+- [x] Parallel execution opportunities identified
+- [x] MVP scope clearly defined
+- [x] File paths are specific and actionable
+- [x] Agent assignments available in quickstart.md
+- [x] Implementation follows plan.md architecture
+- [x] All FR requirements covered by tasks
+
+**Ready for implementation** ✅
+
+Run `/speckit.implement` to begin execution.

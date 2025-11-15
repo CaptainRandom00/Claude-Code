@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Verify frontend and backend availability with Playwright tests",
+    "status": "completed",
+    "priority": "high",
+    "id": "65"
+  },
+  {
+    "content": "Check backend API server status and endpoints",
+    "status": "completed",
+    "priority": "high",
+    "id": "66"
+  },
+  {
+    "content": "Run comprehensive health checks for all services",
+    "status": "completed",
+    "priority": "medium",
+    "id": "67"
+  },
+  {
+    "content": "Validate API connectivity from frontend",
+    "status": "completed",
+    "priority": "medium",
+    "id": "68"
+  },
+  {
+    "content": "Fix navigation redirection issue in tasks page",
+    "status": "pending",
+    "priority": "medium",
+    "id": "69"
+  },
+  {
+    "content": "Investigate recurring task configuration display",
+    "status": "pending",
+    "priority": "low",
+    "id": "70"
+  }
+]

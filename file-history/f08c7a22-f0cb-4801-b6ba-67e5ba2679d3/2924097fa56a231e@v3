@@ -1,0 +1,486 @@
+# Feature Specification: Product Image Management for Stock Profiles
+
+**Feature Branch**: `025-product-image-management`
+**Created**: 2025-10-07
+**Status**: Draft
+**Input**: User description: "Add comprehensive product image management system to Stock Profiles module. Users can upload, view, and manage up to 5 product images per product from the Edit Product popup."
+
+## Execution Flow (main)
+```
+1. Parse user description from Input
+   � Feature scope: Image upload, compression, storage, and management for product profiles
+2. Extract key concepts from description
+   � Actors: Warehouse managers, inventory staff, product managers
+   � Actions: Upload, view, navigate, delete, set primary image
+   � Data: Product images (max 5), metadata, compression statistics
+   � Constraints: 5 image limit, 10MB file size, specific formats, auto-compression
+3. For each unclear aspect:
+   � All requirements specified by user (comprehensive)
+4. Fill User Scenarios & Testing section
+   � User flow: Edit product � Upload images � View/navigate � Manage
+5. Generate Functional Requirements
+   � Each requirement is testable (upload limits, compression, navigation, etc.)
+6. Identify Key Entities
+   � Product Profile, Product Image, Image Metadata
+7. Run Review Checklist
+   � SUCCESS: All requirements clear and testable
+8. Return: SUCCESS (spec ready for planning)
+```
+
+---
+
+## � Quick Guidelines
+-  Focus on WHAT users need and WHY
+- L Avoid HOW to implement (no tech stack, APIs, code structure)
+- =e Written for business stakeholders, not developers
+
+---
+
+## User Scenarios & Testing *(mandatory)*
+
+### Primary User Story
+
+**As a warehouse manager**, I want to upload and manage product images so that I can visually identify products in the inventory system, reduce picking errors, and improve product verification during stock management.
+
+**Context**: Currently, the Stock Profiles module only shows text-based product information (item code, description, category, supplier). Users must memorize product appearances or refer to external documentation, leading to identification errors and slower operations.
+
+### User Journey
+
+1. **Initial State**: User viewing stock profiles list, sees text-only product information
+2. **Action**: User clicks "Edit" on product (e.g., item code 10033 "WU CHUNG VEGETARIAN MOCK DUCK")
+3. **Edit Modal Opens**: User sees existing product details (description, supplier, category, packaging)
+4. **New Section Visible**: "Product Images (Max 5)" card appears after packaging section
+5. **Empty State**: If no images exist, user sees upload prompt: "No images yet. Drag images here or click to browse"
+6. **Upload Action**: User drags 3 product photos from desktop onto upload zone (or clicks browse button)
+7. **Visual Feedback**: Upload zone highlights during drag-over, progress bar shows "Uploading 2 of 3..."
+8. **Auto-Processing**: System automatically compresses images, shows compression stats ("Original: 5MB � Compressed: 800KB")
+9. **Success**: Toast notification "3 images uploaded successfully!" appears
+10. **Display**: Thumbnail grid shows 3 images in 4-column layout (150x150px each)
+11. **Image Count**: Badge shows "3/5" indicating 3 of 5 maximum images uploaded
+12. **View Full Size**: User clicks any thumbnail, carousel viewer opens at 800x800px
+13. **Navigate Images**: User uses arrow buttons or keyboard (Left/Right keys) to browse images
+14. **Image Counter**: Displays "Image 2 of 3" at top of carousel
+15. **Set Primary**: User clicks "Set as Primary" button, gold star badge appears on thumbnail
+16. **Delete Image**: User clicks "Delete" button, confirmation dialog appears
+17. **Confirm Deletion**: User confirms, image removed immediately, grid updates to show "2/5"
+18. **Save Product**: User clicks "Save" on product edit modal, all image metadata persisted
+19. **Future Edits**: When user reopens product, all images remain visible and manageable
+
+### Acceptance Scenarios
+
+#### Scenario 1: First-Time Image Upload
+**Given** a product with no existing images
+**When** user opens Edit Product popup
+**Then** system displays empty state with upload prompt and icon
+**And** user can drag-drop OR click browse button to select images
+**And** system accepts only JPG, JPEG, PNG, WEBP formats
+**And** system shows upload progress for each image
+**And** system automatically compresses images to WebP format
+**And** system displays compression statistics to user
+**And** thumbnail grid appears after successful upload
+
+#### Scenario 2: Viewing Multiple Images
+**Given** a product with 3 uploaded images
+**When** user opens Edit Product popup
+**Then** system displays 3 thumbnails in grid layout (4 columns, 150x150px)
+**And** image count badge shows "3/5"
+**And** primary image has visible gold star indicator
+**When** user clicks any thumbnail
+**Then** carousel viewer opens in full-screen mode (800x800px max)
+**And** selected image displays at full resolution
+**And** image counter shows "Image 2 of 3" (or current position)
+**And** navigation arrows allow previous/next browsing
+**And** keyboard arrows (Left/Right) navigate between images
+**And** ESC key closes carousel viewer
+
+#### Scenario 3: Managing Image Limit
+**Given** a product with 4 uploaded images
+**When** user attempts to upload 2 more images
+**Then** system prevents upload after 1st additional image
+**And** displays message "Maximum 5 images reached"
+**And** upload button becomes disabled
+**And** badge shows "5/5 (max)"
+**When** user deletes 1 image
+**Then** system enables upload button again
+**And** badge updates to "4/5"
+**And** user can upload 1 more image
+
+#### Scenario 4: Setting Primary Image
+**Given** a product with 3 images, image #1 is currently primary
+**When** user opens carousel and navigates to image #3
+**And** clicks "Set as Primary" button
+**Then** system immediately marks image #3 as primary
+**And** gold star indicator moves from image #1 to image #3
+**And** toast notification confirms "Image set as primary"
+**And** image #3 displays first in future views
+
+#### Scenario 5: Deleting Images with Confirmation
+**Given** a product with 5 images
+**When** user opens carousel and clicks "Delete" on image #2
+**Then** system displays confirmation dialog "Are you sure you want to delete this image?"
+**When** user clicks "Cancel"
+**Then** dialog closes and image remains
+**When** user clicks "Delete" again and confirms
+**Then** image #2 is immediately removed from grid
+**And** remaining images reorder (image #3 becomes #2, etc.)
+**And** image count updates to "4/5"
+**And** toast notification confirms "Image deleted successfully"
+
+#### Scenario 6: File Size and Type Validation
+**Given** user attempts to upload an image
+**When** file is larger than 10MB
+**Then** system rejects upload before processing
+**And** displays error message "File size exceeds 10MB limit"
+**When** file type is PDF or TXT
+**Then** system rejects upload
+**And** displays error message "Only JPG, JPEG, PNG, WEBP formats accepted"
+**When** file is 8MB JPG
+**Then** system accepts and compresses to ~1-2MB WebP
+**And** displays compression stats showing size reduction
+
+#### Scenario 7: Concurrent Edit Protection
+**Given** User A has product 10033 open for editing and uploaded 2 images
+**When** User B opens same product for editing
+**Then** system displays existing edit session warning (leverages existing lock mechanism)
+**And** User B sees read-only view OR waits for User A to finish
+**When** User A saves and closes
+**Then** User B can now edit and manage images
+
+### Edge Cases
+
+#### What happens when network fails during upload?
+- **Behavior**: System detects upload timeout (30 seconds)
+- **User Sees**: Error toast "Upload failed - network error. Please retry."
+- **Action**: User can click "Retry" button to attempt upload again
+- **Data**: No partial images saved; upload is atomic (all or nothing)
+
+#### What happens when user closes modal during upload?
+- **Behavior**: System cancels in-progress uploads
+- **User Sees**: Warning dialog "Upload in progress. Cancel upload and close?"
+- **Action**: User can confirm cancel or return to wait for completion
+- **Data**: Cancelled uploads not saved; only completed uploads persist
+
+#### What happens when disk space is full?
+- **Behavior**: Server detects insufficient space during compression
+- **User Sees**: Error toast "Upload failed - server storage full. Contact administrator."
+- **Action**: User cannot upload until administrator frees space
+- **Data**: Error logged for admin monitoring
+
+#### What happens when image dimensions are too small?
+- **Behavior**: System validates minimum 100x100px dimensions
+- **User Sees**: Error toast "Image too small. Minimum 100x100 pixels required."
+- **Action**: User must select larger image
+- **Data**: Image rejected before upload begins
+
+#### What happens when user rapidly clicks "Delete" on multiple images?
+- **Behavior**: System queues delete operations, shows loading state
+- **User Sees**: Spinner on images being deleted, sequential confirmations
+- **Action**: Each delete requires individual confirmation (no batch delete without explicit feature)
+- **Data**: Optimistic UI shows removal immediately; reverts if server fails
+
+#### What happens when user uploads same image twice?
+- **Behavior**: System allows duplicate uploads (filename hashing makes each unique)
+- **User Sees**: Both images appear in grid, counted toward 5-image limit
+- **Action**: User can manually delete duplicate if desired
+- **Data**: Each upload creates separate metadata entry with unique ID
+
+#### What happens to images when product is deleted?
+- **Expected Behavior**: [NEEDS CLARIFICATION: Should images be deleted CASCADE with product, or retained for audit/recovery?]
+- **Options**:
+  - Option A: Delete all images when product deleted (free storage)
+  - Option B: Soft-delete (mark inactive, allow recovery)
+  - Option C: Archive to separate location with retention policy
+
+#### What happens when user has slow internet connection?
+- **Behavior**: System shows extended upload time with progress percentage
+- **User Sees**: Progress bar updates every few seconds (e.g., "25% uploaded...")
+- **Action**: User can cancel upload if too slow
+- **Data**: Timeout set to 60 seconds for slow connections
+
+---
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+#### Image Upload System
+- **FR-025.1**: System MUST support drag-and-drop file upload with visual feedback (drop zone highlights on drag-over)
+- **FR-025.2**: System MUST provide fallback file browser button for users who prefer traditional upload
+- **FR-025.3**: System MUST accept only JPG, JPEG, PNG, and WEBP image formats
+- **FR-025.4**: System MUST reject any file type other than specified image formats
+- **FR-025.5**: System MUST enforce maximum 5 images per product
+- **FR-025.6**: System MUST enforce maximum 10MB file size per image before compression
+- **FR-025.7**: System MUST display upload progress indicator showing percentage completion
+- **FR-025.8**: System MUST display compression statistics after successful upload (e.g., "Original: 5MB � Compressed: 800KB")
+- **FR-025.9**: System MUST prevent additional uploads when 5-image limit is reached
+- **FR-025.10**: System MUST display clear message "Maximum 5 images reached" when limit hit
+
+#### Image Compression & Storage
+- **FR-025.11**: System MUST automatically compress all uploaded images to WebP format
+- **FR-025.12**: System MUST use 85% quality setting for WebP compression
+- **FR-025.13**: System MUST resize images exceeding 1200x1200 pixels while maintaining aspect ratio
+- **FR-025.14**: System MUST generate 300x300 pixel thumbnails for grid display (center crop)
+- **FR-025.15**: System MUST strip EXIF metadata from images for privacy and security
+- **FR-025.16**: System MUST hash filenames using MD5(itemCode + description + timestamp) to ensure uniqueness
+- **FR-025.17**: System MUST store images in organized folder structure: /uploads/product-images/{itemCode}/
+- **FR-025.18**: System MUST store both original compressed image and thumbnail for each upload
+- **FR-025.19**: System MUST achieve 60-80% file size reduction through compression
+- **FR-025.20**: System MUST generate unique filename for each image preventing collisions
+
+#### Image Display & Navigation
+- **FR-025.21**: System MUST display uploaded images in 4-column grid layout
+- **FR-025.22**: System MUST render thumbnails at 150x150 pixels in grid view
+- **FR-025.23**: System MUST display image count badge (e.g., "3/5" or "5/5 (max)")
+- **FR-025.24**: System MUST mark primary image with visible gold star badge
+- **FR-025.25**: System MUST open full-size carousel viewer when user clicks any thumbnail
+- **FR-025.26**: System MUST display images at maximum 800x800 pixels in carousel viewer
+- **FR-025.27**: System MUST provide previous/next arrow buttons for image navigation in carousel
+- **FR-025.28**: System MUST support keyboard navigation (Left/Right arrow keys, ESC to close) in carousel
+- **FR-025.29**: System MUST display image counter (e.g., "Image 2 of 5") in carousel viewer
+- **FR-025.30**: System MUST display empty state message "No images yet. Drag images here or click to browse" when no images exist
+- **FR-025.31**: System MUST display skeleton loader animation during image loading
+- **FR-025.32**: System MUST display error message with retry button when image load fails
+
+#### Image Management
+- **FR-025.33**: System MUST allow users to designate any uploaded image as primary
+- **FR-025.34**: System MUST display confirmation dialog before deleting any image
+- **FR-025.35**: System MUST immediately update UI after user actions (optimistic updates)
+- **FR-025.36**: System MUST display toast notifications for all successful operations (upload, delete, set primary)
+- **FR-025.37**: System MUST display toast notifications for all failed operations with error details
+- **FR-025.38**: System MUST persist primary image designation when saving product
+- **FR-025.39**: System MUST remove deleted images from storage and database
+- **FR-025.40**: System MUST update image count badge immediately after upload or delete operations
+
+#### Data Persistence
+- **FR-025.41**: System MUST store primary image path in product_profiles.primary_image_path field
+- **FR-025.42**: System MUST store complete image metadata (filename, size, dimensions, upload date) in product_profiles.image_metadata JSON field
+- **FR-025.43**: System MUST store total image count in product_profiles.image_count field
+- **FR-025.44**: System MUST update product_profiles.last_image_updated timestamp on any image operation
+- **FR-025.45**: System MUST persist all image data when user saves product edits
+- **FR-025.46**: System MUST load existing images when user opens product for editing
+
+#### Security & Validation
+- **FR-025.47**: System MUST validate file types on server-side (not just client-side extension check)
+- **FR-025.48**: System MUST sanitize filenames to prevent directory traversal attacks
+- **FR-025.49**: System MUST validate minimum image dimensions (100x100 pixels)
+- **FR-025.50**: System MUST require user authentication for all image upload operations
+- **FR-025.51**: System MUST require user authentication for all image delete operations
+- **FR-025.52**: System MUST rate-limit uploads to maximum 10 uploads per minute per user
+- **FR-025.53**: System MUST handle disk space full scenarios gracefully with clear error message
+- **FR-025.54**: System MUST validate that uploaded files are actual images (not renamed malicious files)
+
+#### User Experience
+- **FR-025.55**: System MUST provide visual feedback for all user actions (hover states, loading states, success/error states)
+- **FR-025.56**: System MUST display smooth transitions and animations (fade-in for loaded images)
+- **FR-025.57**: System MUST work on mobile and tablet devices (responsive design)
+- **FR-025.58**: System MUST support keyboard accessibility (tab navigation, enter to upload)
+- **FR-025.59**: System MUST include screen reader support with proper ARIA labels
+- **FR-025.60**: System MUST highlight drag-drop zone when file is dragged over it
+- **FR-025.61**: System MUST validate files before attempting upload and provide immediate feedback
+- **FR-025.62**: System MUST gracefully degrade when images fail to load (show placeholder)
+
+#### Performance
+- **FR-025.63**: System MUST lazy-load thumbnail images (only load visible images)
+- **FR-025.64**: System MUST respond to image API requests in under 200ms (constitutional requirement)
+- **FR-025.65**: System MUST cache image metadata for 5 minutes to reduce database queries
+- **FR-025.66**: System MUST implement progressive image loading (blur-up effect) for better perceived performance
+
+#### Error Handling
+- **FR-025.67**: System MUST handle network timeouts gracefully with retry option
+- **FR-025.68**: System MUST detect concurrent edit conflicts and warn users (leverage existing edit session system)
+- **FR-025.69**: System MUST provide clear error messages for invalid file types
+- **FR-025.70**: System MUST provide clear error messages for image processing failures
+- **FR-025.71**: System MUST log all image operation errors for administrator monitoring
+
+### Non-Functional Requirements
+
+#### Usability
+- **NFR-025.1**: Users MUST be able to complete image upload workflow within 30 seconds for 5 images
+- **NFR-025.2**: Users MUST be able to navigate carousel with keyboard alone (accessibility requirement)
+- **NFR-025.3**: Error messages MUST be written in plain language understandable by non-technical users
+- **NFR-025.4**: UI MUST follow existing application design patterns and component library
+
+#### Performance
+- **NFR-025.5**: Image compression MUST complete within 5 seconds per image
+- **NFR-025.6**: Thumbnail generation MUST complete within 2 seconds per image
+- **NFR-025.7**: API endpoint response time MUST be under 200ms (99th percentile)
+- **NFR-025.8**: System MUST handle concurrent uploads from 10 users without degradation
+
+#### Security
+- **NFR-025.9**: Uploaded images MUST have EXIF data stripped to prevent privacy leaks
+- **NFR-025.10**: Image filenames MUST be hashed to prevent predictable URLs
+- **NFR-025.11**: File upload endpoint MUST implement rate limiting to prevent abuse
+- **NFR-025.12**: System MUST validate file magic numbers (not just extensions) to detect malicious files
+
+#### Reliability
+- **NFR-025.13**: Upload operations MUST be atomic (all succeed or all fail)
+- **NFR-025.14**: System MUST recover gracefully from compression failures without data loss
+- **NFR-025.15**: Deleted images MUST be immediately removed from storage (no orphaned files)
+
+#### Compatibility
+- **NFR-025.16**: Image viewing MUST work in Safari, Chrome, Firefox, Edge (latest 2 versions)
+- **NFR-025.17**: WebP format MUST have JPEG fallback for older browsers [NEEDS CLARIFICATION: Is fallback required or can we assume modern browsers?]
+- **NFR-025.18**: Feature MUST work on iOS, Android, Windows, macOS devices
+
+#### Maintainability
+- **NFR-025.19**: Feature MUST integrate with existing authentication system without modifications
+- **NFR-025.20**: Feature MUST respect existing edit session locking mechanism
+- **NFR-025.21**: Feature MUST follow project code style and architectural patterns
+- **NFR-025.22**: Feature MUST include comprehensive unit, integration, and E2E tests
+- **NFR-025.23**: Feature MUST maintain zero breaking changes to existing product profile functionality
+
+### Key Entities *(mandatory - feature involves data)*
+
+#### Product Profile
+- **What it represents**: Existing product master data (item code, description, category, supplier, packaging)
+- **New attributes**:
+  - Primary image reference (path to main product photo)
+  - Image collection metadata (array of all product images)
+  - Image count (quick reference for queries)
+  - Last image update timestamp (audit trail)
+- **Relationships**:
+  - One product has zero to five images
+  - One product has zero or one primary image
+
+#### Product Image
+- **What it represents**: Visual photograph or rendering of a physical product
+- **Key attributes**:
+  - Unique identifier (UUID)
+  - Original filename (user's file name)
+  - Stored filename (hashed, secure)
+  - Storage path (relative URL)
+  - File size (bytes after compression)
+  - Dimensions (width x height in pixels)
+  - Format (always WebP after processing)
+  - Primary flag (boolean - is this the main image?)
+  - Upload timestamp (audit trail)
+- **Relationships**:
+  - Each image belongs to exactly one product
+  - Each image has two file variants: original (1200x1200 max) and thumbnail (300x300)
+
+#### Image Metadata
+- **What it represents**: Structured data describing each product image for quick retrieval without file system access
+- **Storage format**: JSON array within product_profiles table
+- **Key attributes**:
+  - Image ID, filename, original name
+  - Path, size, MIME type
+  - Dimensions (width, height)
+  - Primary designation
+  - Upload timestamp
+- **Purpose**:
+  - Enable fast image listing without file system scans
+  - Support primary image identification
+  - Track compression statistics
+  - Provide audit trail of image operations
+
+---
+
+## Review & Acceptance Checklist
+
+### Content Quality
+- [x] No implementation details (languages, frameworks, APIs) - *Focused on user capabilities*
+- [x] Focused on user value and business needs - *Solves visual product identification problem*
+- [x] Written for non-technical stakeholders - *Plain language, business-focused*
+- [x] All mandatory sections completed - *User Scenarios, Requirements, Key Entities included*
+
+### Requirement Completeness
+- [ ] No [NEEDS CLARIFICATION] markers remain - *One clarification needed: image deletion policy when product deleted*
+- [x] Requirements are testable and unambiguous - *All 71 FRs have clear acceptance criteria*
+- [x] Success criteria are measurable - *Specific limits: 5 images, 10MB, <200ms response, 60-80% compression*
+- [x] Scope is clearly bounded - *Limited to Stock Profiles module, Edit Product popup only*
+- [x] Dependencies and assumptions identified - *Existing auth system, edit session locking, multer library*
+
+### Outstanding Clarifications
+1. **Image retention policy**: When a product is deleted, should images be:
+   - Deleted immediately (cascade delete)?
+   - Soft-deleted and retained for audit purposes?
+   - Archived with specific retention period?
+
+2. **Browser fallback**: Do we need JPEG fallback for browsers that don't support WebP, or can we assume modern browsers only?
+
+---
+
+## Execution Status
+
+- [x] User description parsed - *Complete image management system for Stock Profiles*
+- [x] Key concepts extracted - *Actors: managers/staff; Actions: upload/view/manage; Data: images; Constraints: 5 max, compression*
+- [x] Ambiguities marked - *Two clarifications needed (retention policy, browser fallback)*
+- [x] User scenarios defined - *7 acceptance scenarios + 9 edge cases documented*
+- [x] Requirements generated - *71 functional requirements + 23 non-functional requirements*
+- [x] Entities identified - *Product Profile, Product Image, Image Metadata*
+- [ ] Review checklist passed - *Pending clarification on 2 items*
+
+---
+
+## Success Criteria Summary
+
+The feature will be considered successfully implemented when:
+
+1.  Users can upload 1-5 images per product using drag-drop or file browser
+2.  All images are automatically compressed to WebP format with 60-80% size reduction
+3.  Images display in responsive 4-column thumbnail grid with primary indicator (gold star)
+4.  Full-size carousel viewer provides intuitive navigation (arrows, keyboard, touch)
+5.  Users can designate any image as primary with immediate visual feedback
+6.  Image deletion requires confirmation and updates UI optimistically
+7.  Upload progress is visible with percentage and compression statistics
+8.  System strictly enforces 5 image maximum with clear messaging
+9.  All images stored with secure, unique hashed filenames
+10.  Complete database audit trail captures all image operations with timestamps
+11.  Zero breaking changes to existing product profile functionality
+12.  All tests passing: unit tests (validation, compression), integration tests (upload/delete flows), E2E tests (full user workflows)
+13.  API response times under 200ms for all image operations
+14.  Feature works across modern browsers (Safari, Chrome, Firefox, Edge) and devices (desktop, tablet, mobile)
+15.  Accessibility standards met (keyboard navigation, screen readers, ARIA labels)
+
+---
+
+## Dependencies & Assumptions
+
+### External Dependencies
+- **Image Processing Library**: Sharp (for compression, resizing, thumbnail generation)
+- **File Upload Handling**: Multer (already installed, multipart/form-data parsing)
+- **Hash Generation**: Node.js crypto module (built-in, MD5 hashing)
+
+### System Dependencies
+- **Authentication**: Existing user authentication system (requireAuth middleware)
+- **Edit Session Locking**: Existing product edit session management (prevents concurrent edits)
+- **Component Library**: shadcn/ui components (for consistent UI/UX)
+- **Data Fetching**: TanStack Query (for caching, optimistic updates, error handling)
+
+### Infrastructure Assumptions
+- **Storage**: File system has sufficient space for product images (monitoring required)
+- **Network**: Users have reliable internet connection for uploads (timeout handling for slow connections)
+- **Database**: MySQL JSON field type supported (for image_metadata storage)
+- **Browser**: Users have modern browsers with WebP support (or fallback implemented)
+
+### Integration Points
+- **Product Profile Edit Modal**: New "Product Images" section added after "Packaging & Units"
+- **Product Profile API**: Extended with 4 new image-related endpoints
+- **Product Profile Service**: Extended with image management methods
+- **Database Schema**: Four new columns added to product_profiles table
+
+---
+
+## Next Steps
+
+1. **Clarify outstanding questions** with product owner:
+   - Image retention policy when products deleted
+   - Browser fallback requirements for WebP format
+
+2. **Run `/plan` command** to generate detailed implementation plan with:
+   - Database migration scripts
+   - Backend service design (product-image-service.ts)
+   - API endpoint specifications
+   - Frontend component architecture
+   - Testing strategy breakdown
+
+3. **Run `/implement` command** to execute implementation tasks:
+   - Schema updates and migrations
+   - Backend service and API development
+   - Frontend components and hooks
+   - Integration and E2E testing
+   - Documentation updates
+
+---
+
+**Specification Status**:  Ready for Planning Phase (pending 2 clarifications)

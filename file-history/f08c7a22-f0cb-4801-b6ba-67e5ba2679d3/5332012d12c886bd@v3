@@ -1,0 +1,177 @@
+/**
+ * Populate API Endpoints Metadata Table
+ * Feature: 028-build-a-widget (User Story 3 - T057)
+ *
+ * Reads routes.registry.json and populates api_endpoints_metadata table
+ * for widget configuration API discovery.
+ */
+
+import { db } from '../db';
+import { apiEndpointsMetadata } from '../../shared/schema';
+import routesRegistry from '../routes.registry.json';
+import { eq } from 'drizzle-orm';
+
+interface RouteEntry {
+  id: string;
+  path: string;
+  method: string;
+  file: string;
+  tags?: string[];
+  responses?: { statusCode: number; description: string }[];
+  relationships?: {
+    relatedServices?: string[];
+  };
+}
+
+/**
+ * Determine if an endpoint is suitable for widgets
+ * Widget-suitable endpoints should:
+ * - Be GET requests
+ * - Return data (not just status)
+ * - Have meaningful response schemas
+ */
+function isWidgetSuitable(route: RouteEntry): boolean {
+  // Must be GET request
+  if (route.method !== 'GET') return false;
+
+  // Exclude test/health/meta endpoints
+  const excludePaths = ['/test', '/health', '/ping', '/meta', '/stats'];
+  if (excludePaths.some(p => route.path.includes(p))) return false;
+
+  // Include data-focused routes
+  const includePaths = [
+    '/api/product-profiles',
+    '/api/epos',
+    '/api/bbd',
+    '/api/stock',
+    '/api/supplier',
+    '/api/sales',
+    '/api/widgets/dashboards',
+  ];
+
+  return includePaths.some(p => route.path.startsWith(p));
+}
+
+/**
+ * Extract description from route metadata
+ */
+function extractDescription(route: RouteEntry): string {
+  // Try to infer description from path
+  const pathParts = route.path.split('/').filter(Boolean);
+  const mainEntity = pathParts[pathParts.length - 1] || 'data';
+
+  return `Returns ${mainEntity} data from ${route.file.split('/').pop()}`;
+}
+
+/**
+ * Infer response schema from route metadata
+ */
+function inferResponseSchema(route: RouteEntry): any {
+  const successResponse = route.responses?.find(r => r.statusCode === 200);
+
+  // Basic schema structure
+  return {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'array',
+        items: {
+          type: 'object',
+          description: successResponse?.description || 'Data item',
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Extract available fields for calculations
+ */
+function extractAvailableFields(route: RouteEntry): string[] {
+  // Common fields based on route type
+  if (route.path.includes('product-profiles')) {
+    return ['quantity', 'price', 'cost', 'revenue', 'stock_level'];
+  }
+
+  if (route.path.includes('sales') || route.path.includes('epos')) {
+    return ['total_sales', 'quantity_sold', 'revenue', 'transactions'];
+  }
+
+  if (route.path.includes('stock')) {
+    return ['stock_level', 'reorder_point', 'quantity'];
+  }
+
+  return ['value', 'count', 'amount'];
+}
+
+/**
+ * Main population function
+ */
+async function populateApiMetadata() {
+  console.log('🔧 Populating API Endpoints Metadata...\n');
+
+  const routes = routesRegistry.routes as RouteEntry[];
+  const widgetSuitableRoutes = routes.filter(isWidgetSuitable);
+
+  console.log(`📊 Found ${routes.length} total routes`);
+  console.log(`✅ ${widgetSuitableRoutes.length} routes suitable for widgets\n`);
+
+  let inserted = 0;
+  let updated = 0;
+
+  for (const route of widgetSuitableRoutes) {
+    try {
+      const metadata = {
+        endpointPath: route.path,
+        httpMethod: route.method,
+        description: extractDescription(route),
+        responseSchema: inferResponseSchema(route),
+        availableFields: extractAvailableFields(route),
+        isDeprecated: false,
+      };
+
+      // Check if endpoint already exists
+      const [existing] = await db
+        .select()
+        .from(apiEndpointsMetadata)
+        .where(eq(apiEndpointsMetadata.endpointPath, route.path))
+        .limit(1);
+
+      if (existing) {
+        // Update existing
+        await db
+          .update(apiEndpointsMetadata)
+          .set({
+            ...metadata,
+            updatedAt: new Date(),
+          })
+          .where(eq(apiEndpointsMetadata.id, existing.id));
+        updated++;
+        console.log(`♻️  Updated: ${route.method} ${route.path}`);
+      } else {
+        // Insert new
+        await db.insert(apiEndpointsMetadata).values(metadata);
+        inserted++;
+        console.log(`✅ Inserted: ${route.method} ${route.path}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Error processing ${route.path}:`, error.message);
+    }
+  }
+
+  console.log(`\n📊 Summary:`);
+  console.log(`  Inserted: ${inserted}`);
+  console.log(`  Updated: ${updated}`);
+  console.log(`  Total: ${inserted + updated}`);
+}
+
+// Run the script
+populateApiMetadata()
+  .then(() => {
+    console.log('\n✅ API metadata population complete!');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('\n❌ Failed to populate API metadata:', error);
+    process.exit(1);
+  });

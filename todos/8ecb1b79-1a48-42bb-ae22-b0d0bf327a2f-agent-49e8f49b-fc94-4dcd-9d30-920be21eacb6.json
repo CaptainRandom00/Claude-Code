@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Connect to WordPress database and examine wp_posts table structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Search for about pages by slug patterns (about, about-our-tutoring-service, etc.)",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Extract current content from wp_posts for about page",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check wp_posts for revisions and drafts of about page content",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Provide summary of all found about page content from database",
+    "status": "in_progress",
+    "priority": "medium",
+    "id": "5"
+  }
+]

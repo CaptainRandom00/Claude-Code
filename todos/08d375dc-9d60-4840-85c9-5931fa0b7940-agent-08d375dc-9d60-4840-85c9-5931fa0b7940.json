@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Add laser aiming with arrow keys (up/forward)",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Spawn red boxes randomly across screen every 1-3 seconds",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create dust particle effect when red box is destroyed",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Update laser firing direction based on aim",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  }
+]

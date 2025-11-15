@@ -1,0 +1,76 @@
+/**
+ * Widget Factory Component
+ * Feature: 028-build-a-widget
+ *
+ * Factory component that renders the appropriate widget type based on configuration
+ * Centralizes widget type selection and rendering logic
+ */
+
+import React from 'react';
+import { MetricWidget } from './types/MetricWidget';
+import { AlertWidget } from './types/AlertWidget';
+import type { WidgetType, VisualizationConfig } from '@/types/widget-types';
+
+interface WidgetFactoryProps {
+  widgetType: WidgetType;
+  data: any[];
+  visualizationConfig: VisualizationConfig;
+}
+
+/**
+ * Renders the appropriate widget component based on widgetType
+ */
+export function WidgetFactory({
+  widgetType,
+  data,
+  visualizationConfig,
+}: WidgetFactoryProps) {
+  switch (widgetType) {
+    case 'metric':
+      return (
+        <MetricWidget
+          data={data}
+          visualizationConfig={visualizationConfig}
+        />
+      );
+
+    case 'alert':
+      return (
+        <AlertWidget
+          data={data}
+          visualizationConfig={visualizationConfig}
+        />
+      );
+
+    case 'chart':
+      // TODO: Implement ChartWidget in future user stories
+      return (
+        <div className="flex items-center justify-center h-full min-h-[200px]">
+          <p className="text-muted-foreground">Chart widget coming soon</p>
+        </div>
+      );
+
+    case 'table':
+      // TODO: Implement TableWidget in future user stories
+      return (
+        <div className="flex items-center justify-center h-full min-h-[200px]">
+          <p className="text-muted-foreground">Table widget coming soon</p>
+        </div>
+      );
+
+    case 'progress':
+      // TODO: Implement ProgressWidget in future user stories
+      return (
+        <div className="flex items-center justify-center h-full min-h-[200px]">
+          <p className="text-muted-foreground">Progress widget coming soon</p>
+        </div>
+      );
+
+    default:
+      return (
+        <div className="flex items-center justify-center h-full min-h-[200px]">
+          <p className="text-destructive">Unknown widget type: {widgetType}</p>
+        </div>
+      );
+  }
+}

@@ -1,0 +1,497 @@
+openapi: 3.1.0
+info:
+  title: Byte Bridges Case Studies API
+  version: 1.0.0
+  description: Case study management and retrieval endpoints
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://bytebridges.com
+    description: Production
+
+paths:
+  /api/case-studies:
+    get:
+      summary: List case studies
+      description: Get list of case studies with optional filtering
+      operationId: listCaseStudies
+      tags:
+        - Case Studies
+      parameters:
+        - name: industry
+          in: query
+          schema:
+            type: string
+            enum:
+              - healthcare
+              - finance
+              - retail
+              - manufacturing
+              - education
+              - government
+          description: Filter by industry
+        - name: service
+          in: query
+          schema:
+            type: string
+            enum:
+              - custom-software
+              - web-development
+              - mobile-apps
+              - cloud-solutions
+              - ai-integration
+              - consulting
+          description: Filter by service type
+        - name: published
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Filter by published status (admin only for false)
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+          description: Only show featured/highest priority cases
+      responses:
+        '200':
+          description: List of case studies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  caseStudies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CaseStudySummary'
+                  total:
+                    type: integer
+
+    post:
+      summary: Create case study
+      description: Create a new case study (admin only)
+      operationId: createCaseStudy
+      tags:
+        - Case Studies
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseStudyCreate'
+      responses:
+        '201':
+          description: Case study created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStudy'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Unauthorized
+
+  /api/case-studies/{slug}:
+    get:
+      summary: Get case study by slug
+      description: Retrieve a single case study
+      operationId: getCaseStudy
+      tags:
+        - Case Studies
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Case study slug
+      responses:
+        '200':
+          description: Case study details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStudy'
+        '404':
+          description: Case study not found
+
+  /api/case-studies/{id}:
+    put:
+      summary: Update case study
+      description: Update an existing case study (admin only)
+      operationId: updateCaseStudy
+      tags:
+        - Case Studies
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Case study ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseStudyUpdate'
+      responses:
+        '200':
+          description: Case study updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStudy'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Case study not found
+
+    delete:
+      summary: Delete case study
+      description: Delete a case study (admin only, soft delete)
+      operationId: deleteCaseStudy
+      tags:
+        - Case Studies
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Case study ID
+      responses:
+        '204':
+          description: Case study deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Case study not found
+
+components:
+  schemas:
+    CaseStudy:
+      type: object
+      required:
+        - id
+        - slug
+        - title
+        - clientName
+        - clientIndustry
+        - serviceTypes
+        - challenge
+        - solution
+        - published
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          example: 1
+        slug:
+          type: string
+          example: healthcare-platform-modernization
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+          example: Healthcare Platform Modernization
+        clientName:
+          type: string
+          minLength: 2
+          maxLength: 255
+          example: MedTech Solutions
+        clientIndustry:
+          type: string
+          enum:
+            - healthcare
+            - finance
+            - retail
+            - manufacturing
+            - education
+            - government
+          example: healthcare
+        serviceTypes:
+          type: array
+          items:
+            type: string
+            enum:
+              - custom-software
+              - web-development
+              - mobile-apps
+              - cloud-solutions
+              - ai-integration
+              - consulting
+          minItems: 1
+          maxItems: 6
+          example: [custom-software, cloud-solutions]
+        challenge:
+          type: string
+          minLength: 100
+          maxLength: 2000
+          example: Legacy system unable to scale with patient growth...
+        solution:
+          type: string
+          minLength: 100
+          maxLength: 5000
+          example: Built a modern cloud-native platform with Next.js...
+        resultsMetrics:
+          type: array
+          items:
+            type: object
+            required:
+              - label
+              - value
+            properties:
+              label:
+                type: string
+                example: Performance Improvement
+              value:
+                oneOf:
+                  - type: string
+                  - type: number
+                example: 3x faster
+              icon:
+                type: string
+                example: speed
+          example:
+            - label: Performance Improvement
+              value: 3x faster
+              icon: speed
+            - label: Cost Reduction
+              value: 40%
+              icon: savings
+        technologies:
+          type: array
+          items:
+            type: string
+          example: [Next.js, PostgreSQL, AWS, TypeScript]
+        projectDuration:
+          type: string
+          nullable: true
+          example: 6 months
+        teamSize:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 5
+        featuredImageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: /images/case-studies/medtech.jpg
+        galleryImages:
+          type: array
+          items:
+            type: string
+            format: uri
+          example:
+            - /images/case-studies/medtech/screenshot1.jpg
+            - /images/case-studies/medtech/screenshot2.jpg
+        testimonialQuote:
+          type: string
+          nullable: true
+          minLength: 50
+          maxLength: 500
+          example: Byte Bridges transformed our entire platform...
+        testimonialAuthor:
+          type: string
+          nullable: true
+          example: Dr. Jane Smith
+        testimonialRole:
+          type: string
+          nullable: true
+          example: CTO, MedTech Solutions
+        published:
+          type: boolean
+          example: true
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        displayOrder:
+          type: integer
+          minimum: 0
+          example: 1
+          description: Lower numbers appear first (0 = highest priority)
+        createdBy:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CaseStudySummary:
+      type: object
+      description: Abbreviated case study for list views
+      required:
+        - id
+        - slug
+        - title
+        - clientName
+        - clientIndustry
+        - serviceTypes
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        clientName:
+          type: string
+        clientIndustry:
+          type: string
+        serviceTypes:
+          type: array
+          items:
+            type: string
+        featuredImageUrl:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+
+    CaseStudyCreate:
+      type: object
+      required:
+        - title
+        - clientName
+        - clientIndustry
+        - serviceTypes
+        - challenge
+        - solution
+      properties:
+        title:
+          type: string
+          minLength: 10
+          maxLength: 500
+        clientName:
+          type: string
+          minLength: 2
+          maxLength: 255
+        clientIndustry:
+          type: string
+          enum: [healthcare, finance, retail, manufacturing, education, government]
+        serviceTypes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 6
+        challenge:
+          type: string
+          minLength: 100
+          maxLength: 2000
+        solution:
+          type: string
+          minLength: 100
+          maxLength: 5000
+        resultsMetrics:
+          type: array
+          items:
+            type: object
+        technologies:
+          type: array
+          items:
+            type: string
+        projectDuration:
+          type: string
+        teamSize:
+          type: integer
+        featuredImageUrl:
+          type: string
+        galleryImages:
+          type: array
+          items:
+            type: string
+        testimonialQuote:
+          type: string
+        testimonialAuthor:
+          type: string
+        testimonialRole:
+          type: string
+        published:
+          type: boolean
+          default: false
+        displayOrder:
+          type: integer
+          default: 0
+
+    CaseStudyUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        clientName:
+          type: string
+        clientIndustry:
+          type: string
+        serviceTypes:
+          type: array
+          items:
+            type: string
+        challenge:
+          type: string
+        solution:
+          type: string
+        resultsMetrics:
+          type: array
+        technologies:
+          type: array
+          items:
+            type: string
+        projectDuration:
+          type: string
+        teamSize:
+          type: integer
+        featuredImageUrl:
+          type: string
+        galleryImages:
+          type: array
+          items:
+            type: string
+        testimonialQuote:
+          type: string
+        testimonialAuthor:
+          type: string
+        testimonialRole:
+          type: string
+        published:
+          type: boolean
+        displayOrder:
+          type: integer
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token

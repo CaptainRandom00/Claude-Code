@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Add supplier dropdown filter to Stock Profiles",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create product edit popup modal component",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Make table rows clickable to open edit modal",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create API endpoint for updating product information",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Add form validation for product edit fields",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

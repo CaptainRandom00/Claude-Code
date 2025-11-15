@@ -1,0 +1,357 @@
+/**
+ * Search Utility
+ * Feature: 029-complete-user-guide
+ * Purpose: Fuse.js search implementation for documentation content
+ */
+
+import Fuse from 'fuse.js';
+import type { FeatureId, Task, QuickReference, TroubleshootingEntry } from '@/components/dashboard/UserGuideSection';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface SearchableContent {
+  id: string;
+  type: 'feature' | 'task' | 'quick-reference' | 'troubleshooting';
+  featureId: FeatureId;
+  featureTitle: string;
+  title: string;
+  description: string;
+  content: string;
+  keywords: string[];
+  difficulty?: string;
+}
+
+export interface SearchResult {
+  item: SearchableContent;
+  score?: number;
+  matches?: Array<{
+    indices: Array<[number, number]>;
+    value?: string;
+    key?: string;
+  }>;
+}
+
+export interface GroupedSearchResults {
+  features: SearchResult[];
+  tasks: SearchResult[];
+  quickReference: SearchResult[];
+  troubleshooting: SearchResult[];
+  totalResults: number;
+}
+
+// ============================================================================
+// Fuse.js Configuration
+// ============================================================================
+
+const fuseOptions: Fuse.IFuseOptions<SearchableContent> = {
+  // Search settings
+  threshold: 0.4, // 0 = perfect match, 1 = match anything
+  distance: 100, // Maximum distance for fuzzy matching
+  minMatchCharLength: 2, // Minimum characters to match
+  includeScore: true,
+  includeMatches: true,
+
+  // Fields to search (with weights)
+  keys: [
+    { name: 'title', weight: 3 }, // Highest priority
+    { name: 'description', weight: 2 },
+    { name: 'keywords', weight: 2.5 },
+    { name: 'featureTitle', weight: 1.5 },
+    { name: 'content', weight: 1 }
+  ],
+
+  // Ignore case and location
+  ignoreLocation: true,
+  isCaseSensitive: false
+};
+
+// ============================================================================
+// Search Index Builder
+// ============================================================================
+
+/**
+ * Build search index from feature guide data
+ */
+export function buildSearchIndex(guides: any[]): SearchableContent[] {
+  const searchableContent: SearchableContent[] = [];
+
+  guides.forEach((guide) => {
+    // Index feature overview
+    searchableContent.push({
+      id: `${guide.id}-overview`,
+      type: 'feature',
+      featureId: guide.id,
+      featureTitle: guide.title,
+      title: guide.title,
+      description: guide.overview.description,
+      content: [
+        guide.overview.description,
+        ...guide.overview.benefits,
+        ...(guide.overview.prerequisites || [])
+      ].join(' '),
+      keywords: [
+        guide.id,
+        guide.title,
+        ...guide.overview.targetUsers,
+        ...(guide.metadata?.difficulty ? [guide.metadata.difficulty] : [])
+      ],
+      difficulty: guide.metadata?.difficulty
+    });
+
+    // Index tasks
+    guide.tasks?.forEach((task: Task) => {
+      const taskContent = task.steps
+        .map((step) => [step.title, ...step.instructions].join(' '))
+        .join(' ');
+
+      searchableContent.push({
+        id: `${guide.id}-task-${task.id}`,
+        type: 'task',
+        featureId: guide.id,
+        featureTitle: guide.title,
+        title: task.title,
+        description: task.description,
+        content: taskContent,
+        keywords: [
+          task.id,
+          task.title,
+          task.difficulty,
+          ...(task.tips || [])
+        ],
+        difficulty: task.difficulty
+      });
+    });
+
+    // Index quick reference tasks
+    guide.commonTasks?.forEach((quickRef: QuickReference, index: number) => {
+      searchableContent.push({
+        id: `${guide.id}-quickref-${index}`,
+        type: 'quick-reference',
+        featureId: guide.id,
+        featureTitle: guide.title,
+        title: quickRef.name,
+        description: quickRef.description,
+        content: quickRef.quickSteps.join(' '),
+        keywords: [quickRef.name, ...quickRef.quickSteps]
+      });
+    });
+
+    // Index troubleshooting entries
+    guide.troubleshooting?.forEach((trouble: TroubleshootingEntry, index: number) => {
+      searchableContent.push({
+        id: `${guide.id}-trouble-${index}`,
+        type: 'troubleshooting',
+        featureId: guide.id,
+        featureTitle: guide.title,
+        title: trouble.issue,
+        description: trouble.symptoms.join(', '),
+        content: [
+          ...trouble.symptoms,
+          ...(trouble.causes || []),
+          ...trouble.solution
+        ].join(' '),
+        keywords: [trouble.issue, ...trouble.symptoms]
+      });
+    });
+  });
+
+  return searchableContent;
+}
+
+// ============================================================================
+// Search Engine
+// ============================================================================
+
+export class DocumentationSearch {
+  private fuse: Fuse<SearchableContent>;
+  private searchIndex: SearchableContent[];
+
+  constructor(guides: any[]) {
+    this.searchIndex = buildSearchIndex(guides);
+    this.fuse = new Fuse(this.searchIndex, fuseOptions);
+  }
+
+  /**
+   * Search documentation content
+   */
+  search(query: string, limit: number = 20): SearchResult[] {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    return this.fuse.search(query, { limit });
+  }
+
+  /**
+   * Search and group results by type
+   */
+  searchGrouped(query: string, limit: number = 20): GroupedSearchResults {
+    const results = this.search(query, limit);
+
+    const grouped: GroupedSearchResults = {
+      features: [],
+      tasks: [],
+      quickReference: [],
+      troubleshooting: [],
+      totalResults: results.length
+    };
+
+    results.forEach((result) => {
+      switch (result.item.type) {
+        case 'feature':
+          grouped.features.push(result);
+          break;
+        case 'task':
+          grouped.tasks.push(result);
+          break;
+        case 'quick-reference':
+          grouped.quickReference.push(result);
+          break;
+        case 'troubleshooting':
+          grouped.troubleshooting.push(result);
+          break;
+      }
+    });
+
+    return grouped;
+  }
+
+  /**
+   * Search within a specific feature
+   */
+  searchFeature(featureId: FeatureId, query: string, limit: number = 10): SearchResult[] {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    // Filter index to feature content only
+    const featureContent = this.searchIndex.filter(
+      (item) => item.featureId === featureId
+    );
+
+    const featureFuse = new Fuse(featureContent, fuseOptions);
+    return featureFuse.search(query, { limit });
+  }
+
+  /**
+   * Get suggestions based on partial query
+   */
+  getSuggestions(query: string, limit: number = 5): string[] {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    const results = this.search(query, limit);
+    return results.map((result) => result.item.title);
+  }
+
+  /**
+   * Search by difficulty level
+   */
+  searchByDifficulty(difficulty: string, limit: number = 20): SearchResult[] {
+    const filtered = this.searchIndex.filter(
+      (item) => item.difficulty === difficulty
+    );
+
+    return filtered.slice(0, limit).map((item) => ({
+      item,
+      score: 0
+    }));
+  }
+
+  /**
+   * Get all content for a feature
+   */
+  getFeatureContent(featureId: FeatureId): SearchableContent[] {
+    return this.searchIndex.filter((item) => item.featureId === featureId);
+  }
+
+  /**
+   * Update search index
+   */
+  updateIndex(guides: any[]): void {
+    this.searchIndex = buildSearchIndex(guides);
+    this.fuse = new Fuse(this.searchIndex, fuseOptions);
+  }
+
+  /**
+   * Get total indexed items
+   */
+  getIndexSize(): number {
+    return this.searchIndex.length;
+  }
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Highlight search matches in text
+ */
+export function highlightMatches(
+  text: string,
+  matches: Array<[number, number]>
+): string {
+  if (!matches || matches.length === 0) {
+    return text;
+  }
+
+  let highlighted = '';
+  let lastIndex = 0;
+
+  matches.forEach(([start, end]) => {
+    highlighted += text.substring(lastIndex, start);
+    highlighted += `<mark>${text.substring(start, end + 1)}</mark>`;
+    lastIndex = end + 1;
+  });
+
+  highlighted += text.substring(lastIndex);
+  return highlighted;
+}
+
+/**
+ * Extract snippet around match
+ */
+export function extractSnippet(
+  text: string,
+  matches: Array<[number, number]>,
+  contextLength: number = 50
+): string {
+  if (!matches || matches.length === 0) {
+    return text.substring(0, contextLength * 2) + '...';
+  }
+
+  const [start, end] = matches[0];
+  const snippetStart = Math.max(0, start - contextLength);
+  const snippetEnd = Math.min(text.length, end + contextLength);
+
+  let snippet = text.substring(snippetStart, snippetEnd);
+
+  if (snippetStart > 0) {
+    snippet = '...' + snippet;
+  }
+
+  if (snippetEnd < text.length) {
+    snippet = snippet + '...';
+  }
+
+  return snippet;
+}
+
+/**
+ * Debounce search queries
+ */
+export function debounceSearch<T extends (...args: any[]) => any>(
+  func: T,
+  delay: number = 300
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout;
+
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+}

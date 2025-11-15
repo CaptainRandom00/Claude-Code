@@ -1,0 +1,662 @@
+/**
+ * Dashboard Service
+ * Feature: 028-build-a-widget
+ *
+ * Handles CRUD operations for dashboards, dashboard widgets, layouts,
+ * and version management for dashboard configurations.
+ */
+
+import { db } from '../db';
+import {
+  dashboards,
+  dashboardWidgets,
+  widgetDefinitions,
+  widgetLayouts,
+  dashboardVersions,
+  dashboardTemplates,
+  templateWidgets,
+  type Dashboard,
+  type InsertDashboard,
+  type DashboardWidget,
+  type InsertDashboardWidget,
+  type WidgetLayout,
+  type InsertWidgetLayout,
+  type DashboardVersion,
+  type InsertDashboardVersion,
+  type DashboardTemplate,
+  type TemplateWidget
+} from '@shared/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
+
+export class DashboardService {
+  /**
+   * Create a new dashboard
+   * @param data - Dashboard data
+   * @returns Created dashboard
+   */
+  async create(data: InsertDashboard): Promise<Dashboard> {
+    // Validate name length (3-255 characters per CHECK constraint)
+    if (data.name.length < 3 || data.name.length > 255) {
+      throw new Error('Dashboard name must be between 3 and 255 characters');
+    }
+
+    const [dashboard] = await db.insert(dashboards).values(data).$returningId();
+
+    // Create initial version (version 1)
+    await this.createVersion(dashboard.id, {
+      config: { widgets: [], layouts: {}, globalFilters: data.globalFilters || {} },
+      description: 'Initial dashboard creation',
+      userId: data.userId
+    });
+
+    const created = await this.getById(dashboard.id);
+    if (!created) {
+      throw new Error('Failed to create dashboard');
+    }
+
+    return created;
+  }
+
+  /**
+   * Get dashboard by ID
+   * @param id - Dashboard ID
+   * @returns Dashboard or null
+   */
+  async getById(id: number): Promise<Dashboard | null> {
+    const [dashboard] = await db
+      .select()
+      .from(dashboards)
+      .where(eq(dashboards.id, id))
+      .limit(1);
+
+    return dashboard || null;
+  }
+
+  /**
+   * Get all dashboards for a specific user
+   * @param userId - User ID
+   * @param includeInactive - Include inactive dashboards (default: false)
+   * @returns Array of dashboards
+   */
+  async getByUser(userId: number, includeInactive: boolean = false): Promise<Dashboard[]> {
+    const conditions = [eq(dashboards.userId, userId)];
+
+    if (!includeInactive) {
+      conditions.push(eq(dashboards.isActive, true));
+    }
+
+    return await db
+      .select()
+      .from(dashboards)
+      .where(and(...conditions))
+      .orderBy(desc(dashboards.updatedAt));
+  }
+
+  /**
+   * Update dashboard
+   * @param id - Dashboard ID
+   * @param data - Partial dashboard data to update
+   * @param userId - User ID for authorization
+   * @returns Updated dashboard
+   */
+  async update(
+    id: number,
+    data: Partial<InsertDashboard>,
+    userId: number
+  ): Promise<Dashboard> {
+    const dashboard = await this.getById(id);
+
+    if (!dashboard) {
+      throw new Error(`Dashboard with ID ${id} not found`);
+    }
+
+    // Verify ownership
+    if (dashboard.userId !== userId) {
+      throw new Error('Unauthorized: Cannot update dashboard owned by another user');
+    }
+
+    // Validate name length if provided
+    if (data.name && (data.name.length < 3 || data.name.length > 255)) {
+      throw new Error('Dashboard name must be between 3 and 255 characters');
+    }
+
+    // Update dashboard
+    await db
+      .update(dashboards)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(dashboards.id, id));
+
+    const updated = await this.getById(id);
+    if (!updated) {
+      throw new Error(`Dashboard with ID ${id} not found after update`);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Soft delete dashboard (set isActive = false)
+   * @param id - Dashboard ID
+   * @param userId - User ID for authorization
+   * @returns Success boolean
+   */
+  async delete(id: number, userId: number): Promise<boolean> {
+    const dashboard = await this.getById(id);
+
+    if (!dashboard) {
+      throw new Error(`Dashboard with ID ${id} not found`);
+    }
+
+    // Verify ownership
+    if (dashboard.userId !== userId) {
+      throw new Error('Unauthorized: Cannot delete dashboard owned by another user');
+    }
+
+    // Soft delete (FR-050: 30-day retention for undo)
+    await db
+      .update(dashboards)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(dashboards.id, id));
+
+    return true;
+  }
+
+  // ========================================================================
+  // Dashboard Widgets Management
+  // ========================================================================
+
+  /**
+   * Add widget to dashboard
+   * @param data - Dashboard widget data
+   * @returns Created dashboard widget
+   */
+  async addWidget(data: InsertDashboardWidget): Promise<DashboardWidget> {
+    const [widget] = await db.insert(dashboardWidgets).values(data).$returningId();
+
+    const [created] = await db
+      .select()
+      .from(dashboardWidgets)
+      .where(eq(dashboardWidgets.id, widget.id))
+      .limit(1);
+
+    if (!created) {
+      throw new Error('Failed to add widget to dashboard');
+    }
+
+    return created;
+  }
+
+  /**
+   * Get all widgets for a dashboard
+   * @param dashboardId - Dashboard ID
+   * @returns Array of dashboard widgets
+   */
+  async getWidgets(dashboardId: number): Promise<DashboardWidget[]> {
+    const results = await db
+      .select({
+        id: dashboardWidgets.id,
+        dashboardId: dashboardWidgets.dashboardId,
+        widgetDefinitionId: dashboardWidgets.widgetDefinitionId,
+        widgetTitle: dashboardWidgets.widgetTitle,
+        configOverride: dashboardWidgets.configOverride,
+        isVisible: dashboardWidgets.isVisible,
+        sortOrder: dashboardWidgets.sortOrder,
+        createdAt: dashboardWidgets.createdAt,
+        widgetDefinition: widgetDefinitions,
+      })
+      .from(dashboardWidgets)
+      .innerJoin(
+        widgetDefinitions,
+        eq(dashboardWidgets.widgetDefinitionId, widgetDefinitions.id)
+      )
+      .where(
+        and(
+          eq(dashboardWidgets.dashboardId, dashboardId),
+          eq(dashboardWidgets.isVisible, true)
+        )
+      )
+      .orderBy(dashboardWidgets.sortOrder);
+
+    return results as any;
+  }
+
+  /**
+   * Remove widget from dashboard
+   * @param dashboardWidgetId - Dashboard widget ID
+   * @returns Success boolean
+   */
+  async removeWidget(dashboardWidgetId: number): Promise<boolean> {
+    // Delete layouts first (CASCADE will handle this, but explicit is safer)
+    await db
+      .delete(widgetLayouts)
+      .where(eq(widgetLayouts.dashboardWidgetId, dashboardWidgetId));
+
+    // Delete dashboard widget
+    await db
+      .delete(dashboardWidgets)
+      .where(eq(dashboardWidgets.id, dashboardWidgetId));
+
+    return true;
+  }
+
+  // ========================================================================
+  // Widget Layouts Management
+  // ========================================================================
+
+  /**
+   * Set widget layout for a specific breakpoint
+   * @param data - Widget layout data
+   * @returns Created/updated widget layout
+   */
+  async setLayout(data: InsertWidgetLayout): Promise<WidgetLayout> {
+    // Validate grid dimensions (per FR-020, updated to allow min 1 for metrics)
+    if (data.gridW < 1 || data.gridW > 12) {
+      throw new Error('Grid width must be between 1 and 12');
+    }
+    if (data.gridH < 2 || data.gridH > 8) {
+      throw new Error('Grid height must be between 2 and 8');
+    }
+
+    // Check if layout already exists for this widget + breakpoint
+    const [existing] = await db
+      .select()
+      .from(widgetLayouts)
+      .where(
+        and(
+          eq(widgetLayouts.dashboardWidgetId, data.dashboardWidgetId),
+          eq(widgetLayouts.breakpoint, data.breakpoint)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      // Update existing layout
+      await db
+        .update(widgetLayouts)
+        .set({
+          gridX: data.gridX,
+          gridY: data.gridY,
+          gridW: data.gridW,
+          gridH: data.gridH,
+          minW: data.minW ?? null,
+          minH: data.minH ?? null,
+          maxW: data.maxW ?? null,
+          maxH: data.maxH ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(widgetLayouts.id, existing.id));
+
+      const [updated] = await db
+        .select()
+        .from(widgetLayouts)
+        .where(eq(widgetLayouts.id, existing.id))
+        .limit(1);
+
+      return updated!;
+    } else {
+      // Insert new layout
+      const [layout] = await db.insert(widgetLayouts).values(data).$returningId();
+
+      const [created] = await db
+        .select()
+        .from(widgetLayouts)
+        .where(eq(widgetLayouts.id, layout.id))
+        .limit(1);
+
+      return created!;
+    }
+  }
+
+  /**
+   * Get all layouts for a dashboard widget
+   * @param dashboardWidgetId - Dashboard widget ID
+   * @returns Array of widget layouts (one per breakpoint)
+   */
+  async getLayouts(dashboardWidgetId: number): Promise<WidgetLayout[]> {
+    return await db
+      .select()
+      .from(widgetLayouts)
+      .where(eq(widgetLayouts.dashboardWidgetId, dashboardWidgetId));
+  }
+
+  // ========================================================================
+  // Version Management (FR-048: 5 versions, 24h retention)
+  // ========================================================================
+
+  /**
+   * Create a new dashboard version snapshot
+   * @param dashboardId - Dashboard ID
+   * @param options - Version options (config, description, userId)
+   * @returns Created dashboard version
+   */
+  async createVersion(
+    dashboardId: number,
+    options: {
+      config: any;
+      description?: string;
+      userId: number;
+    }
+  ): Promise<DashboardVersion> {
+    // Get latest version number for this dashboard
+    const [latestVersion] = await db
+      .select({ maxVersion: sql<number>`MAX(${dashboardVersions.versionNumber})` })
+      .from(dashboardVersions)
+      .where(eq(dashboardVersions.dashboardId, dashboardId));
+
+    const nextVersion = (latestVersion?.maxVersion || 0) + 1;
+
+    // Create new version
+    const [version] = await db.insert(dashboardVersions).values({
+      dashboardId,
+      versionNumber: nextVersion,
+      configSnapshot: options.config,
+      changeDescription: options.description || null,
+      createdByUserId: options.userId,
+    }).$returningId();
+
+    const [created] = await db
+      .select()
+      .from(dashboardVersions)
+      .where(eq(dashboardVersions.id, version.id))
+      .limit(1);
+
+    if (!created) {
+      throw new Error('Failed to create dashboard version');
+    }
+
+    return created;
+  }
+
+  /**
+   * Get version history for a dashboard
+   * @param dashboardId - Dashboard ID
+   * @param limit - Maximum number of versions to return (default: 10)
+   * @returns Array of dashboard versions (newest first)
+   */
+  async getVersions(dashboardId: number, limit: number = 10): Promise<DashboardVersion[]> {
+    return await db
+      .select()
+      .from(dashboardVersions)
+      .where(eq(dashboardVersions.dashboardId, dashboardId))
+      .orderBy(desc(dashboardVersions.versionNumber))
+      .limit(limit);
+  }
+
+  /**
+   * Get specific version by version number
+   * @param dashboardId - Dashboard ID
+   * @param versionNumber - Version number
+   * @returns Dashboard version or null
+   */
+  async getVersion(dashboardId: number, versionNumber: number): Promise<DashboardVersion | null> {
+    const [version] = await db
+      .select()
+      .from(dashboardVersions)
+      .where(
+        and(
+          eq(dashboardVersions.dashboardId, dashboardId),
+          eq(dashboardVersions.versionNumber, versionNumber)
+        )
+      )
+      .limit(1);
+
+    return version || null;
+  }
+
+  /**
+   * Restore dashboard to a specific version
+   * @param dashboardId - Dashboard ID
+   * @param versionNumber - Version number to restore
+   * @param userId - User ID for authorization
+   * @returns Restored dashboard
+   */
+  async restoreVersion(
+    dashboardId: number,
+    versionNumber: number,
+    userId: number
+  ): Promise<Dashboard> {
+    const dashboard = await this.getById(dashboardId);
+
+    if (!dashboard) {
+      throw new Error(`Dashboard with ID ${dashboardId} not found`);
+    }
+
+    // Verify ownership
+    if (dashboard.userId !== userId) {
+      throw new Error('Unauthorized: Cannot restore dashboard owned by another user');
+    }
+
+    // Get version
+    const version = await this.getVersion(dashboardId, versionNumber);
+
+    if (!version) {
+      throw new Error(`Version ${versionNumber} not found for dashboard ${dashboardId}`);
+    }
+
+    // Apply version config to dashboard
+    const config = version.configSnapshot as any;
+
+    await this.update(
+      dashboardId,
+      {
+        globalFilters: config.globalFilters || null,
+        // Add other restorable fields as needed
+      },
+      userId
+    );
+
+    // Create new version to track the restore
+    await this.createVersion(dashboardId, {
+      config: version.configSnapshot,
+      description: `Restored from version ${versionNumber}`,
+      userId,
+    });
+
+    const restored = await this.getById(dashboardId);
+    if (!restored) {
+      throw new Error('Failed to restore dashboard');
+    }
+
+    return restored;
+  }
+
+  /**
+   * Prune old versions (called by T077 background job)
+   * Keeps 5 most recent versions, deletes versions older than 24h beyond that
+   * @param dashboardId - Dashboard ID
+   * @returns Number of versions deleted
+   */
+  async pruneOldVersions(dashboardId: number): Promise<number> {
+    // Get all versions for this dashboard
+    const allVersions = await db
+      .select()
+      .from(dashboardVersions)
+      .where(eq(dashboardVersions.dashboardId, dashboardId))
+      .orderBy(desc(dashboardVersions.createdAt));
+
+    // Keep 5 most recent
+    const versionsToKeep = allVersions.slice(0, 5);
+    const candidatesForDeletion = allVersions.slice(5);
+
+    // Filter candidates: only delete if older than 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const versionIdsToDelete = candidatesForDeletion
+      .filter(v => v.createdAt && new Date(v.createdAt) < twentyFourHoursAgo)
+      .map(v => v.id);
+
+    if (versionIdsToDelete.length === 0) {
+      return 0;
+    }
+
+    // Delete old versions
+    for (const id of versionIdsToDelete) {
+      await db
+        .delete(dashboardVersions)
+        .where(eq(dashboardVersions.id, id));
+    }
+
+    return versionIdsToDelete.length;
+  }
+
+  // ========================================================================
+  // Template-Based Dashboard Creation (US2 - T042)
+  // ========================================================================
+
+  /**
+   * Create a new dashboard from a template
+   * Copies template configuration, widgets, and default layouts
+   * @param templateId - Dashboard template ID
+   * @param userId - User ID creating the dashboard
+   * @param customName - Optional custom name (defaults to template name)
+   * @returns Created dashboard with widgets
+   */
+  async createDashboardFromTemplate(
+    templateId: number,
+    userId: number,
+    customName?: string
+  ): Promise<Dashboard & { widgets: DashboardWidget[] }> {
+    // 1. Get template
+    const [template] = await db
+      .select()
+      .from(dashboardTemplates)
+      .where(eq(dashboardTemplates.id, templateId))
+      .limit(1);
+
+    if (!template) {
+      throw new Error(`Template with ID ${templateId} not found`);
+    }
+
+    if (!template.isActive) {
+      throw new Error(`Template "${template.name}" is not active`);
+    }
+
+    // 2. Get template widgets
+    const templateWidgetDefs = await db
+      .select({
+        widgetDefinitionId: templateWidgets.widgetDefinitionId,
+        sortOrder: templateWidgets.sortOrder,
+        widgetDefinition: widgetDefinitions,
+      })
+      .from(templateWidgets)
+      .innerJoin(
+        widgetDefinitions,
+        eq(templateWidgets.widgetDefinitionId, widgetDefinitions.id)
+      )
+      .where(eq(templateWidgets.templateId, templateId))
+      .orderBy(templateWidgets.sortOrder);
+
+    if (templateWidgetDefs.length === 0) {
+      throw new Error(`Template "${template.name}" has no widgets defined`);
+    }
+
+    // 3. Create dashboard
+    const dashboardName = customName || `${template.name} - ${new Date().toLocaleDateString()}`;
+    const dashboard = await this.create({
+      userId,
+      name: dashboardName,
+      description: template.description,
+      globalFilters: (template.config as any)?.globalFilters || null,
+      isActive: true,
+    });
+
+    // 4. Add widgets to dashboard
+    const createdWidgets: DashboardWidget[] = [];
+    for (const templateWidget of templateWidgetDefs) {
+      const widget = await this.addWidget({
+        dashboardId: dashboard.id,
+        widgetDefinitionId: templateWidget.widgetDefinitionId,
+        widgetTitle: null, // Use widget definition's default name
+        configOverride: null, // No customization initially
+        isVisible: true,
+        sortOrder: templateWidget.sortOrder,
+      });
+      createdWidgets.push(widget);
+    }
+
+    // 5. Create version snapshot
+    await this.createVersion(dashboard.id, {
+      config: {
+        widgets: createdWidgets.map(w => ({
+          id: w.id,
+          widgetDefinitionId: w.widgetDefinitionId,
+          sortOrder: w.sortOrder,
+        })),
+        globalFilters: dashboard.globalFilters || {},
+        templateId,
+      },
+      description: `Created from template: ${template.name}`,
+      userId,
+    });
+
+    // 6. Fetch full widgets with definitions
+    const widgets = await this.getWidgets(dashboard.id);
+
+    return {
+      ...dashboard,
+      widgets,
+    };
+  }
+
+  /**
+   * Get all active dashboard templates
+   * @param category - Optional category filter
+   * @returns Array of dashboard templates
+   */
+  async getTemplates(category?: string): Promise<DashboardTemplate[]> {
+    const conditions = [eq(dashboardTemplates.isActive, true)];
+
+    if (category) {
+      conditions.push(eq(dashboardTemplates.category, category));
+    }
+
+    return await db
+      .select()
+      .from(dashboardTemplates)
+      .where(and(...conditions))
+      .orderBy(dashboardTemplates.sortOrder);
+  }
+
+  /**
+   * Get template by ID with widget preview
+   * @param templateId - Template ID
+   * @returns Template with widget definitions
+   */
+  async getTemplateById(
+    templateId: number
+  ): Promise<(DashboardTemplate & { widgets: any[] }) | null> {
+    const [template] = await db
+      .select()
+      .from(dashboardTemplates)
+      .where(eq(dashboardTemplates.id, templateId))
+      .limit(1);
+
+    if (!template) {
+      return null;
+    }
+
+    const widgets = await db
+      .select({
+        widgetDefinitionId: templateWidgets.widgetDefinitionId,
+        sortOrder: templateWidgets.sortOrder,
+        widgetDefinition: widgetDefinitions,
+      })
+      .from(templateWidgets)
+      .innerJoin(
+        widgetDefinitions,
+        eq(templateWidgets.widgetDefinitionId, widgetDefinitions.id)
+      )
+      .where(eq(templateWidgets.templateId, templateId))
+      .orderBy(templateWidgets.sortOrder);
+
+    return {
+      ...template,
+      widgets,
+    };
+  }
+}
+
+// Export singleton instance
+export const dashboardService = new DashboardService();

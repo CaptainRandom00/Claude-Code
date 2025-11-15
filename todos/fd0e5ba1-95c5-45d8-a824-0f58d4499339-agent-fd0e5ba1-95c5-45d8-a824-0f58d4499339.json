@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Test SSH connection on different ports (22, 2222, 2200)",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Try different usernames for SSH connection",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check SSH service status and connection details",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Verify key authorization and test verbose connection",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Contact hosting provider to enable shell access",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  }
+]

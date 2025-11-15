@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Check if the dev server is still running",
+    "status": "completed",
+    "id": "1"
+  },
+  {
+    "content": "Restart the development server",
+    "status": "completed",
+    "id": "2"
+  },
+  {
+    "content": "Set up Playwright for testing",
+    "status": "completed",
+    "id": "3"
+  },
+  {
+    "content": "Create a Playwright test to verify the site loads",
+    "status": "completed",
+    "id": "4"
+  },
+  {
+    "content": "Run Playwright test to confirm site is working",
+    "status": "completed",
+    "id": "5"
+  },
+  {
+    "content": "Fix hydration error in AIAssistant component",
+    "status": "completed",
+    "id": "6"
+  },
+  {
+    "content": "Re-run Playwright test to verify the fix",
+    "status": "completed",
+    "id": "7"
+  }
+]

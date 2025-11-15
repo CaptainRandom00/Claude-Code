@@ -1,0 +1,311 @@
+/**
+ * @file ImageUploadZone.tsx
+ * @description Drag-and-drop file upload zone for product images
+ * Feature: 025-product-image-management
+ */
+
+import React, { useRef, useState, useCallback } from 'react';
+import { Upload, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import type { ProductImage } from '../../../../shared/types/product-images';
+
+interface ImageUploadZoneProps {
+  itemCode: string;
+  currentCount: number;
+  onUploadSuccess: (images: ProductImage[]) => void;
+}
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_IMAGES = 5;
+
+/**
+ * ImageUploadZone component for uploading product images
+ */
+export function ImageUploadZone({ itemCode, currentCount, onUploadSuccess }: ImageUploadZoneProps) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [compressionStats, setCompressionStats] = useState<string | null>(null);
+
+  const isDisabled = currentCount >= MAX_IMAGES || isUploading;
+
+  /**
+   * Validate file type and size
+   */
+  const validateFile = useCallback((file: File): { valid: boolean; error?: string } => {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return {
+        valid: false,
+        error: `${file.name}: Only JPG, JPEG, PNG, WEBP formats accepted`,
+      };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `${file.name}: File size exceeds 10MB limit`,
+      };
+    }
+
+    return { valid: true };
+  }, []);
+
+  /**
+   * Handle file upload
+   */
+  const handleUpload = useCallback(async (files: File[]) => {
+    console.log('[ImageUploadZone] handleUpload called with', files.length, 'files');
+
+    // Validate count
+    if (currentCount >= MAX_IMAGES) {
+      toast({
+        title: 'Upload limit reached',
+        description: `Maximum ${MAX_IMAGES} images allowed per product`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Limit files to remaining slots
+    const remainingSlots = MAX_IMAGES - currentCount;
+    const filesToUpload = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      toast({
+        title: 'Too many files',
+        description: `Only ${remainingSlots} more image(s) can be uploaded`,
+        variant: 'destructive',
+      });
+    }
+
+    // Validate all files
+    const validationErrors: string[] = [];
+    const validFiles: File[] = [];
+
+    filesToUpload.forEach((file) => {
+      const validation = validateFile(file);
+      if (validation.valid) {
+        validFiles.push(file);
+      } else if (validation.error) {
+        validationErrors.push(validation.error);
+      }
+    });
+
+    // Show validation errors
+    if (validationErrors.length > 0) {
+      validationErrors.forEach((error) => {
+        toast({
+          title: 'Invalid file',
+          description: error,
+          variant: 'destructive',
+        });
+      });
+    }
+
+    // Upload valid files
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setCompressionStats(null);
+
+    try {
+      const formData = new FormData();
+      validFiles.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      // Calculate total original size for compression stats
+      const totalOriginalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
+
+      console.log('[ImageUploadZone] Starting upload of', validFiles.length, 'files to', itemCode);
+
+      // Simulate progress (actual upload doesn't support progress tracking with fetch)
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 100);
+
+      const response = await fetch(`/api/product-profiles/${itemCode}/images`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      console.log('[ImageUploadZone] Upload response status:', response.status);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('[ImageUploadZone] Upload result:', result);
+
+      // Calculate compression stats
+      const uploadedImages: ProductImage[] = result.data.images;
+      const totalCompressedSize = uploadedImages
+        .slice(-validFiles.length) // Get only newly uploaded images
+        .reduce((sum, img) => sum + img.size, 0);
+
+      const originalMB = (totalOriginalSize / (1024 * 1024)).toFixed(2);
+      const compressedKB = (totalCompressedSize / 1024).toFixed(0);
+
+      setCompressionStats(`Original: ${originalMB}MB → Compressed: ${compressedKB}KB`);
+
+      // Call success callback
+      onUploadSuccess(uploadedImages);
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Clear compression stats after 5 seconds
+      setTimeout(() => {
+        setCompressionStats(null);
+      }, 5000);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  }, [itemCode, currentCount, validateFile, onUploadSuccess, toast]);
+
+  /**
+   * Handle drag events
+   */
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDisabled) {
+      setIsDragging(true);
+    }
+  }, [isDisabled]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (isDisabled) {
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    handleUpload(files);
+  }, [isDisabled, handleUpload]);
+
+  /**
+   * Handle file input change
+   */
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    console.log('[ImageUploadZone] File input changed, files:', files.length);
+    handleUpload(files);
+  }, [handleUpload]);
+
+  /**
+   * Handle browse button click
+   */
+  const handleBrowseClick = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    console.log('[ImageUploadZone] Browse button clicked');
+    fileInputRef.current?.click();
+  }, []);
+
+  return (
+    <div className="w-full">
+      <div
+        className={`
+          relative border-2 border-dashed rounded-lg p-6 transition-colors
+          ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+          ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400'}
+        `}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ALLOWED_TYPES.join(',')}
+          className="hidden"
+          onChange={handleFileInputChange}
+          disabled={isDisabled}
+        />
+
+        <div className="flex flex-col items-center justify-center gap-3 text-center">
+          {isUploading ? (
+            <>
+              <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">
+                  Uploading... {uploadProgress}%
+                </p>
+                <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <Upload className="h-10 w-10 text-gray-400" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">
+                  {currentCount >= MAX_IMAGES
+                    ? `Maximum ${MAX_IMAGES} images reached`
+                    : 'Drag images here or click to browse'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  JPG, JPEG, PNG, WEBP • Max 10MB • {MAX_IMAGES - currentCount} remaining
+                </p>
+              </div>
+              {!isDisabled && (
+                <Button type="button" variant="outline" size="sm" onClick={handleBrowseClick}>
+                  Browse Files
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {compressionStats && (
+        <p className="mt-2 text-sm text-green-600 font-medium">
+          ✓ {compressionStats}
+        </p>
+      )}
+    </div>
+  );
+}

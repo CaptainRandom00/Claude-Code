@@ -1,0 +1,172 @@
+/**
+ * Dashboard Builder Page
+ * Feature: 028-build-a-widget (User Story 3 - T060)
+ *
+ * Allows users to build custom dashboards and configure widgets visually.
+ * Features edit/view mode toggle and widget configuration UI.
+ */
+
+import { useState } from 'react';
+import { useRoute, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Edit3, Eye, Plus } from 'lucide-react';
+import { WidgetConfigurator } from '@/components/dashboard-builder/WidgetConfigurator';
+
+interface Dashboard {
+  id: number;
+  name: string;
+  description: string | null;
+  widgets: any[];
+}
+
+async function fetchDashboard(id: number): Promise<Dashboard> {
+  const response = await fetch(`/api/widgets/dashboards/${id}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch dashboard');
+  }
+  return response.json();
+}
+
+export default function DashboardBuilder() {
+  const [matchConfigure, paramsConfigure] = useRoute('/dashboards/builder/:id?/configure/:widgetType?');
+  const [matchBuilder, paramsBuilder] = useRoute('/dashboards/builder/:id?');
+  const [, setLocation] = useLocation();
+
+  const params = matchConfigure ? paramsConfigure : paramsBuilder;
+  const dashboardId = params?.id ? parseInt(params.id) : null;
+  const widgetType = matchConfigure ? paramsConfigure?.widgetType : null;
+
+  const [editMode, setEditMode] = useState(true);
+  const [showWidgetSelector, setShowWidgetSelector] = useState(false);
+
+  // Fetch dashboard if ID provided
+  const {
+    data: dashboard,
+    isLoading,
+  } = useQuery({
+    queryKey: ['dashboard', dashboardId],
+    queryFn: () => fetchDashboard(dashboardId!),
+    enabled: !!dashboardId,
+  });
+
+  // If widget type is in URL, show configurator
+  if (widgetType) {
+    return (
+      <WidgetConfigurator
+        widgetType={widgetType}
+        dashboardId={dashboardId || undefined}
+        onCancel={() => setLocation(`/dashboards/builder/${dashboardId || ''}`)}
+      />
+    );
+  }
+
+  return (
+    <div className="p-6" data-testid="dashboard-builder">
+      {/* Header with Edit Mode Toggle */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">
+            {dashboardId ? (isLoading ? 'Loading...' : dashboard?.name || 'Dashboard') : 'New Dashboard'}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {editMode ? 'Configure your dashboard' : 'Preview mode'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* Edit Mode Toggle */}
+          <div className="flex items-center gap-2" data-testid="edit-mode-toggle">
+            <Eye className={`h-4 w-4 ${!editMode ? 'text-primary' : 'text-muted-foreground'}`} />
+            <Switch
+              checked={editMode}
+              onCheckedChange={setEditMode}
+              aria-label="Toggle edit mode"
+            />
+            <Edit3 className={`h-4 w-4 ${editMode ? 'text-primary' : 'text-muted-foreground'}`} />
+            <Label className="ml-2">
+              {editMode ? 'Edit Mode' : 'View Mode'}
+            </Label>
+          </div>
+
+          {/* Add Widget Button (only in edit mode) */}
+          {editMode && (
+            <Button
+              onClick={() => setShowWidgetSelector(true)}
+              data-testid="add-widget-button"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Widget
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Widget Selector Dialog */}
+      {showWidgetSelector && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div
+            className="bg-card rounded-lg shadow-lg p-6 max-w-2xl w-full"
+            data-testid="widget-selector"
+          >
+            <h2 className="text-2xl font-bold mb-4">Select Widget Type</h2>
+            <p className="text-muted-foreground mb-6">
+              Choose a widget type to add to your dashboard
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { type: 'metric', label: 'Metric', icon: '📊', description: 'Display single value' },
+                { type: 'chart', label: 'Chart', icon: '📈', description: 'Line, bar, or area chart' },
+                { type: 'table', label: 'Table', icon: '📋', description: 'Data table' },
+                { type: 'alert', label: 'Alert', icon: '🔔', description: 'Notifications list' },
+                { type: 'progress', label: 'Progress', icon: '⏳', description: 'Progress indicator' },
+              ].map((widget) => (
+                <button
+                  key={widget.type}
+                  className="p-6 border rounded-lg hover:bg-accent hover:border-primary transition-colors text-left"
+                  data-testid={`widget-type-${widget.type}`}
+                  onClick={() => {
+                    // Navigate to widget configurator
+                    setLocation(`/dashboards/builder/${dashboardId || 'new'}/configure/${widget.type}`);
+                  }}
+                >
+                  <div className="text-4xl mb-2">{widget.icon}</div>
+                  <h3 className="font-semibold text-lg">{widget.label}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowWidgetSelector(false)}
+                data-testid="cancel-widget-button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dashboard Content Area */}
+      <div className="border-2 border-dashed border-muted rounded-lg p-8 min-h-[400px] flex items-center justify-center">
+        {!dashboardId || !dashboard?.widgets || dashboard.widgets.length === 0 ? (
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">
+              No widgets yet. Click "Add Widget" to get started.
+            </p>
+          </div>
+        ) : (
+          <div className="text-muted-foreground">
+            Dashboard with {dashboard.widgets.length} widgets
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

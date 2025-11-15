@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Examine authentication pages (login, register, forgot-password) for glass/plasma theme usage",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Analyze main app pages (dashboard, projects/page.tsx, tasks/page.tsx) for glass-panel and btn-primary usage",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check form components (EnhancedTaskForm.tsx, project creation forms) for input-glass usage",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Verify design system consistency in report pages (sample 2-3 from reports section)",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Check for separate CSS files that might conflict with main design system",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Compile findings with specific file paths and line numbers for inconsistencies",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  }
+]

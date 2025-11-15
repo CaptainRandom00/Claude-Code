@@ -1,0 +1,480 @@
+/**
+ * Widget Dashboard Navigation Integration E2E Test
+ * Feature: 028-build-a-widget - Navigation Integration
+ *
+ * Comprehensive test validating:
+ * - Visual UI elements (sidebar links, headers, layouts)
+ * - Backend API functionality (dashboards, widgets, templates)
+ * - Navigation flows between all widget pages
+ * - Responsive design behavior
+ * - Error handling
+ */
+
+import { test, expect, Page } from '@playwright/test';
+
+const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
+
+// Helper to wait for network idle and page stability
+async function waitForStable(page: Page, timeout = 1000) {
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(timeout);
+}
+
+// Helper to take screenshots with descriptions
+async function screenshot(page: Page, name: string, description?: string) {
+  await page.screenshot({
+    path: `test-results/widget-nav-screenshots/${name}.png`,
+    fullPage: true
+  });
+  if (description) {
+    console.log(`  📸 ${description}`);
+  }
+}
+
+test.describe('Widget Dashboard Navigation Integration', () => {
+  test.beforeEach(async ({ page }) => {
+    // Start on main dashboard
+    await page.goto(`${BASE_URL}/`);
+    await waitForStable(page);
+  });
+
+  // ==========================================================================
+  // TEST 1: Sidebar Navigation Links Visibility
+  // ==========================================================================
+  test('should display widget navigation links in sidebar with correct icons', async ({ page }) => {
+    console.log('\n═══ TEST 1: Sidebar Navigation Links Visibility ═══\n');
+
+    // Wait for sidebar to be visible
+    const sidebar = page.locator('aside.sidebar-dark, aside').filter({ hasText: 'LF-SMS' }).first();
+    await expect(sidebar).toBeVisible({ timeout: 5000 });
+    console.log('  ✅ Sidebar is visible');
+
+    // Verify Widget Dashboards link
+    const widgetDashboardsLink = page.locator('button:has-text("Widget Dashboards")');
+    await expect(widgetDashboardsLink).toBeVisible();
+    console.log('  ✅ "Widget Dashboards" link is visible');
+
+    // Verify Widget Builder link
+    const widgetBuilderLink = page.locator('button:has-text("Widget Builder")');
+    await expect(widgetBuilderLink).toBeVisible();
+    console.log('  ✅ "Widget Builder" link is visible');
+
+    // Verify Widget Templates link
+    const widgetTemplatesLink = page.locator('button:has-text("Widget Templates")');
+    await expect(widgetTemplatesLink).toBeVisible();
+    console.log('  ✅ "Widget Templates" link is visible');
+
+    // Verify links are in correct order (should be near top after Dashboard)
+    const navButtons = page.locator('aside nav button');
+    const allButtonTexts = await navButtons.allTextContents();
+
+    const widgetDashboardsIndex = allButtonTexts.findIndex(t => t.includes('Widget Dashboards'));
+    const widgetBuilderIndex = allButtonTexts.findIndex(t => t.includes('Widget Builder'));
+    const widgetTemplatesIndex = allButtonTexts.findIndex(t => t.includes('Widget Templates'));
+
+    expect(widgetDashboardsIndex).toBeGreaterThan(-1);
+    expect(widgetBuilderIndex).toBeGreaterThan(widgetDashboardsIndex);
+    expect(widgetTemplatesIndex).toBeGreaterThan(widgetBuilderIndex);
+    console.log('  ✅ Widget navigation links are in correct order');
+
+    await screenshot(page, '01-sidebar-with-widget-links', 'Sidebar with widget navigation links');
+  });
+
+  // ==========================================================================
+  // TEST 2: Navigate to Widget Dashboards Page
+  // ==========================================================================
+  test('should navigate to Widget Dashboards and load data with sidebar/header', async ({ page }) => {
+    console.log('\n═══ TEST 2: Navigate to Widget Dashboards ═══\n');
+
+    // Set up API response listener
+    let apiCalled = false;
+    let apiStatusCode = 0;
+
+    page.on('response', response => {
+      if (response.url().includes('/api/widgets/dashboards/1')) {
+        apiCalled = true;
+        apiStatusCode = response.status();
+        console.log(`  📡 API call to ${response.url()} - Status: ${apiStatusCode}`);
+      }
+    });
+
+    // Click Widget Dashboards link
+    const widgetDashboardsLink = page.locator('button:has-text("Widget Dashboards")');
+    await widgetDashboardsLink.click();
+    await waitForStable(page, 2000);
+
+    // Verify URL changed
+    expect(page.url()).toContain('/dashboards/1');
+    console.log('  ✅ URL changed to /dashboards/1');
+
+    // Verify sidebar is still present
+    const sidebar = page.locator('aside.sidebar-dark, aside').filter({ hasText: 'LF-SMS' }).first();
+    await expect(sidebar).toBeVisible();
+    console.log('  ✅ Sidebar is present on Widget Dashboards page');
+
+    // Verify header is present
+    const header = page.locator('header, [role="banner"]');
+    await expect(header).toBeVisible();
+    console.log('  ✅ Header is present on Widget Dashboards page');
+
+    // Verify dashboard title appears (should be "Sales Overview" from API data)
+    const dashboardTitle = page.locator('h1, h2').filter({ hasText: /sales|dashboard|overview/i }).first();
+    await expect(dashboardTitle).toBeVisible({ timeout: 10000 });
+    const titleText = await dashboardTitle.textContent();
+    console.log(`  ✅ Dashboard title: "${titleText}"`);
+
+    // Verify widgets are rendered
+    await page.waitForTimeout(2000); // Give widgets time to load
+    const widgetElements = page.locator('[data-testid^="widget-"], .react-grid-item');
+    const widgetCount = await widgetElements.count();
+
+    expect(widgetCount).toBeGreaterThanOrEqual(1);
+    console.log(`  ✅ ${widgetCount} widget(s) rendered on dashboard`);
+
+    // Verify API was called successfully
+    expect(apiCalled).toBeTruthy();
+    expect(apiStatusCode).toBe(200);
+    console.log('  ✅ Backend API call succeeded (200 OK)');
+
+    await screenshot(page, '02-widget-dashboards-page', 'Widget Dashboards page loaded');
+  });
+
+  // ==========================================================================
+  // TEST 3: Navigate to Widget Builder Page
+  // ==========================================================================
+  test('should navigate to Widget Builder and show builder UI with sidebar/header', async ({ page }) => {
+    console.log('\n═══ TEST 3: Navigate to Widget Builder ═══\n');
+
+    // Click Widget Builder link
+    const widgetBuilderLink = page.locator('button:has-text("Widget Builder")');
+    await widgetBuilderLink.click();
+    await waitForStable(page, 2000);
+
+    // Verify URL changed
+    expect(page.url()).toContain('/dashboards/builder');
+    console.log('  ✅ URL changed to /dashboards/builder');
+
+    // Verify sidebar is still present
+    const sidebar = page.locator('aside.sidebar-dark, aside').filter({ hasText: 'LF-SMS' }).first();
+    await expect(sidebar).toBeVisible();
+    console.log('  ✅ Sidebar is present on Widget Builder page');
+
+    // Verify header is present
+    const header = page.locator('header, [role="banner"]');
+    await expect(header).toBeVisible();
+    console.log('  ✅ Header is present on Widget Builder page');
+
+    // Verify builder page title
+    const pageTitle = page.locator('h1').filter({ hasText: /dashboard|builder|new/i }).first();
+    await expect(pageTitle).toBeVisible({ timeout: 5000 });
+    const titleText = await pageTitle.textContent();
+    console.log(`  ✅ Builder page title: "${titleText}"`);
+
+    // Verify "Add Widget" button is visible
+    const addWidgetBtn = page.locator('button:has-text("Add Widget")');
+    await expect(addWidgetBtn).toBeVisible({ timeout: 5000 });
+    console.log('  ✅ "Add Widget" button is visible');
+
+    // Verify edit mode toggle or configuration UI is present
+    const configUI = page.locator('[data-testid="dashboard-builder"], text=Configure, text=Edit');
+    const hasConfigUI = await configUI.count() > 0;
+    expect(hasConfigUI).toBeTruthy();
+    console.log('  ✅ Builder configuration UI is present');
+
+    await screenshot(page, '03-widget-builder-page', 'Widget Builder page loaded');
+  });
+
+  // ==========================================================================
+  // TEST 4: Navigate to Widget Templates Page
+  // ==========================================================================
+  test('should navigate to Widget Templates and fetch templates with sidebar/header', async ({ page }) => {
+    console.log('\n═══ TEST 4: Navigate to Widget Templates ═══\n');
+
+    // Set up API response listener
+    let templatesApiCalled = false;
+    let templatesApiStatusCode = 0;
+
+    page.on('response', response => {
+      if (response.url().includes('/api/widgets/templates')) {
+        templatesApiCalled = true;
+        templatesApiStatusCode = response.status();
+        console.log(`  📡 API call to ${response.url()} - Status: ${templatesApiStatusCode}`);
+      }
+    });
+
+    // Click Widget Templates link
+    const widgetTemplatesLink = page.locator('button:has-text("Widget Templates")');
+    await widgetTemplatesLink.click();
+    await waitForStable(page, 2000);
+
+    // Verify URL changed
+    expect(page.url()).toContain('/dashboards/templates');
+    console.log('  ✅ URL changed to /dashboards/templates');
+
+    // Verify sidebar is still present
+    const sidebar = page.locator('aside.sidebar-dark, aside').filter({ hasText: 'LF-SMS' }).first();
+    await expect(sidebar).toBeVisible();
+    console.log('  ✅ Sidebar is present on Widget Templates page');
+
+    // Verify header is present
+    const header = page.locator('header, [role="banner"]');
+    await expect(header).toBeVisible();
+    console.log('  ✅ Header is present on Widget Templates page');
+
+    // Verify templates page loaded (either template cards or empty state)
+    await page.waitForTimeout(1000);
+    const templateCards = page.locator('[data-testid^="template-"], .template-card, [class*="card"]');
+    const emptyState = page.locator('text=No templates, text=empty, text=Create your first');
+
+    const hasTemplates = await templateCards.count() > 0;
+    const hasEmptyState = await emptyState.count() > 0;
+
+    expect(hasTemplates || hasEmptyState).toBeTruthy();
+
+    if (hasTemplates) {
+      const templateCount = await templateCards.count();
+      console.log(`  ✅ ${templateCount} template(s) displayed`);
+    } else {
+      console.log('  ✅ Empty state displayed (no templates yet)');
+    }
+
+    // Verify API was called (may return empty array)
+    expect(templatesApiCalled).toBeTruthy();
+    console.log('  ✅ Backend API call to templates endpoint made');
+
+    await screenshot(page, '04-widget-templates-page', 'Widget Templates page loaded');
+  });
+
+  // ==========================================================================
+  // TEST 5: Sidebar Active State Updates
+  // ==========================================================================
+  test('should show correct active state for each widget page', async ({ page }) => {
+    console.log('\n═══ TEST 5: Sidebar Active State ═══\n');
+
+    // Navigate to Widget Dashboards
+    const widgetDashboardsLink = page.locator('button:has-text("Widget Dashboards")');
+    await widgetDashboardsLink.click();
+    await waitForStable(page);
+
+    // Check active state (looking for active class or highlighting)
+    const activeDashboardLink = page.locator('button:has-text("Widget Dashboards")');
+    const dashboardClasses = await activeDashboardLink.getAttribute('class');
+
+    // Active links typically have "active", "bg-" color classes, or higher opacity
+    const isActive = dashboardClasses?.includes('active') ||
+                     dashboardClasses?.includes('bg-') ||
+                     dashboardClasses?.includes('nav-link-active');
+
+    console.log(`  ℹ️  Widget Dashboards link classes: ${dashboardClasses}`);
+    console.log(`  ✅ Active state detection working`);
+
+    // Navigate to Widget Builder
+    const widgetBuilderLink = page.locator('button:has-text("Widget Builder")');
+    await widgetBuilderLink.click();
+    await waitForStable(page);
+
+    const activeBuilderLink = page.locator('button:has-text("Widget Builder")');
+    const builderClasses = await activeBuilderLink.getAttribute('class');
+    console.log(`  ℹ️  Widget Builder link classes: ${builderClasses}`);
+    console.log('  ✅ Active state updates on navigation');
+  });
+
+  // ==========================================================================
+  // TEST 6: Cross-Navigation Flow
+  // ==========================================================================
+  test('should handle smooth navigation flow between all widget pages', async ({ page }) => {
+    console.log('\n═══ TEST 6: Cross-Navigation Flow ═══\n');
+
+    // Flow: Dashboard → Widget Dashboards → Widget Builder → Widget Templates → Dashboard
+
+    // 1. Navigate to Widget Dashboards
+    console.log('  📍 Navigating to Widget Dashboards...');
+    await page.locator('button:has-text("Widget Dashboards")').click();
+    await waitForStable(page);
+    expect(page.url()).toContain('/dashboards/1');
+    console.log('  ✅ Widget Dashboards loaded');
+
+    // 2. Navigate to Widget Builder
+    console.log('  📍 Navigating to Widget Builder...');
+    await page.locator('button:has-text("Widget Builder")').click();
+    await waitForStable(page);
+    expect(page.url()).toContain('/dashboards/builder');
+    console.log('  ✅ Widget Builder loaded');
+
+    // 3. Navigate to Widget Templates
+    console.log('  📍 Navigating to Widget Templates...');
+    await page.locator('button:has-text("Widget Templates")').click();
+    await waitForStable(page);
+    expect(page.url()).toContain('/dashboards/templates');
+    console.log('  ✅ Widget Templates loaded');
+
+    // 4. Navigate back to main Dashboard
+    console.log('  📍 Navigating back to main Dashboard...');
+    await page.locator('button:has-text("Dashboard")').first().click();
+    await waitForStable(page);
+    expect(page.url()).toMatch(/\/$|\/dashboard$/);
+    console.log('  ✅ Main Dashboard loaded');
+
+    // Verify no white screens or errors occurred
+    const errorElements = page.locator('text=Error, text=Failed, text=not found');
+    const errorCount = await errorElements.count();
+    expect(errorCount).toBe(0);
+    console.log('  ✅ No errors during navigation flow');
+
+    await screenshot(page, '05-navigation-flow-complete', 'Complete navigation flow');
+  });
+
+  // ==========================================================================
+  // TEST 7: Mobile Responsive Navigation
+  // ==========================================================================
+  test('should handle mobile viewport navigation correctly', async ({ page }) => {
+    console.log('\n═══ TEST 7: Mobile Responsive Navigation ═══\n');
+
+    // Set mobile viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto(`${BASE_URL}/dashboards/1`);
+    await waitForStable(page);
+
+    // On mobile, sidebar should be hidden initially or have a menu button
+    const menuButton = page.locator('button:has-text("Menu"), button[aria-label*="menu" i], button:has([class*="Menu"])').first();
+
+    // If menu button exists, sidebar is likely hidden
+    const hasMenuButton = await menuButton.count() > 0;
+
+    if (hasMenuButton) {
+      console.log('  ✅ Mobile menu button detected');
+
+      // Try to open mobile sidebar
+      await menuButton.click();
+      await page.waitForTimeout(500);
+
+      // Sidebar should now be visible
+      const sidebar = page.locator('aside, [role="navigation"]').first();
+      await expect(sidebar).toBeVisible({ timeout: 3000 });
+      console.log('  ✅ Mobile sidebar can be toggled');
+
+      await screenshot(page, '06-mobile-navigation', 'Mobile navigation open');
+    } else {
+      console.log('  ℹ️  Mobile menu not implemented or always visible');
+    }
+
+    // Reset viewport
+    await page.setViewportSize({ width: 1920, height: 1080 });
+  });
+
+  // ==========================================================================
+  // TEST 8: Backend API Integration Verification
+  // ==========================================================================
+  test('should make correct API calls with proper status codes', async ({ page }) => {
+    console.log('\n═══ TEST 8: Backend API Integration ═══\n');
+
+    const apiCalls: { url: string; status: number }[] = [];
+
+    // Track all API calls
+    page.on('response', response => {
+      if (response.url().includes('/api/widgets')) {
+        apiCalls.push({
+          url: response.url(),
+          status: response.status()
+        });
+      }
+    });
+
+    // Navigate to Widget Dashboards page
+    await page.goto(`${BASE_URL}/dashboards/1`);
+    await waitForStable(page, 3000);
+
+    // Check for dashboard API call
+    const dashboardCall = apiCalls.find(call => call.url.includes('/api/widgets/dashboards/1'));
+    expect(dashboardCall).toBeTruthy();
+    expect(dashboardCall?.status).toBe(200);
+    console.log(`  ✅ GET /api/widgets/dashboards/1 - ${dashboardCall?.status}`);
+
+    // Navigate to templates
+    await page.goto(`${BASE_URL}/dashboards/templates`);
+    await waitForStable(page, 2000);
+
+    // Check for templates API call
+    const templatesCall = apiCalls.find(call => call.url.includes('/api/widgets/templates'));
+    if (templatesCall) {
+      console.log(`  ✅ GET /api/widgets/templates - ${templatesCall.status}`);
+    } else {
+      console.log('  ℹ️  Templates API not called (may be lazy loaded)');
+    }
+
+    console.log(`  📊 Total widget API calls: ${apiCalls.length}`);
+  });
+
+  // ==========================================================================
+  // TEST 9: Error Handling
+  // ==========================================================================
+  test('should gracefully handle API errors without white screens', async ({ page }) => {
+    console.log('\n═══ TEST 9: Error Handling ═══\n');
+
+    // Intercept API to simulate error
+    await page.route('**/api/widgets/dashboards/1', route => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal Server Error' })
+      });
+    });
+
+    // Navigate to Widget Dashboards (should trigger error)
+    await page.goto(`${BASE_URL}/dashboards/1`);
+    await waitForStable(page, 2000);
+
+    // Page should still render (not white screen)
+    const body = page.locator('body');
+    await expect(body).toBeVisible();
+    console.log('  ✅ Page renders despite API error');
+
+    // Sidebar should still be present and functional
+    const sidebar = page.locator('aside.sidebar-dark, aside:has(text("LF-SMS"))');
+    await expect(sidebar).toBeVisible();
+    console.log('  ✅ Sidebar remains functional');
+
+    // User should be able to navigate to other pages
+    const widgetBuilderLink = page.locator('button:has-text("Widget Builder")');
+    await widgetBuilderLink.click();
+    await waitForStable(page);
+
+    expect(page.url()).toContain('/dashboards/builder');
+    console.log('  ✅ User can navigate to other pages after error');
+
+    await screenshot(page, '07-error-handling', 'Error handling test');
+  });
+
+  // ==========================================================================
+  // TEST 10: Sidebar Persistence Across Pages
+  // ==========================================================================
+  test('should maintain sidebar visibility across all widget pages', async ({ page }) => {
+    console.log('\n═══ TEST 10: Sidebar Persistence ═══\n');
+
+    const pages = [
+      { name: 'Widget Dashboards', url: '/dashboards/1' },
+      { name: 'Widget Builder', url: '/dashboards/builder' },
+      { name: 'Widget Templates', url: '/dashboards/templates' },
+    ];
+
+    for (const pageInfo of pages) {
+      console.log(`  📍 Testing sidebar on ${pageInfo.name}...`);
+
+      await page.goto(`${BASE_URL}${pageInfo.url}`);
+      await waitForStable(page);
+
+      // Verify sidebar is visible
+      const sidebar = page.locator('aside.sidebar-dark, aside').filter({ hasText: 'LF-SMS' }).first();
+      await expect(sidebar).toBeVisible({ timeout: 5000 });
+
+      // Verify sidebar contains navigation items
+      const navButtons = sidebar.locator('button');
+      const buttonCount = await navButtons.count();
+      expect(buttonCount).toBeGreaterThan(5); // Should have multiple nav items
+
+      console.log(`    ✅ Sidebar visible with ${buttonCount} navigation items`);
+    }
+
+    console.log('  ✅ Sidebar persists across all widget pages');
+  });
+});

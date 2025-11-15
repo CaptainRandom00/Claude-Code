@@ -1,0 +1,158 @@
+openapi: 3.1.0
+info:
+  title: Byte Bridges Authentication API
+  version: 1.0.0
+  description: Admin authentication endpoints using NextAuth
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://bytebridges.com
+    description: Production
+
+paths:
+  /api/auth/signin:
+    post:
+      summary: Admin sign in
+      description: Authenticate admin user with email and password
+      operationId: signIn
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@bytebridges.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 12
+                  example: SecurePassword123!
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserProfile'
+                  expires:
+                    type: string
+                    format: date-time
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/signout:
+    post:
+      summary: Admin sign out
+      description: Terminate admin session
+      operationId: signOut
+      tags:
+        - Authentication
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Sign out successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /api/auth/session:
+    get:
+      summary: Get current session
+      description: Retrieve current authenticated user session
+      operationId: getSession
+      tags:
+        - Authentication
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Session data
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/UserProfile'
+                      expires:
+                        type: string
+                        format: date-time
+                  - type: 'null'
+                    description: No active session
+
+components:
+  schemas:
+    UserProfile:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - role
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: admin@bytebridges.com
+        name:
+          type: string
+          example: Admin User
+        role:
+          type: string
+          enum: [admin]
+          example: admin
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Invalid credentials
+        code:
+          type: string
+          example: AUTH_FAILED
+        details:
+          type: object
+          additionalProperties: true
+
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth session cookie

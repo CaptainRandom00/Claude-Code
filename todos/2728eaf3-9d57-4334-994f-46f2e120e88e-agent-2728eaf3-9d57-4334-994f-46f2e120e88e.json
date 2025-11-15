@@ -1,0 +1,62 @@
+[
+  {
+    "content": "Analyze Untitled.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled.wav"
+  },
+  {
+    "content": "Analyze Untitled-2.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-2.wav"
+  },
+  {
+    "content": "Analyze Untitled-3.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-3.wav"
+  },
+  {
+    "content": "Analyze Untitled-4.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-4.wav"
+  },
+  {
+    "content": "Analyze Untitled-5.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-5.wav"
+  },
+  {
+    "content": "Analyze Untitled-6.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-6.wav"
+  },
+  {
+    "content": "Analyze Untitled-7.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-7.wav"
+  },
+  {
+    "content": "Analyze Untitled-8.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-8.wav"
+  },
+  {
+    "content": "Analyze Untitled-9.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-9.wav"
+  },
+  {
+    "content": "Analyze Untitled-10.wav",
+    "status": "pending",
+    "activeForm": "Analyzing Untitled-10.wav"
+  },
+  {
+    "content": "Rename files based on analysis",
+    "status": "pending",
+    "activeForm": "Renaming files based on analysis"
+  },
+  {
+    "content": "Create documentation .txt file",
+    "status": "pending",
+    "activeForm": "Creating documentation .txt file"
+  }
+]

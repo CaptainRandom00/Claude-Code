@@ -1,0 +1,450 @@
+# Tasks: Widget-Based Dashboard Framework
+
+**Input**: Design documents from `/specs/028-build-a-widget/`
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/widget-api.md, quickstart.md
+
+**Tests**: Included per Constitution Principle VI (E2E Testing & Audit Trail requirement)
+
+**Organization**: Tasks are grouped by user story priority (P1 → P4) to enable independent implementation and testing of each story.
+
+## Format: `[ID] [P?] [Story] Description`
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to (US1, US2, US3, US4, US5, or SETUP/FOUNDATION/POLISH)
+- Include exact file paths in descriptions
+
+## Path Conventions (Web App)
+- Backend: `server/`
+- Frontend: `client/src/`
+- Shared: `shared/`
+- Tests: `tests/`
+- Database: `db/migrations/`
+
+---
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: Project initialization and dependency installation
+
+- [X] **T001** [P] [SETUP] Install react-grid-layout v1.5.2 and @types/react-grid-layout via `npm install react-grid-layout @types/react-grid-layout`
+- [X] **T002** [P] [SETUP] Install isomorphic-dompurify for XSS prevention via `npm install isomorphic-dompurify`
+- [X] **T003** [P] [SETUP] Create audit trail directory structure at `specs/028-build-a-widget/audit/` with subdirectories: `playwright-execution-logs/`, `failure-analysis/screenshots/`, `remediation/`
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+### Database Schema
+
+- [X] **T004** [FOUNDATION] Create database migration file `db/migrations/028_widget_dashboard_framework.sql` with 8 tables: widget_definitions, dashboards, dashboard_widgets, widget_layouts, dashboard_templates, template_widgets, api_endpoints_metadata, dashboard_versions (per data-model.md)
+- [X] **T005** [FOUNDATION] Add indexes to migration: idx_widget_user, idx_widget_type, idx_dashboard_user, idx_layout_dashwidget, idx_endpoint_path, idx_version_dashboard (per data-model.md)
+- [X] **T006** [FOUNDATION] Run database migration to create tables
+- [X] **T007** [FOUNDATION] Add Drizzle schema exports in `shared/schema.ts`: widgetDefinitions, dashboards, dashboardWidgets, widgetLayouts, dashboardTemplates, templateWidgets, apiEndpointsMetadata, dashboardVersions (per data-model.md Drizzle schema section)
+
+### Backend Foundation
+
+- [X] **T008** [P] [FOUNDATION] Create validation schemas in `server/validation/widget-schemas.ts` using Zod: widgetDefinitionSchema, dashboardSchema, widgetLayoutSchema, calculationConfigSchema, visualizationConfigSchema (per contracts/widget-api.md request bodies)
+- [X] **T009** [P] [FOUNDATION] Create route file `server/routes-widget-dashboard.ts` with function registerWidgetDashboardRoutes(app: Express) with basic CRUD endpoints
+- [X] **T010** [P] [FOUNDATION] Create service file `server/services/widget-service.ts` with class WidgetService (includes CRUD, calculation pipeline, validation)
+- [X] **T011** [P] [FOUNDATION] Create service file `server/services/dashboard-service.ts` with class DashboardService (includes dashboard CRUD, widget management, layouts, version management with pruning)
+- [X] **T012** [FOUNDATION] Register widget dashboard routes in `server/index.ts` by calling registerWidgetDashboardRoutes(app) after existing routes
+
+### Frontend Foundation
+
+- [X] **T013** [P] [FOUNDATION] Import react-grid-layout CSS in `client/src/index.css`: `@import 'react-grid-layout/css/styles.css'` and `@import 'react-resizable/css/styles.css'`
+- [X] **T014** [P] [FOUNDATION] Create widget types file `client/src/types/widget-types.ts` with TypeScript interfaces: Widget, WidgetConfiguration, Dashboard, DashboardLayout, CalculationPipeline, breakpoint configs (per data-model.md entities)
+- [X] **T015** [P] [FOUNDATION] Create calculation engine file `client/src/lib/calculation-engine.ts` with Lodash-based pipeline functions: applyFilters, applyGroupBy, applyAggregations, applyComparisons, formatValue, getTrendIndicator (per research.md §4)
+- [ ] **T016** [P] [FOUNDATION] Create error boundary component `client/src/components/ui/error-boundary.tsx` for widget error isolation (per spec.md acceptance scenario 1.4)
+
+**Checkpoint**: Foundation ready - user story implementation can now begin
+
+---
+
+## Phase 3: User Story 1 - View Pre-Built Dashboard with Live Data (Priority: P1) 🎯 MVP
+
+**Goal**: Store manager can view a pre-configured dashboard with 3-4 widgets showing current sales, stock levels, and expiry alerts with auto-refresh
+
+**Independent Test**: Create default dashboard with 3 widgets (sales metric, stock alert, expiry count), verify data loads from existing API endpoints
+
+### E2E Tests for User Story 1
+
+**NOTE: Write tests FIRST per TDD workflow, ensure they FAIL before implementation**
+
+- [X] **T017** [P] [US1] Create Playwright test `tests/playwright/dashboard-viewer.spec.ts` with 10 comprehensive tests covering dashboard display, widget rendering, auto-refresh (60s), error isolation, loading states, manual refresh, slow API handling, titles, and responsive grid layout
+- [X] **T018** [US1] Playwright test created (will run after implementation per TDD)
+
+### Seed Data for User Story 1
+
+- [X] **T019** [P] [US1] Seed data already created in migration (T004): 3 system widgets (Total Sales metric, Monthly Trend chart, Top Products table) + 1 Sales Overview template with widget links
+
+### Backend Implementation for User Story 1
+
+- [X] **T020** [P] [US1] Implemented GET /api/widgets/templates endpoint returning active dashboard templates ordered by sort_order
+- [X] **T021** [P] [US1] Implemented POST /api/widgets/dashboards/from-template/:templateId endpoint creating dashboard from template with widgets
+- [X] **T022** [P] [US1] Already implemented in T009 - GET /api/widgets/dashboards/:id returns dashboard with widgets
+- [X] **T023** [P] [US1] Implemented POST /api/widgets/data/fetch endpoint with mock data generation and calculation pipeline
+- [X] **T024** [US1] Already implemented in T010 - WidgetService.applyCalculations() with complete Lodash pipeline
+- [X] **T025** [US1] Error handling built into WidgetService.applyCalculations() and routes (try-catch with error responses)
+
+### Frontend Implementation for User Story 1
+
+- [ ] **T026** [P] [US1] Create base widget component `client/src/components/widgets/base/WidgetContainer.tsx` with error boundary, refresh control, loading states (per quickstart.md §3.2)
+- [ ] **T027** [P] [US1] Create widget header component `client/src/components/widgets/base/WidgetHeader.tsx` with title and refresh button
+- [ ] **T028** [P] [US1] Create widget error component `client/src/components/widgets/base/WidgetError.tsx` with error message, timestamp, retry button (per spec.md edge case)
+- [ ] **T029** [P] [US1] Create MetricWidget component `client/src/components/widgets/types/MetricWidget.tsx` displaying single value with Recharts number formatting
+- [ ] **T030** [P] [US1] Create AlertWidget component `client/src/components/widgets/types/AlertWidget.tsx` displaying notification list
+- [ ] **T031** [P] [US1] Create WidgetFactory component `client/src/components/widgets/WidgetFactory.tsx` rendering widget by type (metric, chart, table, alert, progress)
+- [ ] **T032** [P] [US1] Create hook `client/src/hooks/use-widget-data.ts` using TanStack Query for widget data fetching with auto-refresh (refetchInterval from widget config)
+- [ ] **T033** [US1] Create DashboardViewer page `client/src/pages/dashboard-viewer.tsx` with ResponsiveGridLayout from react-grid-layout, rendering widgets via WidgetFactory (per quickstart.md §3.4)
+- [ ] **T034** [US1] Add route in `client/src/App.tsx`: `<Route path="/dashboards/:id" element={<DashboardViewer />} />`
+- [ ] **T035** [US1] Create default dashboard on first load by calling POST /api/widgets/dashboards/from-template/:templateId for "Store Overview" template
+
+**Checkpoint**: User Story 1 complete - Users can view pre-built dashboard with live data and auto-refresh
+
+---
+
+## Phase 4: User Story 2 - Create Custom Dashboard from Template (Priority: P2)
+
+**Goal**: Data analyst can create dashboard from template (Expiry Management, Sales, Inventory), customize filters, save with custom name
+
+**Independent Test**: Provide 2-3 templates, select one, customize date range/filters, save with custom name, verify appears in dashboard list
+
+### E2E Tests for User Story 2
+
+- [ ] **T036** [P] [US2] Create Playwright test `tests/playwright/template-creation.spec.ts` testing:
+  - Navigate to /dashboards/templates, verify template gallery displays
+  - Click "Expiry Management" template, verify dashboard created with expiry widgets
+  - Modify date range filter, verify all widgets update
+  - Click "Save", enter custom name, verify dashboard saved
+  - Navigate to dashboards list, verify new dashboard appears
+  - Switch between dashboards, verify each retains configuration
+- [ ] **T037** [US2] Run test, log results to `specs/028-build-a-widget/audit/playwright-execution-logs/template-creation.log`
+
+### Seed Data for User Story 2
+
+- [ ] **T038** [P] [US2] Add 2 more dashboard templates to seed script `db/seeds/028_widget_dashboard_templates.sql`:
+  - "Expiry Management" template with BBD-related widgets
+  - "Sales Performance" template with EPOS sales widgets
+  - Link appropriate widget definitions to each template
+
+### Backend Implementation for User Story 2
+
+- [ ] **T039** [P] [US2] Implement POST /api/widgets/dashboards endpoint in `server/routes-widget-dashboard.ts` for creating custom dashboard (per contracts/widget-api.md §2.1)
+- [ ] **T040** [P] [US2] Implement GET /api/widgets/dashboards endpoint in `server/routes-widget-dashboard.ts` for listing user dashboards (per contracts/widget-api.md §2.2)
+- [ ] **T041** [P] [US2] Implement PUT /api/widgets/dashboards/:id endpoint in `server/routes-widget-dashboard.ts` for updating dashboard with global filters (per contracts/widget-api.md §2.4)
+- [ ] **T042** [US2] Implement DashboardService.createDashboard() in `server/services/dashboard-service.ts` with auto-versioning (creates version 1, per data-model.md)
+- [ ] **T043** [US2] Implement DashboardService.createVersion() in `server/services/dashboard-service.ts` for dashboard_versions table population (per data-model.md)
+- [ ] **T044** [US2] Add global filter application logic in WidgetService.fetchWidgetData() to merge dashboard.globalFilters with widget.queryParams (per spec.md acceptance scenario 2.2)
+
+### Frontend Implementation for User Story 2
+
+- [ ] **T045** [P] [US2] Create TemplateGallery page `client/src/pages/template-gallery.tsx` displaying dashboard templates grid with preview images
+- [ ] **T046** [P] [US2] Create DashboardList component `client/src/components/dashboard-builder/DashboardList.tsx` showing user's saved dashboards with navigation
+- [ ] **T047** [P] [US2] Create DashboardFilters component `client/src/components/dashboard-builder/DashboardFilters.tsx` for global filter configuration (date range, suppliers, categories)
+- [ ] **T048** [US2] Add template selection flow in TemplateGallery: click template → create dashboard from template → redirect to dashboard viewer
+- [ ] **T049** [US2] Add dashboard save functionality in DashboardViewer with name input dialog
+- [ ] **T050** [US2] Add route in `client/src/App.tsx`: `<Route path="/dashboards/templates" element={<TemplateGallery />} />`
+
+**Checkpoint**: User Story 2 complete - Users can create custom dashboards from templates and save them
+
+---
+
+## Phase 5: User Story 3 - Configure Widget Data Source Visually (Priority: P3)
+
+**Goal**: User can add widget, select API endpoint from dropdown, choose calculation (Sum, Average, Count), see preview before saving
+
+**Independent Test**: Add blank widget, select API from list, choose calculation, verify preview shows correct data
+
+### E2E Tests for User Story 3
+
+- [ ] **T051** [P] [US3] Create Playwright test `tests/playwright/widget-configuration.spec.ts` testing:
+  - Open dashboard in edit mode, click "Add Widget"
+  - Verify widget type options (Metric, Chart, Table, Alert, Progress)
+  - Select Metric widget, click "Configure Data Source"
+  - Verify API endpoint list with descriptions
+  - Select API, choose Sum calculation, verify preview displays
+  - Add date range filter, verify preview updates
+  - Save widget, verify appears on dashboard with data
+- [ ] **T052** [US3] Run test, log to `specs/028-build-a-widget/audit/playwright-execution-logs/widget-configuration.log`
+
+### Backend Implementation for User Story 3
+
+- [ ] **T053** [P] [US3] Implement GET /api/widgets/metadata/endpoints endpoint in `server/routes-widget-dashboard.ts` for API discovery (per contracts/widget-api.md §4.1)
+- [ ] **T054** [P] [US3] Implement GET /api/widgets/metadata/endpoints/:id/schema endpoint in `server/routes-widget-dashboard.ts` for endpoint schema details (per contracts/widget-api.md §4.2)
+- [ ] **T055** [P] [US3] Implement POST /api/widgets/data/preview endpoint in `server/routes-widget-dashboard.ts` for real-time preview with <500ms latency (per spec.md FR-031, contracts §5.2)
+- [ ] **T056** [P] [US3] Implement POST /api/widgets/definitions endpoint in `server/routes-widget-dashboard.ts` for creating widget definition (per contracts/widget-api.md §1.1)
+- [ ] **T057** [US3] Populate api_endpoints_metadata table by parsing routes.registry.json per algorithm in research.md §7.1 (see: endpoint extraction, schema mapping, upsert pattern for duplicate handling)
+- [ ] **T058** [US3] Implement WidgetService.validateConfiguration() with Zod schema validation and endpoint whitelist check (per spec.md FR-038)
+- [ ] **T059** [US3] Add preview optimization in WidgetService.previewData() limiting to 100 records max (per contracts/widget-api.md §5.2)
+
+### Frontend Implementation for User Story 3
+
+- [ ] **T060** [P] [US3] Create DashboardBuilder page `client/src/pages/dashboard-builder.tsx` with edit/view mode toggle
+- [ ] **T061** [P] [US3] Create WidgetSelector component `client/src/components/dashboard-builder/WidgetSelector.tsx` showing 5 widget type buttons
+- [ ] **T062** [P] [US3] Create ApiEndpointPicker component `client/src/components/dashboard-builder/ApiEndpointPicker.tsx` displaying available endpoints from GET /api/widgets/metadata/endpoints
+- [ ] **T063** [P] [US3] Create CalculationBuilder component `client/src/components/dashboard-builder/CalculationBuilder.tsx` with dropdowns for aggregation types (Sum, Average, Count, Min, Max)
+- [ ] **T064** [P] [US3] Create PreviewPanel component `client/src/components/dashboard-builder/PreviewPanel.tsx` showing real-time widget data preview
+- [ ] **T065** [P] [US3] Create WidgetConfigurator component `client/src/components/dashboard-builder/WidgetConfigurator.tsx` orchestrating API picker, calculation builder, preview panel
+- [ ] **T066** [P] [US3] Create hook `client/src/hooks/use-api-metadata.ts` using TanStack Query for fetching available endpoints
+- [ ] **T067** [US3] Wire WidgetConfigurator to POST /api/widgets/definitions on save
+- [ ] **T068** [US3] Add widget to dashboard after creation by inserting into dashboard_widgets table
+- [ ] **T069** [US3] Add route in `client/src/App.tsx`: `<Route path="/dashboards/builder/:id?" element={<DashboardBuilder />} />`
+
+**Checkpoint**: User Story 3 complete - Users can configure widget data sources visually without coding
+
+---
+
+## Phase 6: User Story 4 - Customize Dashboard Layout (Priority: P3)
+
+**Goal**: User can drag widgets to new positions, resize them, save layout with persistence across sessions
+
+**Independent Test**: Open dashboard, drag widget, resize it, save, reload page, verify layout persists
+
+### E2E Tests for User Story 4
+
+- [ ] **T070** [P] [US4] Create Playwright test `tests/playwright/layout-persistence.spec.ts` testing:
+  - Open dashboard in edit mode, verify edit controls visible
+  - Drag widget to new position, verify other widgets reposition
+  - Drag resize handle, verify size changes with min/max constraints
+  - Save layout, reload page, verify layout restored exactly
+  - Resize browser to mobile width, verify responsive reflow
+  - Make layout changes, click Undo, verify reverts
+- [ ] **T071** [US4] Run test, log to `specs/028-build-a-widget/audit/playwright-execution-logs/layout-persistence.log`
+
+### Backend Implementation for User Story 4
+
+- [ ] **T072** [P] [US4] Implement PATCH /api/widgets/dashboards/:dashboardId/layouts endpoint in `server/routes-widget-dashboard.ts` for updating widget layouts per breakpoint (per contracts/widget-api.md §2.6)
+- [ ] **T073** [P] [US4] Implement GET /api/widgets/dashboards/:id/versions endpoint in `server/routes-widget-dashboard.ts` for version history (per contracts/widget-api.md §2.7)
+- [ ] **T074** [P] [US4] Implement POST /api/widgets/dashboards/:id/versions/:versionNumber/restore endpoint in `server/routes-widget-dashboard.ts` for version restore (per contracts/widget-api.md §2.8)
+- [ ] **T075** [US4] Implement DashboardService.updateLayouts() in `server/services/dashboard-service.ts` with collision detection and auto-adjustment (per spec.md FR-021)
+- [ ] **T076** [US4] Add auto-save logic in DashboardService with 30-second debounce and version creation (per spec.md FR-046)
+- [ ] **T077** [P] [US4] Implement dashboard version auto-pruning background job in `server/services/version-pruning-service.ts` to enforce FR-048 retention policy (keep 5 most recent versions per dashboard, minimum 24-hour retention). Scheduled job runs hourly, queries versions beyond 5 most recent AND older than 24 hours, deletes with CASCADE cleanup. Register cron job in `server/index.ts`.
+- [ ] **T078** [US4] Implement layout validation in DashboardService checking grid bounds (2x2 to 12x8 per breakpoint, per spec.md FR-020)
+
+### Frontend Implementation for User Story 4
+
+- [ ] **T079** [P] [US4] Create LayoutEditor component `client/src/components/dashboard-builder/LayoutEditor.tsx` wrapping ResponsiveGridLayout with drag-drop enabled
+- [ ] **T080** [P] [US4] Create hook `client/src/hooks/use-layout-persistence.ts` with auto-save debounced to 500ms calling PATCH /api/widgets/dashboards/:dashboardId/layouts
+- [ ] **T081** [P] [US4] Implement undo/redo functionality in DashboardBuilder using layout history stack (per spec.md acceptance scenario 4.5)
+- [ ] **T082** [US4] Configure react-grid-layout with breakpoints: `{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }` and cols: `{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }` (per research.md §1)
+- [ ] **T083** [US4] Add layout change handler calling use-layout-persistence hook
+- [ ] **T084** [US4] Implement version restore UI in DashboardBuilder showing version history with restore button
+
+**Checkpoint**: User Story 4 complete - Users can customize dashboard layouts with drag-drop and persistence
+
+---
+
+## Phase 7: User Story 5 - Build Advanced Calculation Widget (Priority: P4)
+
+**Goal**: Analyst can create custom metric with comparison mode (week-over-week), percent change calculation, conditional formatting
+
+**Independent Test**: Create metric widget with two time-based queries (this week, last week), select Percent Change, verify correct result
+
+### E2E Tests for User Story 5
+
+- [ ] **T085** [P] [US5] Create Playwright test `tests/playwright/advanced-calculations.spec.ts` testing:
+  - Create metric widget, enable "Comparison Mode"
+  - Configure two data queries (current period, comparison period)
+  - Select "Percent Change" calculation, verify percentage display with +/- indicator
+  - Add conditional formatting (green if positive, red if negative), verify colors
+  - Save widget as template, verify other users can add it
+- [ ] **T086** [US5] Run test, log to `specs/028-build-a-widget/audit/playwright-execution-logs/advanced-calculations.log`
+
+### Backend Implementation for User Story 5
+
+- [ ] **T087** [P] [US5] Extend POST /api/widgets/definitions endpoint to support comparison mode configuration in calculationConfig
+- [ ] **T088** [US5] Implement comparison calculations in WidgetService.applyComparisons() for percent_change, difference, ratio (per data-model.md calculationConfig schema)
+- [ ] **T089** [US5] Add conditional formatting support in WidgetService with rule evaluation (per spec.md acceptance scenario 5.3)
+- [ ] **T090** [US5] Implement widget template save functionality storing widget definition as reusable template
+
+### Frontend Implementation for User Story 5
+
+- [ ] **T091** [P] [US5] Extend CalculationBuilder component to include comparison mode toggle and two query configurators
+- [ ] **T092** [P] [US5] Create ConditionalFormattingBuilder component `client/src/components/dashboard-builder/ConditionalFormattingBuilder.tsx` for formatting rules
+- [ ] **T093** [P] [US5] Extend MetricWidget to display comparison results with trend indicators (arrows, colors)
+- [ ] **T094** [US5] Add comparison calculation support in calculation-engine.ts for percent change between two datasets
+- [ ] **T095** [US5] Implement widget template save UI with "Save as Template" button in WidgetConfigurator
+
+**Checkpoint**: User Story 5 complete - Power users can build advanced calculation widgets with comparisons
+
+---
+
+## Phase 8: Accessibility & Keyboard Navigation (Cross-Cutting)
+
+**Purpose**: WCAG 2.1 Level AA compliance per FR-041 to FR-045
+
+- [ ] **T096** [P] [POLISH] Create KeyboardNavigation component `client/src/components/dashboard-builder/KeyboardNavigation.tsx` implementing custom keyboard handlers for react-grid-layout (Arrow keys to move, Space/Enter to activate, Escape to cancel, per spec.md FR-042)
+- [ ] **T097** [P] [POLISH] Add ARIA labels to all widgets with `aria-label` describing widget type and data (per spec.md FR-043)
+- [ ] **T098** [P] [POLISH] Add `aria-live="polite"` regions to widgets for state change announcements (loading, error, data updated, per spec.md FR-043)
+- [ ] **T099** [P] [POLISH] Implement focus management in DashboardBuilder maintaining 3:1 contrast ratio for focus indicators (per spec.md FR-044)
+- [ ] **T100** [P] [POLISH] Validate color contrast in all widget visualizations (4.5:1 for text, 3:1 for UI components, per spec.md FR-045)
+- [ ] **T101** [POLISH] Create Playwright accessibility test `tests/playwright/accessibility.spec.ts` validating keyboard navigation, screen reader compatibility, color contrast
+
+---
+
+## Phase 9: Security Hardening (Cross-Cutting)
+
+**Purpose**: Implement FR-036 to FR-040 security requirements
+
+- [ ] **T102** [P] [POLISH] Implement XSS prevention in all user-generated content fields using DOMPurify.sanitize() for dashboard names, widget titles, custom labels (per spec.md FR-036)
+- [ ] **T103** [P] [POLISH] Implement CSRF protection middleware in `server/routes-widget-dashboard.ts` for all state-changing operations (dashboard save, delete, widget config, per spec.md FR-037)
+- [ ] **T104** [P] [POLISH] Implement input validation whitelist for API endpoints in WidgetService.validateConfiguration() (per spec.md FR-038)
+- [ ] **T105** [P] [POLISH] Add output encoding for all API response data before widget rendering (per spec.md FR-039)
+- [ ] **T106** [POLISH] Verify Drizzle ORM parameterized queries for all calculation filter operations (SQL injection prevention, per spec.md FR-040)
+
+---
+
+## Phase 10: Performance Optimization (Cross-Cutting)
+
+**Purpose**: Enforce resource limits FR-057 to FR-061
+
+- [ ] **T107** [P] [POLISH] Implement memory limit monitoring in DashboardViewer enforcing 250MB max per dashboard (per spec.md FR-057)
+- [ ] **T108** [P] [POLISH] Implement calculation timeout handler in WidgetService with 30-second limit and async option (per spec.md FR-058)
+- [ ] **T109** [P] [POLISH] Implement concurrent request throttling limiting 10 simultaneous requests per dashboard (per spec.md FR-059)
+- [ ] **T110** [P] [POLISH] Implement CPU throttling in use-widget-data hook reducing refresh frequency when CPU >80% for 5 seconds (per spec.md FR-060)
+- [ ] **T111** [P] [POLISH] Implement bandwidth throttling tracking 50MB/min per dashboard and deferring non-critical refreshes (per spec.md FR-061)
+- [ ] **T112** [POLISH] Add widget virtualization using react-window for dashboards with >20 widgets (per research.md §10)
+
+---
+
+## Phase 11: Additional Widget Types (Cross-Cutting)
+
+**Purpose**: Complete 5 widget types per FR-001
+
+- [ ] **T113** [P] [POLISH] Create ChartWidget component `client/src/components/widgets/types/ChartWidget.tsx` using Recharts for line/bar/area/pie/candlestick charts (per research.md §3)
+- [ ] **T114** [P] [POLISH] Create TableWidget component `client/src/components/widgets/types/TableWidget.tsx` with sorting and pagination
+- [ ] **T115** [P] [POLISH] Create ProgressWidget component `client/src/components/widgets/types/ProgressWidget.tsx` with gauge/bar indicators
+- [ ] **T116** [POLISH] Update WidgetFactory to render all 5 widget types (already has Metric and Alert from US1)
+
+---
+
+## Phase 12: Cross-Browser Testing (Cross-Cutting)
+
+**Purpose**: Validate Chrome, Firefox, Safari per Constitution Principle VI
+
+- [ ] **T117** [POLISH] Create Playwright cross-browser test `tests/playwright/cross-browser.spec.ts` running all tests against chromium, firefox, webkit browsers
+- [ ] **T118** [POLISH] Run cross-browser test suite, document browser-specific issues in `specs/028-build-a-widget/audit/failure-analysis/`
+- [ ] **T119** [POLISH] Fix browser compatibility issues identified in cross-browser tests
+- [ ] **T120** [POLISH] Re-run cross-browser tests, verify all pass
+
+---
+
+## Phase 13: Documentation & Deployment
+
+**Purpose**: Complete audit trail, route registry, deployment
+
+- [ ] **T121** [P] [POLISH] Update route registry via `npm run routes:generate:registry`
+- [ ] **T122** [P] [POLISH] Generate OpenAPI documentation via `npm run routes:generate:openapi`
+- [ ] **T123** [P] [POLISH] Create validation report `specs/028-build-a-widget/audit/validation-report.md` summarizing all test results
+- [ ] **T124** [P] [POLISH] Update CLAUDE.md context with widget framework implementation details via `bash .specify/scripts/bash/update-agent-context.sh claude`
+- [ ] **T125** [POLISH] Verify all 17 success criteria (SC-001 to SC-017) from spec.md
+- [ ] **T126** [POLISH] Build production bundle via `npm run build`
+- [ ] **T127** [POLISH] Deploy widget framework to production
+
+---
+
+## Dependencies & Execution Order
+
+### User Story Dependencies
+```
+Foundation (T001-T016) → BLOCKS ALL
+  ↓
+US1 (T017-T035) ← MVP - Deploy after this
+  ↓
+US2 (T036-T050) ← Independent of US1, can run parallel if foundation complete
+  ↓
+US3 (T051-T069) ← Requires US1 widgets, US2 dashboard management
+  ↓
+US4 (T070-T084) ← Requires US3 builder, US2 dashboards
+  ↓
+US5 (T085-T095) ← Requires US3 widget configuration
+  ↓
+Cross-Cutting (T096-T127) ← Enhance all user stories
+```
+
+### Parallel Execution Opportunities
+
+**Within Foundation Phase** (all can run parallel after T001-T003 complete):
+- T004-T007 (Database schema)
+- T008-T012 (Backend foundation)
+- T013-T016 (Frontend foundation)
+
+**Within User Story 1**:
+- T020-T023 (Backend endpoints - all different functions in same file, sequential)
+- T026-T031 (Frontend components - all different files, parallel)
+- T017 (Test), T019 (Seed) - parallel with each other and implementation
+
+**Within User Story 2**:
+- T039-T041 (Backend endpoints - sequential, same file)
+- T045-T047 (Frontend components - parallel, different files)
+- T036 (Test), T038 (Seed) - parallel
+
+**Within User Story 3**:
+- T053-T056 (Backend endpoints - sequential)
+- T060-T067 (Frontend components - parallel)
+
+**Within User Story 4**:
+- T072-T074 (Backend endpoints - sequential)
+- T079-T081 (Frontend components - parallel)
+
+**Cross-Cutting Phases**:
+- Accessibility (T096-T101) - all parallel
+- Security (T102-T106) - all parallel
+- Performance (T107-T112) - all parallel
+- Widget types (T113-T116) - T113-T115 parallel
+- Documentation (T121-T124) - all parallel
+
+---
+
+## Implementation Strategy
+
+### MVP Scope (User Story 1 Only)
+**Tasks**: T001-T035 (35 tasks)
+**Deliverable**: Pre-built dashboard with 3 widgets, auto-refresh, error handling
+**Timeline**: ~5-7 days
+**Value**: Immediate data visualization for store managers
+
+### Phase 2 Delivery (US1 + US2)
+**Tasks**: T001-T050 (50 tasks)
+**Deliverable**: + Template-based dashboard creation
+**Timeline**: +3-4 days
+**Value**: Personalized dashboards without coding
+
+### Phase 3 Delivery (US1 + US2 + US3)
+**Tasks**: T001-T069 (69 tasks)
+**Deliverable**: + Visual widget configuration builder
+**Timeline**: +5-6 days
+**Value**: Custom widgets without development
+
+### Full Feature (All User Stories + Polish)
+**Tasks**: T001-T127 (127 tasks)
+**Timeline**: 15-20 days total
+**Value**: Complete widget-based dashboard framework
+
+---
+
+## Task Summary
+
+**Total Tasks**: 127
+- **Setup**: 3 tasks (T001-T003)
+- **Foundation**: 13 tasks (T004-T016)
+- **User Story 1 (P1)**: 19 tasks (T017-T035) - MVP
+- **User Story 2 (P2)**: 15 tasks (T036-T050)
+- **User Story 3 (P3)**: 19 tasks (T051-T069)
+- **User Story 4 (P3)**: 15 tasks (T070-T084)
+- **User Story 5 (P4)**: 11 tasks (T085-T095)
+- **Accessibility**: 6 tasks (T096-T101)
+- **Security**: 5 tasks (T102-T106)
+- **Performance**: 6 tasks (T107-T112)
+- **Widget Types**: 4 tasks (T113-T116)
+- **Cross-Browser**: 4 tasks (T117-T120)
+- **Documentation**: 7 tasks (T121-T127)
+
+**Parallel Opportunities**: 67 tasks marked [P] (53% parallelizable)
+**Test Tasks**: 6 Playwright test files (T017, T036, T051, T070, T085, T101, T117)
+**Checkpoints**: 6 checkpoints (Foundation, US1, US2, US3, US4, US5)
+
+**Suggested MVP**: User Story 1 only (T001-T035) delivers immediate value

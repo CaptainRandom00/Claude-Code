@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Remove non-functional stock status tabs (ALL STOCK, LOW STOCK, CRITICAL)",
+    "status": "completed",
+    "priority": "high",
+    "id": "16"
+  },
+  {
+    "content": "Remove non-functional search box from Stock Profiles",
+    "status": "completed",
+    "priority": "high",
+    "id": "17"
+  },
+  {
+    "content": "Remove non-functional category and supplier filter dropdowns",
+    "status": "completed",
+    "priority": "high",
+    "id": "18"
+  },
+  {
+    "content": "Test Stock Profiles interface after cleanup",
+    "status": "completed",
+    "priority": "medium",
+    "id": "19"
+  }
+]

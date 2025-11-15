@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Check project detail page implementation and task fetching logic",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine mock data structure for task-project associations",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Verify API endpoints for fetching project tasks",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check mock project data for correct task associations",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Identify and fix the issue preventing task display",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  }
+]

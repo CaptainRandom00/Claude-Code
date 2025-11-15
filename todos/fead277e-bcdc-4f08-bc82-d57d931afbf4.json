@@ -1,0 +1,116 @@
+[
+  {
+    "content": "Create database schema for case size management tables",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Implement CaseSizeManagementService core functionality",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Add BRN packing size extraction logic",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create EPOS-only item detection system",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Build API endpoints for case size CRUD operations",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Create case size management UI dashboard",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Fix case size dashboard runtime errors",
+    "status": "completed",
+    "priority": "low",
+    "id": "15"
+  },
+  {
+    "content": "Analyze existing product_profiles table structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "16"
+  },
+  {
+    "content": "Create product profiles from BRN data automatically",
+    "status": "completed",
+    "priority": "high",
+    "id": "17"
+  },
+  {
+    "content": "Create product profiles from EPOS-only items",
+    "status": "completed",
+    "priority": "high",
+    "id": "18"
+  },
+  {
+    "content": "Add BRN snapshot tracking to product profiles",
+    "status": "completed",
+    "priority": "high",
+    "id": "19"
+  },
+  {
+    "content": "Remove duplicate EPOS items that exist in BRN",
+    "status": "completed",
+    "priority": "high",
+    "id": "21"
+  },
+  {
+    "content": "Fix TypeScript compilation errors blocking server",
+    "status": "completed",
+    "priority": "high",
+    "id": "22"
+  },
+  {
+    "content": "Fix EPOS-only API endpoint visibility issue",
+    "status": "completed",
+    "priority": "high",
+    "id": "23"
+  },
+  {
+    "content": "Document comprehensive case size management system progress",
+    "status": "completed",
+    "priority": "high",
+    "id": "24"
+  },
+  {
+    "content": "Commit all case size management changes to git repository",
+    "status": "completed",
+    "priority": "high",
+    "id": "25"
+  },
+  {
+    "content": "Integrate case size extraction with BRN import",
+    "status": "pending",
+    "priority": "medium",
+    "id": "20"
+  },
+  {
+    "content": "Integrate case sizes with order recommendations",
+    "status": "pending",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Add case size sync to BRN import process",
+    "status": "pending",
+    "priority": "medium",
+    "id": "8"
+  }
+]

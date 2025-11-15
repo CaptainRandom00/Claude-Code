@@ -1,0 +1,22 @@
+[
+  {
+    "content": "Database Foundation (T004-T007)",
+    "status": "completed",
+    "activeForm": "Completing database foundation"
+  },
+  {
+    "content": "T008-T012: Backend services layer",
+    "status": "in_progress",
+    "activeForm": "Building backend services"
+  },
+  {
+    "content": "T013-T016: Frontend foundation",
+    "status": "pending",
+    "activeForm": "Building frontend foundation"
+  },
+  {
+    "content": "User Story 1 (T017-T035)",
+    "status": "pending",
+    "activeForm": "Implementing US1 - MVP"
+  }
+]

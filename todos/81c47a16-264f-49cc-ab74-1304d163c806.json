@@ -1,0 +1,14 @@
+[
+  {
+    "content": "Fix missing Header and Footer components in all created pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Review and fix styling issues (light text on white background)",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  }
+]

@@ -1,0 +1,175 @@
+// Case Studies API - List and Create
+// GET /api/case-studies - List all case studies (with filters)
+// POST /api/case-studies - Create new case study (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { query } from '@/lib/db';
+import { caseStudySchema } from '@/lib/validations';
+
+// GET /api/case-studies - List case studies
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+
+    // Parse pagination and filters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const industry = searchParams.get('industry');
+    const published = searchParams.get('published') === 'true' ? true : searchParams.get('published') === 'false' ? false : undefined;
+    const search = searchParams.get('search');
+
+    const offset = (page - 1) * limit;
+
+    // Build query
+    let queryString = `
+      SELECT
+        id, slug, title, client_name, industry, services_used,
+        challenge, solution, results, technologies, featured_image,
+        metrics, published, published_at, created_at, updated_at
+      FROM case_studies
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (industry) {
+      queryString += ` AND industry = $${paramIndex}`;
+      params.push(industry);
+      paramIndex++;
+    }
+
+    if (published !== undefined) {
+      queryString += ` AND published = $${paramIndex}`;
+      params.push(published);
+      paramIndex++;
+    }
+
+    if (search) {
+      queryString += ` AND search_vector @@ plainto_tsquery('english', $${paramIndex})`;
+      params.push(search);
+      paramIndex++;
+    }
+
+    queryString += ` ORDER BY published_at DESC NULLS LAST, created_at DESC`;
+    queryString += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) FROM case_studies WHERE 1=1';
+    const countParams: any[] = [];
+    let countParamIndex = 1;
+
+    if (industry) {
+      countQuery += ` AND industry = $${countParamIndex}`;
+      countParams.push(industry);
+      countParamIndex++;
+    }
+
+    if (published !== undefined) {
+      countQuery += ` AND published = $${countParamIndex}`;
+      countParams.push(published);
+      countParamIndex++;
+    }
+
+    if (search) {
+      countQuery += ` AND search_vector @@ plainto_tsquery('english', $${countParamIndex})`;
+      countParams.push(search);
+    }
+
+    const [result, countResult] = await Promise.all([
+      query(queryString, params),
+      query(countQuery, countParams),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count);
+
+    return NextResponse.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching case studies:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch case studies' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/case-studies - Create case study (admin only)
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+
+    // Validate input
+    const validated = caseStudySchema.parse(body);
+
+    // Insert case study
+    const result = await query(
+      `
+      INSERT INTO case_studies (
+        slug, title, client_name, industry, services_used,
+        challenge, solution, results, technologies, featured_image,
+        metrics, published, published_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *
+      `,
+      [
+        validated.slug,
+        validated.title,
+        validated.client_name,
+        validated.industry,
+        validated.services_used,
+        validated.challenge,
+        validated.solution,
+        validated.results,
+        validated.technologies,
+        validated.featured_image,
+        validated.metrics ? JSON.stringify(validated.metrics) : null,
+        validated.published,
+        validated.published && !validated.published_at ? new Date() : validated.published_at,
+      ]
+    );
+
+    return NextResponse.json(result.rows[0], { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating case study:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error.code === '23505') { // Unique violation
+      return NextResponse.json(
+        { error: 'A case study with this slug already exists' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create case study' },
+      { status: 500 }
+    );
+  }
+}

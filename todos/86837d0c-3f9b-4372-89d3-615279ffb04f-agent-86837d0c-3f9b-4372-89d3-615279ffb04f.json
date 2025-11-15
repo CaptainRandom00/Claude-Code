@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Check if SSH keys already exist",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Generate new SSH key if needed",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Add SSH key to ssh-agent",
+    "status": "pending",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Add SSH key to GitHub account",
+    "status": "pending",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Test SSH connection to GitHub",
+    "status": "pending",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Configure git to use SSH for GitHub",
+    "status": "pending",
+    "priority": "medium",
+    "id": "6"
+  }
+]

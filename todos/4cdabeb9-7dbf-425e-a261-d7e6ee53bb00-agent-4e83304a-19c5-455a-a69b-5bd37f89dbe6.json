@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create SCSS directory structure for block builder",
+    "status": "completed",
+    "priority": "high",
+    "id": "scss-structure"
+  },
+  {
+    "content": "Create utilities SCSS files (_variables.scss, _mixins.scss, _animations.scss)",
+    "status": "completed",
+    "priority": "high",
+    "id": "variables-mixins"
+  },
+  {
+    "content": "Create admin interface SCSS files (block-builder.scss and components)",
+    "status": "completed",
+    "priority": "high",
+    "id": "admin-styles"
+  },
+  {
+    "content": "Create frontend custom-blocks.scss for generated blocks",
+    "status": "completed",
+    "priority": "high",
+    "id": "frontend-styles"
+  },
+  {
+    "content": "Create style guide and documentation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "documentation"
+  }
+]

@@ -1,0 +1,122 @@
+# Audit Trail: Safari White Screen Fix
+
+**Feature**: 024-lets-root-cause
+**Purpose**: Document test execution, root cause analysis, and resolution validation
+
+## Audit Structure
+
+This folder contains evidence and documentation for the Safari white screen fix following Constitutional Principle VI requirements.
+
+### Required Artifacts
+
+1. **Test Execution Logs** (`test-execution-log.md`)
+   - Playwright test results
+   - Safari browser automation output
+   - Pass/fail status with timestamps
+
+2. **Before/After Screenshots**
+   - `before-white-screen.png` - Evidence of original white screen issue
+   - `after-dashboard-working.png` - Evidence of fix working (dashboard visible)
+   - Screenshots captured by Playwright during automated testing
+
+3. **Root Cause Documentation** (`root-cause-analysis.md`)
+   - HTTPS/TLS connection failure details
+   - Module loading failure evidence
+   - Safari WebKit-specific issues
+
+4. **Resolution Validation** (`resolution-validation.md`)
+   - Fix implementation summary
+   - Re-test results showing success
+   - Performance metrics (FCP, TTFB, load time)
+   - Cross-browser compatibility confirmation
+
+## Test Workflow
+
+Per Constitutional Principle VI, this audit trail follows the mandatory sequence:
+
+1. ✅ **Initial Playwright E2E Test** → Document Safari browser automation failures
+2. ✅ **Root Cause Analysis** → Implement fixes (HTTPS config, error boundaries)
+3. ✅ **Re-test with Playwright** → Document resolution with screenshots
+4. ✅ **Final Validation Report** → Audit trail completion
+
+## Validation Criteria
+
+### Simple Pass/Fail Test
+**Question**: Is it a white screen or not?
+
+**PASS**:
+- ✅ Dashboard visible in Safari
+- ✅ 557+ DOM elements rendered
+- ✅ Screenshot shows content
+
+**FAIL**:
+- ❌ White screen (< 100 DOM elements)
+- ❌ Screenshot shows blank page
+- ❌ JavaScript errors prevent rendering
+
+## Files in This Directory
+
+- `README.md` - This file (audit structure overview)
+- `test-execution-log.md` - Detailed test run results
+- `root-cause-analysis.md` - Technical investigation findings
+- `resolution-validation.md` - Fix verification and performance metrics
+- `before-white-screen.png` - Screenshot of original issue (if available)
+- `after-dashboard-working.png` - Screenshot proving fix works
+- `test-report.html` - Playwright HTML report (auto-generated)
+- `performance-metrics.txt` - Safari Web Inspector metrics
+
+## How to Add Audit Evidence
+
+After running tests and validation:
+
+1. **Capture Screenshots**:
+   ```bash
+   # Playwright saves automatically to:
+   # specs/024-lets-root-cause/audit/screenshots/
+   ```
+
+2. **Save Test Results**:
+   ```bash
+   # Copy Playwright report
+   cp playwright-report/index.html specs/024-lets-root-cause/audit/test-report.html
+   ```
+
+3. **Document Metrics**:
+   - Open Safari Web Inspector → Network tab
+   - Record FCP, TTFB, load time
+   - Save to `performance-metrics.txt`
+
+4. **Update Logs**:
+   - Add test execution results to `test-execution-log.md`
+   - Document any issues in `resolution-validation.md`
+
+## Audit Trail Completion Checklist
+
+- [ ] Initial test run executed (before fix)
+- [ ] White screen failure documented
+- [ ] Root cause analysis completed
+- [ ] Fix implemented (HTTPS config, error boundaries)
+- [ ] Re-test executed in Safari
+- [ ] Success screenshots captured
+- [ ] Performance metrics validated
+- [ ] Cross-browser compatibility confirmed (Chrome, Firefox, Safari)
+- [ ] Final validation report completed
+
+## Success Metrics
+
+### Functional Success
+✅ Safari displays dashboard (not white screen)
+✅ 557+ DOM elements visible
+✅ No JavaScript console errors
+
+### Performance Success
+✅ FCP < 1.8 seconds
+✅ TTFB < 100 milliseconds
+✅ Page load < 2 seconds
+
+### Quality Assurance
+✅ Playwright test passes
+✅ Screenshots prove functionality
+✅ Audit trail complete and traceable to specification
+
+This audit structure ensures complete feature validation with automated browser testing and development accountability per Constitutional Principle VI.

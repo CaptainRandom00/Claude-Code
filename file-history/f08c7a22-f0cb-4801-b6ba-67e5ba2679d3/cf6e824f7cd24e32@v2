@@ -1,0 +1,234 @@
+/**
+ * Widget Configuration E2E Tests - User Story 3
+ * Feature: 028-build-a-widget
+ *
+ * Test Scenarios:
+ * - Open dashboard in edit mode
+ * - Add new widget (select widget type)
+ * - Configure data source (select API endpoint)
+ * - Choose calculation type (Sum, Average, Count)
+ * - Preview widget data in real-time
+ * - Apply filters and see preview update
+ * - Save widget and verify it appears on dashboard
+ */
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Widget Configuration - User Story 3', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate to dashboard builder/edit mode
+    await page.goto('/dashboards/builder');
+  });
+
+  test('should display dashboard builder with edit mode toggle', async ({ page }) => {
+    // Wait for dashboard builder to load
+    await expect(page.locator('[data-testid="dashboard-builder"]')).toBeVisible({ timeout: 10000 });
+
+    // Verify edit mode toggle exists
+    await expect(page.locator('[data-testid="edit-mode-toggle"]')).toBeVisible();
+
+    // Verify add widget button is available in edit mode
+    await expect(page.locator('[data-testid="add-widget-button"]')).toBeVisible();
+  });
+
+  test('should show widget type selector when adding new widget', async ({ page }) => {
+    // Click add widget button
+    await page.click('[data-testid="add-widget-button"]');
+
+    // Verify widget selector dialog opens
+    await expect(page.locator('[data-testid="widget-selector"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify all 5 widget types are available
+    const widgetTypes = ['metric', 'chart', 'table', 'alert', 'progress'];
+    for (const type of widgetTypes) {
+      await expect(page.locator(`[data-testid="widget-type-${type}"]`)).toBeVisible();
+    }
+  });
+
+  test('should open data source configurator when metric widget selected', async ({ page }) => {
+    // Add widget and select metric type
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+
+    // Verify data source configuration panel opens
+    await expect(page.locator('[data-testid="data-source-configurator"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify "Configure Data Source" step is active
+    await expect(page.locator('[data-testid="config-step-data-source"]')).toHaveClass(/active/);
+  });
+
+  test('should display available API endpoints in picker', async ({ page }) => {
+    // Navigate to widget configurator
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+
+    // Wait for API endpoint picker to load
+    await expect(page.locator('[data-testid="api-endpoint-picker"]')).toBeVisible({ timeout: 10000 });
+
+    // Verify at least 3 API endpoints are listed
+    const endpoints = page.locator('[data-testid^="api-endpoint-option-"]');
+    expect(await endpoints.count()).toBeGreaterThanOrEqual(3);
+
+    // Verify each endpoint has name and description
+    const firstEndpoint = endpoints.first();
+    await expect(firstEndpoint.locator('[data-testid="endpoint-name"]')).toBeVisible();
+    await expect(firstEndpoint.locator('[data-testid="endpoint-description"]')).toBeVisible();
+  });
+
+  test('should show calculation options when API endpoint selected', async ({ page }) => {
+    // Setup: add widget and select API
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+
+    // Select first API endpoint
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]', { timeout: 10000 });
+    await page.click('[data-testid^="api-endpoint-option-"]');
+
+    // Verify calculation builder appears
+    await expect(page.locator('[data-testid="calculation-builder"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify aggregation type dropdown has options
+    await page.click('[data-testid="aggregation-type-select"]');
+    const aggregations = ['sum', 'average', 'count', 'min', 'max'];
+
+    for (const agg of aggregations) {
+      await expect(page.locator(`[data-testid="aggregation-option-${agg}"]`)).toBeVisible();
+    }
+  });
+
+  test('should display preview panel with real-time data', async ({ page }) => {
+    // Configure widget with API and calculation
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid^="api-endpoint-option-"]');
+
+    // Select sum aggregation
+    await page.click('[data-testid="aggregation-type-select"]');
+    await page.click('[data-testid="aggregation-option-sum"]');
+
+    // Verify preview panel appears
+    await expect(page.locator('[data-testid="preview-panel"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify preview shows loading or data
+    const hasLoading = await page.locator('[data-testid="preview-loading"]').isVisible();
+    const hasData = await page.locator('[data-testid="preview-data"]').isVisible();
+
+    expect(hasLoading || hasData).toBeTruthy();
+
+    // Wait for data to load
+    if (hasLoading) {
+      await expect(page.locator('[data-testid="preview-data"]')).toBeVisible({ timeout: 10000 });
+    }
+  });
+
+  test('should update preview when date range filter added', async ({ page }) => {
+    // Configure widget with API and calculation
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid="aggregation-type-select"]');
+    await page.click('[data-testid="aggregation-option-sum"]');
+
+    // Wait for initial preview
+    await page.waitForSelector('[data-testid="preview-data"]', { timeout: 10000 });
+    const initialValue = await page.locator('[data-testid="preview-value"]').textContent();
+
+    // Add date range filter
+    await page.click('[data-testid="add-filter-button"]');
+    await page.fill('[data-testid="filter-date-start"]', '2025-01-01');
+    await page.fill('[data-testid="filter-date-end"]', '2025-03-31');
+    await page.click('[data-testid="apply-filter-button"]');
+
+    // Wait for preview to refresh
+    await page.waitForTimeout(1000); // Allow time for API call
+
+    // Verify preview updated (loading or new value)
+    const updatedLoading = await page.locator('[data-testid="preview-loading"]').isVisible();
+    const updatedValue = await page.locator('[data-testid="preview-value"]').textContent();
+
+    expect(updatedLoading || (updatedValue !== initialValue)).toBeTruthy();
+  });
+
+  test('should save widget and display it on dashboard', async ({ page }) => {
+    // Configure complete widget
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid="aggregation-type-select"]');
+    await page.click('[data-testid="aggregation-option-count"]');
+
+    // Wait for preview
+    await page.waitForSelector('[data-testid="preview-data"]', { timeout: 10000 });
+
+    // Enter widget name
+    await page.fill('[data-testid="widget-name-input"]', 'Test Widget Count');
+
+    // Save widget
+    await page.click('[data-testid="save-widget-button"]');
+
+    // Wait for save confirmation
+    await expect(page.locator('[data-testid="widget-save-success"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify widget appears in dashboard
+    await expect(page.locator('[data-testid="widget-Test Widget Count"]')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should show field selection for calculation', async ({ page }) => {
+    // Setup widget configuration
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid^="api-endpoint-option-"]');
+
+    // Select aggregation requiring field (sum, average, min, max)
+    await page.click('[data-testid="aggregation-type-select"]');
+    await page.click('[data-testid="aggregation-option-sum"]');
+
+    // Verify field selector appears
+    await expect(page.locator('[data-testid="aggregation-field-select"]')).toBeVisible({ timeout: 5000 });
+
+    // Verify field options are available
+    await page.click('[data-testid="aggregation-field-select"]');
+    const fieldOptions = page.locator('[data-testid^="field-option-"]');
+    expect(await fieldOptions.count()).toBeGreaterThan(0);
+  });
+
+  test('should cancel widget creation and return to dashboard', async ({ page }) => {
+    // Start widget creation
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+
+    // Click cancel button
+    await page.click('[data-testid="cancel-widget-button"]');
+
+    // Verify returned to dashboard view
+    await expect(page.locator('[data-testid="widget-selector"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="dashboard-builder"]')).toBeVisible();
+  });
+
+  test('should show error if preview fails', async ({ page }) => {
+    // Intercept preview API call and return error
+    await page.route('**/api/widgets/data/preview', async (route) => {
+      await route.fulfill({
+        status: 500,
+        body: JSON.stringify({ error: 'Preview failed' })
+      });
+    });
+
+    // Configure widget
+    await page.click('[data-testid="add-widget-button"]');
+    await page.click('[data-testid="widget-type-metric"]');
+    await page.waitForSelector('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid^="api-endpoint-option-"]');
+    await page.click('[data-testid="aggregation-type-select"]');
+    await page.click('[data-testid="aggregation-option-sum"]');
+
+    // Verify error message appears in preview
+    await expect(page.locator('[data-testid="preview-error"]')).toBeVisible({ timeout: 5000 });
+    const errorText = await page.locator('[data-testid="preview-error"]').textContent();
+    expect(errorText).toContain('Preview failed');
+  });
+});

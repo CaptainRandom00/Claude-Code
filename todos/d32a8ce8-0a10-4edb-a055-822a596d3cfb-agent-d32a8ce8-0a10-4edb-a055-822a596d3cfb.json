@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Implement search functionality across site",
+    "status": "pending",
+    "activeForm": "Implementing search functionality"
+  },
+  {
+    "content": "Enhance contact form with database storage",
+    "status": "pending",
+    "activeForm": "Enhancing contact form"
+  },
+  {
+    "content": "Add email notifications for contact form",
+    "status": "pending",
+    "activeForm": "Adding email notifications"
+  },
+  {
+    "content": "Implement Google Analytics with GDPR compliance",
+    "status": "pending",
+    "activeForm": "Implementing Google Analytics"
+  },
+  {
+    "content": "Create cookie consent banner",
+    "status": "pending",
+    "activeForm": "Creating cookie consent banner"
+  },
+  {
+    "content": "Generate sitemap and optimize SEO",
+    "status": "pending",
+    "activeForm": "Generating sitemap and optimizing SEO"
+  },
+  {
+    "content": "Run accessibility audit and fixes",
+    "status": "pending",
+    "activeForm": "Running accessibility audit"
+  },
+  {
+    "content": "Performance optimization - Lighthouse audit",
+    "status": "pending",
+    "activeForm": "Optimizing performance"
+  }
+]

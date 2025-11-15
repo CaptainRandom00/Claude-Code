@@ -1,0 +1,427 @@
+# Session Handoff: Widget-Based Dashboard Framework
+
+**Feature**: 028-build-a-widget
+**Session Date**: 2025-10-12
+**Session Duration**: ~60 minutes
+**Next Session**: Resume with T008 (Backend Services)
+
+---
+
+## What Was Accomplished
+
+### ✅ Critical Remediation (15 min)
+
+Fixed 4 CRITICAL blocking issues before implementation:
+
+1. **A1**: Resolved calculation architecture ambiguity
+   - **Fix**: Clarified "server-executed, client-orchestrated" model in spec.md FR-009
+   - **File**: `specs/028-build-a-widget/spec.md` (line 128-132)
+
+2. **A7**: Added API metadata population algorithm
+   - **Fix**: Detailed algorithm in research.md §7.1 with TypeScript pseudocode
+   - **File**: `specs/028-build-a-widget/research.md` (§7.1, lines 242-343)
+
+3. **A8**: Added version pruning background job task
+   - **Fix**: Inserted T077 with hourly pruning logic (keep 5 versions, 24h retention)
+   - **File**: `specs/028-build-a-widget/tasks.md` (T077, line 232)
+   - **Note**: Tasks renumbered from T001-T126 → T001-T127
+
+4. **I1**: Updated library version in plan.md
+   - **Fix**: Changed "NEEDS CLARIFICATION" → "react-grid-layout v1.5.2"
+   - **File**: `specs/028-build-a-widget/plan.md` (line 16)
+
+**Artifacts Created**:
+- `remediation-plan.md` - Comprehensive fix guide for all 27 analysis findings
+- `IMPLEMENTATION_STATUS.md` - Progress tracking document
+
+---
+
+### ✅ Phase 1: Setup (5 min) - COMPLETE
+
+**Completed Tasks**: T001-T003
+
+1. **T001**: Installed react-grid-layout v1.5.2 + @types/react-grid-layout
+2. **T002**: Installed isomorphic-dompurify for XSS prevention
+3. **T003**: Created audit trail directory structure
+   ```
+   specs/028-build-a-widget/audit/
+   ├── playwright-execution-logs/
+   ├── failure-analysis/screenshots/
+   └── remediation/
+   ```
+
+**Dependencies Added**:
+```bash
+npm install react-grid-layout@1.5.2
+npm install @types/react-grid-layout
+npm install isomorphic-dompurify
+```
+
+---
+
+### ✅ Phase 2: Database Foundation (30 min) - COMPLETE
+
+**Completed Tasks**: T004-T007
+
+#### T004: Database Migration Created ✅
+
+**File**: `migrations/028_widget_dashboard_framework.sql`
+
+**Tables Created** (8 core tables):
+1. `widget_definitions` - Widget type definitions and configurations
+2. `dashboards` - Dashboard configurations and metadata
+3. `dashboard_widgets` - Join table linking widgets to dashboards
+4. `widget_layouts` - Widget layout positions per breakpoint
+5. `dashboard_templates` - Pre-built dashboard templates
+6. `template_widgets` - Join table for template widgets
+7. `api_endpoints_metadata` - System API endpoint metadata
+8. `dashboard_versions` - Dashboard configuration snapshots
+
+**Seed Data Included**:
+- 3 system widgets: Total Sales (metric), Monthly Trend (chart), Top Products (table)
+- 1 dashboard template: Sales Overview (with all 3 widgets pre-configured)
+- 3 template-widget links
+
+**Features**:
+- All foreign keys with CASCADE/RESTRICT constraints
+- All indexes (user, type, dashboard, layout, endpoint, version)
+- CHECK constraints (refresh_interval, grid dimensions, name length)
+- UNIQUE constraints (endpoint+method, dashboard+version, widget+breakpoint)
+- Default values (refresh 60s, isActive true, timestamps)
+
+#### T005-T006: Migration Applied ✅
+
+**Command**:
+```bash
+mysql -h 127.0.0.1 -P 8889 -u root -proot BB_Management_System < migrations/028_widget_dashboard_framework.sql
+```
+
+**Verification**:
+```sql
+-- All 8 tables confirmed in database
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'BB_Management_System'
+AND table_name IN ('widget_definitions','dashboards',...)
+```
+
+**Result**: ✅ All 8 tables created successfully
+
+#### T007: Drizzle ORM Schemas Added ✅
+
+**File**: `shared/schema.ts` (appended at end, lines 1886-2064)
+
+**Added**:
+1. Import: `mysqlEnum` added to imports
+2. 8 Drizzle table definitions with indexes
+3. 8 Zod validation schemas (insertWidgetDefinitionSchema, etc.)
+4. 16 TypeScript types (WidgetDefinition, InsertWidgetDefinition, etc.)
+
+**Exports Available**:
+```typescript
+// Tables
+export const widgetDefinitions = mysqlTable(...)
+export const dashboards = mysqlTable(...)
+// ... 6 more
+
+// Validation Schemas
+export const insertWidgetDefinitionSchema = createInsertSchema(...)
+export const insertDashboardSchema = createInsertSchema(...)
+// ... 6 more
+
+// TypeScript Types
+export type WidgetDefinition = typeof widgetDefinitions.$inferSelect;
+export type InsertWidgetDefinition = z.infer<typeof insertWidgetDefinitionSchema>;
+// ... 14 more types
+```
+
+---
+
+## Current State
+
+### Progress Metrics
+
+- **Total Tasks**: 127
+- **Completed**: 7 tasks (5.5%)
+- **Time Invested**: ~60 minutes
+- **Estimated Remaining**: 7-11 days to MVP
+
+### Task Breakdown by Phase
+
+```
+✅ Setup (T001-T003): 3/3 complete (100%)
+✅ Database Foundation (T004-T007): 4/4 complete (100%)
+⏳ Backend Services (T008-T012): 0/5 complete (0%)
+⏳ Frontend Foundation (T013-T016): 0/4 complete (0%)
+⏳ User Story 1 MVP (T017-T035): 0/19 complete (0%)
+⏳ Remaining Features (T036-T127): 0/92 complete (0%)
+```
+
+### Foundation Phase Status
+
+**Overall Foundation** (T001-T016): 7/16 complete (44%)
+
+**Remaining**:
+- T008: Create widget-service.ts with CRUD methods
+- T009: Add calculation pipeline to WidgetService
+- T010: Create dashboard-service.ts with CRUD methods
+- T011: Add version management to DashboardService
+- T012: Create widget-schemas.ts with Zod validation
+- T013: Create base widget types (widget-types.ts)
+- T014: Create dashboard types (dashboard-types.ts)
+- T015: Create calculation engine (calculation-engine.ts)
+- T016: Create WidgetContainer base component
+
+**⚠️ BLOCKER**: Foundation phase (T001-T016) BLOCKS all user stories
+
+---
+
+## Next Session Action Plan
+
+### Immediate Priority: Complete Foundation Phase
+
+**Goal**: Finish T008-T016 (9 remaining tasks)
+**Estimated Time**: 2-3 hours
+**Order**: Sequential for backend (T008-T012), parallel for frontend (T013-T016)
+
+#### Backend Services (T008-T012) - Sequential
+
+**T008: WidgetService CRUD** (~20 min)
+- **File**: Create `server/services/widget-service.ts`
+- **Methods**: create(), update(), delete(), getById(), getByUser()
+- **Reference**: Data model in `data-model.md`, schemas in `shared/schema.ts`
+
+**T009: Calculation Pipeline** (~25 min)
+- **File**: Extend `server/services/widget-service.ts`
+- **Methods**: applyCalculations(), applyFilters(), applyAggregations(), applyComparisons()
+- **Reference**: research.md §4 (Lodash calculation engine)
+
+**T010: DashboardService CRUD** (~20 min)
+- **File**: Create `server/services/dashboard-service.ts`
+- **Methods**: create(), update(), delete(), getById(), getByUser()
+- **Reference**: Dashboard table schema in `shared/schema.ts`
+
+**T011: Version Management** (~15 min)
+- **File**: Extend `server/services/dashboard-service.ts`
+- **Methods**: createVersion(), getVersions(), restoreVersion()
+- **Reference**: FR-048 (5 versions, 24h retention)
+
+**T012: Zod Validation Schemas** (~30 min)
+- **File**: Create `server/validation/widget-schemas.ts`
+- **Schemas**: widgetDefinitionSchema, calculationConfigSchema, visualizationConfigSchema
+- **Reference**: contracts/widget-api.md request bodies
+
+#### Frontend Foundation (T013-T016) - Can Run in Parallel
+
+**T013: Widget Types** (~10 min)
+- **File**: Create `client/src/types/widget-types.ts`
+- **Types**: WidgetType, CalculationConfig, VisualizationConfig
+- **Reference**: spec.md FR-001, data-model.md JSON schemas
+
+**T014: Dashboard Types** (~10 min)
+- **File**: Create `client/src/types/dashboard-types.ts`
+- **Types**: Dashboard, DashboardLayout, Breakpoint
+- **Reference**: data-model.md dashboard schemas
+
+**T015: Calculation Engine** (~25 min)
+- **File**: Create `client/src/lib/calculation-engine.ts`
+- **Functions**: Lodash-based pipeline functions
+- **Reference**: research.md §4 (calculation engine decision)
+
+**T016: WidgetContainer Component** (~20 min)
+- **File**: Create `client/src/components/widgets/base/WidgetContainer.tsx`
+- **Props**: children, title, loading, error, refreshButton
+- **Reference**: spec.md FR-002, FR-005 (widget independence, manual refresh)
+
+---
+
+## Files Modified This Session
+
+### Created
+1. `/migrations/028_widget_dashboard_framework.sql` (355 lines) - Database migration
+2. `/specs/028-build-a-widget/remediation-plan.md` (479 lines) - Fix guide
+3. `/specs/028-build-a-widget/IMPLEMENTATION_STATUS.md` (233 lines) - Progress tracker
+4. `/specs/028-build-a-widget/SESSION_HANDOFF.md` (this file)
+
+### Modified
+1. `/specs/028-build-a-widget/spec.md`
+   - Lines 128-132: Clarified calculation execution model (FR-009)
+   - Line 190: Enhanced version retention policy (FR-048)
+
+2. `/specs/028-build-a-widget/research.md`
+   - Lines 242-343: Added §7.1 API metadata algorithm
+
+3. `/specs/028-build-a-widget/plan.md`
+   - Line 16: Finalized react-grid-layout version
+
+4. `/specs/028-build-a-widget/tasks.md`
+   - Line 232: Inserted T077 (version pruning task)
+   - All subsequent tasks renumbered (T078-T127)
+   - Lines 28, 29, 30: Marked T001-T003 complete
+   - Lines 42-45: Marked T004-T007 complete
+
+5. `/shared/schema.ts`
+   - Line 1: Added `mysqlEnum` to imports
+   - Lines 1886-2064: Added 8 widget tables + types + validation schemas
+
+### Created Directories
+- `/specs/028-build-a-widget/audit/playwright-execution-logs/`
+- `/specs/028-build-a-widget/audit/failure-analysis/screenshots/`
+- `/specs/028-build-a-widget/audit/remediation/`
+
+---
+
+## Database State
+
+### Tables Created (8)
+
+All tables exist in `BB_Management_System` database:
+
+```sql
+api_endpoints_metadata     -- Empty (populated by T057)
+dashboards                 -- Empty
+dashboard_templates        -- 1 row (Sales Overview)
+dashboard_versions         -- Empty
+dashboard_widgets          -- Empty
+template_widgets           -- 3 rows (linking to Sales Overview)
+widget_definitions         -- 3 rows (system widgets)
+widget_layouts             -- Empty
+```
+
+### Seed Data Verification
+
+```sql
+-- System widgets (3)
+SELECT id, name, widget_type, is_system FROM widget_definitions WHERE is_system = TRUE;
+-- Expected: Total Sales (metric), Monthly Trend (chart), Top Products (table)
+
+-- Dashboard template (1)
+SELECT id, name, category FROM dashboard_templates;
+-- Expected: Sales Overview (sales)
+
+-- Template widgets (3)
+SELECT template_id, widget_definition_id FROM template_widgets;
+-- Expected: 3 links (template 1 → widgets 1, 2, 3)
+```
+
+---
+
+## Known Issues & Warnings
+
+### 1. Drizzle ORM Type Warnings
+
+**Status**: ⚠️ Non-blocking
+**Impact**: TypeScript compilation shows Drizzle ORM library warnings
+**Root Cause**: Pre-existing issues in drizzle-orm type definitions (not our code)
+**Action**: None required - warnings are in node_modules, not our schema
+
+### 2. MySQL CLI Password Warning
+
+**Status**: ⚠️ Informational only
+**Message**: "Using a password on the command line interface can be insecure"
+**Impact**: None for local development
+**Action**: None required (standard MAMP setup)
+
+### 3. NPM Audit Vulnerabilities
+
+**Status**: ⚠️ Existing project vulnerabilities
+**Count**: 28 vulnerabilities (10 moderate, 12 high, 6 critical)
+**Impact**: Not introduced by this feature
+**Action**: Deferred to separate security review
+
+---
+
+## Testing Status
+
+### What's Tested
+- ✅ Database migration applied successfully
+- ✅ All 8 tables exist
+- ✅ Seed data inserted correctly
+- ✅ TypeScript types compile (with expected Drizzle warnings)
+
+### What's Not Tested Yet
+- ⏳ Backend service methods (T008-T012 not implemented)
+- ⏳ Frontend components (T013-T016 not implemented)
+- ⏳ End-to-end workflows (Playwright tests in T017+)
+
+---
+
+## Session Context for Resume
+
+### Git Status
+
+Branch: `028-build-a-widget`
+
+**Modified files**:
+- specs/028-build-a-widget/* (spec, research, plan, tasks)
+- shared/schema.ts
+- migrations/028_widget_dashboard_framework.sql (new)
+
+**Not yet committed**: All changes are working but uncommitted
+
+### Dev Server Status
+
+Background process running: `npm run dev` (bash ID: fee9e9)
+
+### Environment
+
+- Node.js: Active
+- MySQL: Running (MAMP, port 8889)
+- Database: BB_Management_System
+- Dependencies: Installed (react-grid-layout, isomorphic-dompurify)
+
+---
+
+## Quick Start Commands for Next Session
+
+```bash
+# 1. Check database state
+mysql -h 127.0.0.1 -P 8889 -u root -proot -e "SELECT COUNT(*) FROM BB_Management_System.widget_definitions;"
+
+# 2. Verify dev server running
+npm run dev
+
+# 3. Check task status
+cat specs/028-build-a-widget/tasks.md | grep -E '^\- \[X\]' | wc -l
+# Expected: 7 completed
+
+# 4. Resume with T008
+# Create: server/services/widget-service.ts
+```
+
+---
+
+## References for Next Session
+
+**Key Documents**:
+- `specs/028-build-a-widget/tasks.md` - Task list (start at T008)
+- `specs/028-build-a-widget/data-model.md` - Schema reference
+- `specs/028-build-a-widget/contracts/widget-api.md` - API specifications
+- `specs/028-build-a-widget/research.md` - Technical decisions
+- `specs/028-build-a-widget/quickstart.md` - Implementation guide
+- `shared/schema.ts` - Drizzle schemas (lines 1886+)
+
+**Progress Tracking**:
+- `specs/028-build-a-widget/IMPLEMENTATION_STATUS.md`
+- `specs/028-build-a-widget/SESSION_HANDOFF.md` (this file)
+
+---
+
+## Success Criteria for Next Session
+
+**Goal**: Complete Foundation Phase (T008-T016)
+
+**Definition of Done**:
+1. ✅ All backend services created (widget-service, dashboard-service)
+2. ✅ All validation schemas created (widget-schemas.ts)
+3. ✅ All frontend types created (widget-types.ts, dashboard-types.ts)
+4. ✅ Base components created (WidgetContainer, calculation-engine)
+5. ✅ All 16 foundation tasks marked complete in tasks.md
+6. ✅ Ready to begin User Story 1 (T017-T035)
+
+**Estimated Duration**: 2-3 hours
+
+---
+
+**Last Updated**: 2025-10-12 (end of session 1)
+**Next Session**: Begin with T008 (WidgetService CRUD)
+**Status**: Foundation 44% complete, ready for backend services

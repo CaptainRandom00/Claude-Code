@@ -1,0 +1,778 @@
+# Data Model: Feature 029 - Complete User Guide Documentation
+
+**Feature**: 029-complete-user-guide
+**Date**: 2025-10-19
+**Purpose**: Define data structures for user guide documentation system
+
+## Overview
+
+This document defines the data models for the user guide documentation system, including screenshot metadata, component state models, and documentation manifest structures.
+
+## 1. Screenshot Metadata
+
+### ScreenshotMetadata
+
+```typescript
+interface ScreenshotMetadata {
+  /** Unique identifier (filename without extension) */
+  id: string;
+
+  /** Feature this screenshot belongs to */
+  feature: FeatureId;
+
+  /** Step number within the feature guide */
+  step: number;
+
+  /** Human-readable description */
+  description: string;
+
+  /** File path relative to public/ */
+  path: string;
+
+  /** Screenshot dimensions */
+  dimensions: {
+    width: number;
+    height: number;
+  };
+
+  /** File size in bytes */
+  fileSize: number;
+
+  /** Image format (png, webp, avif) */
+  format: 'png' | 'webp' | 'avif';
+
+  /** Optional annotations overlay */
+  annotations?: Annotation[];
+
+  /** Capture metadata */
+  capture: {
+    viewport: 'desktop' | 'tablet' | 'mobile';
+    timestamp: string;
+    capturedBy: 'playwright' | 'manual';
+  };
+
+  /** Alt text for accessibility */
+  altText: string;
+
+  /** Optional caption displayed below image */
+  caption?: string;
+}
+```
+
+### Annotation
+
+```typescript
+interface Annotation {
+  /** Annotation type */
+  type: 'rectangle' | 'circle' | 'arrow' | 'text' | 'highlight';
+
+  /** Position (percentage-based for responsive scaling) */
+  position: {
+    x: number; // 0-100
+    y: number; // 0-100
+    width?: number; // for rectangle/highlight
+    height?: number; // for rectangle/highlight
+    radius?: number; // for circle
+  };
+
+  /** Annotation color */
+  color: 'red' | 'blue' | 'yellow' | 'green';
+
+  /** Optional label text */
+  label?: string;
+
+  /** Step number (for numbered circles) */
+  stepNumber?: number;
+}
+```
+
+## 2. Feature Guide Data
+
+### FeatureGuide
+
+```typescript
+type FeatureId =
+  | 'dashboard'
+  | 'widget-dashboards'
+  | 'widget-builder'
+  | 'widget-templates'
+  | 'stock-control'
+  | 'stock-ordering'
+  | 'sales-analytics'
+  | 'case-sizes'
+  | 'stock-profiles'
+  | 'supplier-profiles'
+  | 'sales-aggregation'
+  | 'waste'
+  | 'expiry-management'
+  | 'tasks'
+  | 'reports'
+  | 'data-upload'
+  | 'settings';
+
+interface FeatureGuide {
+  /** Unique feature identifier */
+  id: FeatureId;
+
+  /** Display title */
+  title: string;
+
+  /** Icon identifier (matches sidebar) */
+  icon: string;
+
+  /** Overview content */
+  overview: OverviewSection;
+
+  /** Getting started section */
+  gettingStarted: GettingStartedSection;
+
+  /** Step-by-step tasks */
+  tasks: Task[];
+
+  /** Common tasks quick reference */
+  commonTasks?: QuickReference[];
+
+  /** Troubleshooting section */
+  troubleshooting?: TroubleshootingEntry[];
+
+  /** Related features */
+  relatedFeatures?: FeatureId[];
+
+  /** Metadata */
+  metadata: {
+    difficulty: 'beginner' | 'intermediate' | 'advanced';
+    estimatedReadTime: number; // minutes
+    lastUpdated: string;
+    version: string;
+  };
+}
+```
+
+### OverviewSection
+
+```typescript
+interface OverviewSection {
+  /** What is this feature? (2-3 sentences) */
+  description: string;
+
+  /** Who should use it? */
+  targetUsers: string[];
+
+  /** Key benefits (3-5 bullet points) */
+  benefits: string[];
+
+  /** Prerequisites */
+  prerequisites?: string[];
+
+  /** Preview screenshot */
+  previewScreenshot?: string;
+}
+```
+
+### GettingStartedSection
+
+```typescript
+interface GettingStartedSection {
+  /** How to navigate to this feature */
+  navigation: {
+    steps: string[];
+    screenshot: string;
+  };
+
+  /** First-time setup (optional) */
+  setup?: {
+    description: string;
+    steps: string[];
+    screenshots: string[];
+  };
+
+  /** Interface overview */
+  interfaceOverview: {
+    description: string;
+    screenshot: string;
+    keyElements: Array<{
+      name: string;
+      description: string;
+    }>;
+  };
+}
+```
+
+### Task
+
+```typescript
+interface Task {
+  /** Task identifier (unique within feature) */
+  id: string;
+
+  /** Task title */
+  title: string;
+
+  /** Difficulty level */
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+
+  /** Estimated completion time */
+  estimatedTime: number; // minutes
+
+  /** Task description */
+  description: string;
+
+  /** Step-by-step instructions */
+  steps: TaskStep[];
+
+  /** Tips and best practices */
+  tips?: string[];
+
+  /** Common errors and solutions */
+  commonErrors?: Array<{
+    error: string;
+    solution: string;
+  }>;
+
+  /** Related tasks */
+  relatedTasks?: string[];
+}
+```
+
+### TaskStep
+
+```typescript
+interface TaskStep {
+  /** Step number (1-indexed) */
+  stepNumber: number;
+
+  /** Step title */
+  title: string;
+
+  /** Detailed instructions */
+  instructions: string[];
+
+  /** Screenshots for this step */
+  screenshots: string[];
+
+  /** Optional warning */
+  warning?: string;
+
+  /** Optional note */
+  note?: string;
+
+  /** Expected result */
+  expectedResult?: string;
+}
+```
+
+### QuickReference
+
+```typescript
+interface QuickReference {
+  /** Task name */
+  name: string;
+
+  /** Brief description */
+  description: string;
+
+  /** Quick steps (1-3 actions) */
+  quickSteps: string[];
+
+  /** Keyboard shortcut (if applicable) */
+  keyboardShortcut?: string;
+
+  /** Link to full task guide */
+  taskId?: string;
+}
+```
+
+### TroubleshootingEntry
+
+```typescript
+interface TroubleshootingEntry {
+  /** Issue title */
+  issue: string;
+
+  /** Symptoms */
+  symptoms: string[];
+
+  /** Possible causes */
+  causes?: string[];
+
+  /** Solution steps */
+  solution: string[];
+
+  /** Screenshots demonstrating fix */
+  screenshots?: string[];
+
+  /** When to contact support */
+  escalation?: string;
+}
+```
+
+## 3. Documentation Manifest
+
+### DocumentationManifest
+
+The manifest file (`public/docs/manifest.json`) provides a complete index of all documentation resources.
+
+```typescript
+interface DocumentationManifest {
+  /** Manifest version */
+  version: string;
+
+  /** Generated timestamp */
+  generatedAt: string;
+
+  /** All feature guides */
+  features: FeatureGuide[];
+
+  /** All screenshots */
+  screenshots: ScreenshotMetadata[];
+
+  /** Search index (for Fuse.js) */
+  searchIndex: SearchIndexEntry[];
+
+  /** Statistics */
+  statistics: {
+    totalFeatures: number;
+    totalScreenshots: number;
+    totalTasks: number;
+    totalSize: number; // bytes
+  };
+}
+```
+
+### SearchIndexEntry
+
+```typescript
+interface SearchIndexEntry {
+  /** Unique entry ID */
+  id: string;
+
+  /** Search content */
+  content: string;
+
+  /** Entry type */
+  type: 'feature' | 'task' | 'troubleshooting';
+
+  /** Feature ID */
+  featureId: FeatureId;
+
+  /** Task ID (if type is 'task') */
+  taskId?: string;
+
+  /** Display title */
+  title: string;
+
+  /** URL fragment for direct navigation */
+  urlFragment: string;
+
+  /** Search keywords */
+  keywords: string[];
+}
+```
+
+## 4. Component State Models
+
+### UserGuideSectionState
+
+```typescript
+interface UserGuideSectionState {
+  /** Currently selected feature */
+  selectedFeature: FeatureId | null;
+
+  /** Currently expanded task */
+  expandedTask: string | null;
+
+  /** Active tab */
+  activeTab: 'overview' | 'tasks' | 'common-tasks' | 'troubleshooting';
+
+  /** Search query */
+  searchQuery: string;
+
+  /** Filtered tasks based on search */
+  filteredTasks: Task[];
+
+  /** Loading state */
+  isLoading: boolean;
+
+  /** Error state */
+  error: string | null;
+}
+```
+
+### ScreenshotViewerState
+
+```typescript
+interface ScreenshotViewerState {
+  /** Current screenshot ID */
+  screenshotId: string;
+
+  /** Is zoomed in */
+  isZoomed: boolean;
+
+  /** Zoom level (1.0 = 100%) */
+  zoomLevel: number;
+
+  /** Pan position (when zoomed) */
+  panPosition: {
+    x: number;
+    y: number;
+  };
+
+  /** Show annotations */
+  showAnnotations: boolean;
+
+  /** Loading state */
+  isLoading: boolean;
+
+  /** Error state */
+  error: string | null;
+
+  /** Available formats */
+  availableFormats: Array<'png' | 'webp' | 'avif'>;
+
+  /** Selected format */
+  selectedFormat: 'png' | 'webp' | 'avif';
+}
+```
+
+### DocumentationNavigationState
+
+```typescript
+interface DocumentationNavigationState {
+  /** Current section */
+  currentSection: 'api' | 'guides';
+
+  /** Feature navigation history */
+  history: Array<{
+    featureId: FeatureId;
+    taskId?: string;
+    timestamp: number;
+  }>;
+
+  /** Bookmarked pages */
+  bookmarks: Array<{
+    featureId: FeatureId;
+    taskId?: string;
+    label: string;
+  }>;
+
+  /** Breadcrumb trail */
+  breadcrumbs: Array<{
+    label: string;
+    url: string;
+  }>;
+}
+```
+
+## 5. Screenshot Capture Configuration
+
+### PlaywrightCaptureConfig
+
+```typescript
+interface PlaywrightCaptureConfig {
+  /** Target URL */
+  baseUrl: string;
+
+  /** Viewport configurations */
+  viewports: {
+    desktop: { width: 1280; height: 800 };
+    tablet: { width: 768; height: 1024 };
+    mobile: { width: 375; height: 667 };
+  };
+
+  /** Output directory */
+  outputDir: string;
+
+  /** Compression settings */
+  compression: {
+    png: {
+      compressionLevel: 9;
+      adaptiveFiltering: true;
+      palette: true;
+    };
+    webp: {
+      quality: 85;
+      lossless: false;
+    };
+    avif: {
+      quality: 80;
+      speed: 6;
+    };
+  };
+
+  /** Wait strategy */
+  waitStrategy: {
+    networkIdle: boolean;
+    timeout: number;
+    stabilityDelay: number;
+  };
+
+  /** Screenshot naming */
+  namingPattern: string; // e.g., "{feature}-{step:02d}-{description}.png"
+
+  /** Annotations overlay */
+  enableAnnotations: boolean;
+}
+```
+
+### CaptureTask
+
+```typescript
+interface CaptureTask {
+  /** Task identifier */
+  id: string;
+
+  /** Feature this screenshot belongs to */
+  feature: FeatureId;
+
+  /** Step number */
+  step: number;
+
+  /** Description for filename */
+  description: string;
+
+  /** URL to navigate to */
+  url: string;
+
+  /** Viewport type */
+  viewport: 'desktop' | 'tablet' | 'mobile';
+
+  /** Selector to wait for */
+  waitForSelector?: string;
+
+  /** Actions to perform before screenshot */
+  actions?: Array<{
+    type: 'click' | 'fill' | 'select' | 'hover' | 'scroll';
+    selector: string;
+    value?: string;
+  }>;
+
+  /** Annotations to overlay */
+  annotations?: Annotation[];
+
+  /** Alt text */
+  altText: string;
+
+  /** Caption */
+  caption?: string;
+}
+```
+
+## 6. File Organization
+
+### Directory Structure
+
+```
+public/
+  docs/
+    manifest.json                    # DocumentationManifest
+    screenshots/
+      {feature}/
+        {step:02d}-{description}.png
+        {step:02d}-{description}.webp
+        {step:02d}-{description}.avif
+        metadata.json                # ScreenshotMetadata[]
+
+specs/029-complete-user-guide/
+  data-model.md                      # This file
+  research.md                        # Research findings
+  plan.md                            # Implementation plan
+  contracts/                         # TypeScript interfaces
+    UserGuideSection.ts
+    ScreenshotViewer.ts
+    DocumentationSearch.ts
+    ScreenshotMetadata.ts
+    FeatureGuide.ts
+
+scripts/
+  capture-user-guide-screenshots.ts  # Playwright automation
+  generate-manifest.ts               # Generate manifest.json
+  optimize-screenshots.ts            # Image optimization
+```
+
+## 7. Data Flow
+
+### Screenshot Capture Flow
+
+```
+1. Define CaptureTask[] in script
+2. Playwright navigates to URLs
+3. Performs actions (clicks, fills, etc.)
+4. Captures screenshot (PNG)
+5. Generates WebP variant (60-70% smaller)
+6. Generates AVIF variant (70-80% smaller)
+7. Extracts metadata (dimensions, size)
+8. Generates ScreenshotMetadata
+9. Saves to public/docs/screenshots/{feature}/
+10. Updates feature metadata.json
+```
+
+### Documentation Loading Flow
+
+```
+1. User navigates to Documentation → User Guides
+2. Component fetches manifest.json
+3. Renders feature list from manifest.features
+4. User selects feature
+5. Component loads FeatureGuide data
+6. Renders sections (overview, tasks, troubleshooting)
+7. ScreenshotViewer lazy-loads images on scroll
+8. Uses <picture> with AVIF/WebP/PNG fallback
+9. Applies annotations overlay if defined
+10. Tracks navigation in history
+```
+
+### Search Flow
+
+```
+1. User types in search box
+2. Query matches against SearchIndexEntry.content
+3. Fuse.js fuzzy search returns ranked results
+4. Results grouped by type (feature, task, troubleshooting)
+5. User clicks result
+6. Navigate to featureId#taskId
+7. Expand relevant task automatically
+8. Highlight search terms
+```
+
+## 8. Constraints and Validation
+
+### Screenshot Constraints
+
+- **Max file size**: 500KB per PNG (after compression)
+- **Max dimensions**: 1920x1080
+- **Min dimensions**: 375x667 (mobile)
+- **Supported formats**: PNG (primary), WebP, AVIF (optimized variants)
+- **Naming pattern**: `{feature}-{step:02d}-{description}.{ext}`
+
+### Feature Guide Constraints
+
+- **Overview description**: 2-3 sentences (150-300 characters)
+- **Benefits**: 3-5 bullet points
+- **Task steps**: Max 10 steps per task
+- **Estimated time**: Realistic estimates (tested with real users)
+- **Difficulty**: Matches actual complexity
+
+### Performance Constraints
+
+- **Page load time**: <2s initial load
+- **LCP**: <2.5s
+- **CLS**: <0.1
+- **Total page size**: <10MB (with lazy loading)
+- **Images above fold**: <1MB total
+- **Screenshot lazy load**: Below 50px from viewport
+
+## 9. Sample Data
+
+### Sample FeatureGuide (Sales Analytics)
+
+```json
+{
+  "id": "sales-analytics",
+  "title": "Sales Analytics",
+  "icon": "BarChart3",
+  "overview": {
+    "description": "Sales Analytics provides comprehensive insights into product sales performance, trends, and patterns. View detailed sales data, filter by date ranges, and analyze supplier performance.",
+    "targetUsers": ["Store Managers", "Business Analysts", "Inventory Planners"],
+    "benefits": [
+      "Track product sales trends over time",
+      "Identify top-performing and underperforming products",
+      "Filter by date range, supplier, and category",
+      "Export data for reporting",
+      "Visual charts for quick insights"
+    ],
+    "prerequisites": ["Sales data uploaded via Data Upload"],
+    "previewScreenshot": "sales-analytics/01-overview.png"
+  },
+  "gettingStarted": {
+    "navigation": {
+      "steps": [
+        "Click 'Sales Analytics' in the left sidebar",
+        "The sales table will load with recent data"
+      ],
+      "screenshot": "sales-analytics/01-navigation.png"
+    },
+    "interfaceOverview": {
+      "description": "The Sales Analytics interface consists of filters at the top, a data table in the middle, and chart view toggle.",
+      "screenshot": "sales-analytics/02-interface.png",
+      "keyElements": [
+        {
+          "name": "Date Range Filter",
+          "description": "Select start and end dates to filter sales data"
+        },
+        {
+          "name": "Supplier Filter",
+          "description": "Filter by specific supplier"
+        },
+        {
+          "name": "Table View",
+          "description": "Sortable table showing product sales"
+        },
+        {
+          "name": "Chart View",
+          "description": "Visual chart representation"
+        }
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "filter-by-date-range",
+      "title": "Filter Sales by Date Range",
+      "difficulty": "beginner",
+      "estimatedTime": 2,
+      "description": "Learn how to filter sales data for a specific time period",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "title": "Open Date Range Picker",
+          "instructions": [
+            "Click the 'Date Range' button at the top of the page"
+          ],
+          "screenshots": ["sales-analytics/03-date-picker.png"],
+          "expectedResult": "Calendar picker opens"
+        },
+        {
+          "stepNumber": 2,
+          "title": "Select Start Date",
+          "instructions": [
+            "Click on the start date in the calendar",
+            "Navigate months using dropdown if needed"
+          ],
+          "screenshots": ["sales-analytics/04-select-start.png"]
+        },
+        {
+          "stepNumber": 3,
+          "title": "Select End Date",
+          "instructions": [
+            "Click on the end date in the calendar",
+            "The range will be highlighted"
+          ],
+          "screenshots": ["sales-analytics/05-select-end.png"],
+          "expectedResult": "Date range selected and table updates"
+        }
+      ],
+      "tips": [
+        "Use month/year dropdowns for faster navigation",
+        "Default range is last 30 days",
+        "Maximum range is 1 year"
+      ]
+    }
+  ],
+  "metadata": {
+    "difficulty": "beginner",
+    "estimatedReadTime": 8,
+    "lastUpdated": "2025-10-19",
+    "version": "1.0.0"
+  }
+}
+```
+
+## 10. Next Steps
+
+After completing data model definition:
+
+1. Create TypeScript interface contracts in `/contracts` directory
+2. Generate sample manifest.json
+3. Create quickstart.md with implementation guide
+4. Update plan.md with Technical Context
+5. Begin Phase 2: Screenshot capture automation

@@ -1,0 +1,508 @@
+/**
+ * Contract: Documentation Search
+ * Feature: 029-complete-user-guide
+ * Purpose: Define TypeScript interfaces for documentation search functionality
+ */
+
+import type { FeatureId, DifficultyLevel } from './UserGuideSection';
+
+// ============================================================================
+// Search Configuration
+// ============================================================================
+
+/**
+ * Search configuration using Fuse.js
+ */
+export interface SearchConfig {
+  /** Keys to search in */
+  keys: SearchKey[];
+
+  /** Fuzzy match threshold (0.0 = exact, 1.0 = match anything) */
+  threshold: number;
+
+  /** Include score in results */
+  includeScore: boolean;
+
+  /** Include matches in results */
+  includeMatches: boolean;
+
+  /** Minimum character length to trigger search */
+  minMatchCharLength: number;
+
+  /** Whether to ignore location */
+  ignoreLocation: boolean;
+
+  /** Minimum search query length */
+  minQueryLength: number;
+
+  /** Maximum results to return */
+  maxResults: number;
+
+  /** Debounce delay (ms) */
+  debounceDelay: number;
+}
+
+/**
+ * Search key configuration
+ */
+export interface SearchKey {
+  /** Field name to search */
+  name: string;
+
+  /** Weight for this field (higher = more important) */
+  weight: number;
+}
+
+// ============================================================================
+// Search Index
+// ============================================================================
+
+/**
+ * Search index entry
+ */
+export interface SearchIndexEntry {
+  /** Unique entry ID */
+  id: string;
+
+  /** Search content */
+  content: string;
+
+  /** Entry type */
+  type: SearchEntryType;
+
+  /** Feature ID */
+  featureId: FeatureId;
+
+  /** Task ID (if type is 'task') */
+  taskId?: string;
+
+  /** Display title */
+  title: string;
+
+  /** URL fragment for direct navigation */
+  urlFragment: string;
+
+  /** Search keywords */
+  keywords: string[];
+
+  /** Feature title */
+  featureTitle: string;
+
+  /** Difficulty (for tasks) */
+  difficulty?: DifficultyLevel;
+
+  /** Section (for navigation) */
+  section?: 'overview' | 'tasks' | 'common-tasks' | 'troubleshooting';
+}
+
+/**
+ * Search entry types
+ */
+export type SearchEntryType = 'feature' | 'task' | 'troubleshooting' | 'quick-reference';
+
+// ============================================================================
+// Search Results
+// ============================================================================
+
+/**
+ * Search result item
+ */
+export interface SearchResult {
+  /** Search index entry */
+  item: SearchIndexEntry;
+
+  /** Match score (0-1, lower is better) */
+  score: number;
+
+  /** Matched text excerpts */
+  matches?: SearchMatch[];
+
+  /** Highlighted title */
+  highlightedTitle?: string;
+
+  /** Highlighted content excerpt */
+  highlightedContent?: string;
+}
+
+/**
+ * Search match details
+ */
+export interface SearchMatch {
+  /** Matched field key */
+  key: string;
+
+  /** Matched value */
+  value: string;
+
+  /** Match indices */
+  indices: Array<[number, number]>;
+}
+
+/**
+ * Grouped search results
+ */
+export interface GroupedSearchResults {
+  /** Feature results */
+  features: SearchResult[];
+
+  /** Task results */
+  tasks: SearchResult[];
+
+  /** Troubleshooting results */
+  troubleshooting: SearchResult[];
+
+  /** Quick reference results */
+  quickReference: SearchResult[];
+
+  /** Total result count */
+  totalCount: number;
+
+  /** Search query */
+  query: string;
+
+  /** Search duration (ms) */
+  duration: number;
+}
+
+// ============================================================================
+// Component Props
+// ============================================================================
+
+/**
+ * SearchBar component props
+ */
+export interface SearchBarProps {
+  /** Current search query */
+  query: string;
+
+  /** Callback when query changes */
+  onQueryChange: (query: string) => void;
+
+  /** Callback when search is submitted */
+  onSearch?: (query: string) => void;
+
+  /** Placeholder text */
+  placeholder?: string;
+
+  /** Show search icon */
+  showIcon?: boolean;
+
+  /** Show clear button */
+  showClear?: boolean;
+
+  /** Auto focus on mount */
+  autoFocus?: boolean;
+
+  /** Disabled state */
+  disabled?: boolean;
+
+  /** Loading state */
+  isLoading?: boolean;
+
+  /** Custom CSS class */
+  className?: string;
+}
+
+/**
+ * SearchResults component props
+ */
+export interface SearchResultsProps {
+  /** Grouped search results */
+  results: GroupedSearchResults;
+
+  /** Callback when result is clicked */
+  onResultClick: (result: SearchResult) => void;
+
+  /** Show result scores */
+  showScores?: boolean;
+
+  /** Group results by type */
+  grouped?: boolean;
+
+  /** Maximum results to display per group */
+  maxPerGroup?: number;
+
+  /** Loading state */
+  isLoading?: boolean;
+
+  /** Empty state message */
+  emptyMessage?: string;
+
+  /** Custom CSS class */
+  className?: string;
+}
+
+/**
+ * SearchResultItem component props
+ */
+export interface SearchResultItemProps {
+  /** Search result */
+  result: SearchResult;
+
+  /** Callback when clicked */
+  onClick: () => void;
+
+  /** Show score */
+  showScore?: boolean;
+
+  /** Highlight query terms */
+  highlightQuery?: boolean;
+
+  /** Custom CSS class */
+  className?: string;
+}
+
+/**
+ * SearchResultGroup component props
+ */
+export interface SearchResultGroupProps {
+  /** Group title */
+  title: string;
+
+  /** Group icon (optional) */
+  icon?: string;
+
+  /** Results in this group */
+  results: SearchResult[];
+
+  /** Callback when result is clicked */
+  onResultClick: (result: SearchResult) => void;
+
+  /** Maximum results to show */
+  maxResults?: number;
+
+  /** Show "View all" link */
+  showViewAll?: boolean;
+
+  /** Callback when "View all" is clicked */
+  onViewAll?: () => void;
+}
+
+/**
+ * SearchFilters component props
+ */
+export interface SearchFiltersProps {
+  /** Active filters */
+  filters: SearchFilters;
+
+  /** Callback when filters change */
+  onFiltersChange: (filters: SearchFilters) => void;
+
+  /** Available features for filtering */
+  availableFeatures: FeatureId[];
+
+  /** Available difficulty levels */
+  availableDifficulties: DifficultyLevel[];
+}
+
+// ============================================================================
+// Search Filters
+// ============================================================================
+
+/**
+ * Search filters
+ */
+export interface SearchFilters {
+  /** Filter by feature IDs */
+  features?: FeatureId[];
+
+  /** Filter by difficulty levels */
+  difficulties?: DifficultyLevel[];
+
+  /** Filter by entry types */
+  types?: SearchEntryType[];
+
+  /** Minimum score threshold */
+  minScore?: number;
+
+  /** Maximum results */
+  maxResults?: number;
+}
+
+// ============================================================================
+// Search State
+// ============================================================================
+
+/**
+ * Search component state
+ */
+export interface SearchState {
+  /** Current search query */
+  query: string;
+
+  /** Search results */
+  results: GroupedSearchResults | null;
+
+  /** Active filters */
+  filters: SearchFilters;
+
+  /** Loading state */
+  isLoading: boolean;
+
+  /** Error state */
+  error: string | null;
+
+  /** Search history */
+  history: string[];
+
+  /** Recent searches */
+  recentSearches: string[];
+
+  /** Popular searches */
+  popularSearches: string[];
+}
+
+// ============================================================================
+// Search Suggestions
+// ============================================================================
+
+/**
+ * Search suggestion
+ */
+export interface SearchSuggestion {
+  /** Suggestion text */
+  text: string;
+
+  /** Suggestion type */
+  type: 'history' | 'popular' | 'autocomplete';
+
+  /** Number of results for this suggestion */
+  resultCount?: number;
+
+  /** Icon (optional) */
+  icon?: string;
+}
+
+/**
+ * SearchSuggestions component props
+ */
+export interface SearchSuggestionsProps {
+  /** Suggestions list */
+  suggestions: SearchSuggestion[];
+
+  /** Callback when suggestion is clicked */
+  onSuggestionClick: (suggestion: SearchSuggestion) => void;
+
+  /** Current query */
+  query?: string;
+
+  /** Show suggestion type labels */
+  showTypeLabels?: boolean;
+
+  /** Maximum suggestions to show */
+  maxSuggestions?: number;
+}
+
+// ============================================================================
+// Search Analytics
+// ============================================================================
+
+/**
+ * Search analytics event
+ */
+export interface SearchAnalyticsEvent {
+  /** Event type */
+  type: 'search' | 'result-click' | 'no-results' | 'filter-change';
+
+  /** Search query */
+  query: string;
+
+  /** Result count */
+  resultCount: number;
+
+  /** Clicked result (if type is 'result-click') */
+  clickedResult?: SearchResult;
+
+  /** Applied filters */
+  filters?: SearchFilters;
+
+  /** Search duration (ms) */
+  duration: number;
+
+  /** Timestamp */
+  timestamp: string;
+}
+
+/**
+ * Search analytics summary
+ */
+export interface SearchAnalytics {
+  /** Total searches */
+  totalSearches: number;
+
+  /** Total result clicks */
+  totalClicks: number;
+
+  /** Click-through rate */
+  clickThroughRate: number;
+
+  /** Average results per search */
+  avgResultsPerSearch: number;
+
+  /** Top queries */
+  topQueries: Array<{
+    query: string;
+    count: number;
+  }>;
+
+  /** No-result queries */
+  noResultQueries: string[];
+
+  /** Average search duration (ms) */
+  avgSearchDuration: number;
+}
+
+// ============================================================================
+// Utility Functions Types
+// ============================================================================
+
+/**
+ * Search index builder options
+ */
+export interface BuildSearchIndexOptions {
+  /** Feature guides to index */
+  features: any[]; // FeatureGuide from UserGuideSection contract
+
+  /** Include task content in index */
+  includeTasks: boolean;
+
+  /** Include troubleshooting in index */
+  includeTroubleshooting: boolean;
+
+  /** Include common tasks in index */
+  includeCommonTasks: boolean;
+
+  /** Minimum content length to index */
+  minContentLength: number;
+}
+
+/**
+ * Highlight options
+ */
+export interface HighlightOptions {
+  /** Opening tag for highlight */
+  openTag: string;
+
+  /** Closing tag for highlight */
+  closeTag: string;
+
+  /** Case-sensitive highlighting */
+  caseSensitive: boolean;
+}
+
+/**
+ * Text excerpt options
+ */
+export interface ExcerptOptions {
+  /** Maximum excerpt length */
+  maxLength: number;
+
+  /** Context characters before match */
+  contextBefore: number;
+
+  /** Context characters after match */
+  contextAfter: number;
+
+  /** Ellipsis character */
+  ellipsis: string;
+}

@@ -1,0 +1,219 @@
+# Tasks: Safari White Screen Root Cause Fix
+
+**Input**: Design documents from `/specs/024-lets-root-cause/`
+**Prerequisites**: plan.md (complete), research.md (complete), quickstart.md (complete)
+
+## Feature Summary
+Fix Safari-specific white screen issue caused by HTTPS/TLS connection failures preventing JavaScript module loading. Simple pass/fail validation: "Is it a white screen or not?"
+
+## Format: `[ID] [P?] Description`
+- **[P]**: Can run in parallel (different files, no dependencies)
+- Include exact file paths in descriptions
+
+## Phase 3.1: HTTPS Development Server Setup
+
+**Priority**: HIGH (blocks Safari testing)
+
+- [x] T001 Install mkcert and generate local HTTPS certificates
+  - Run `brew install mkcert` (macOS)
+  - Run `mkcert -install` to trust local CA
+  - Generate certificates: `mkcert localhost 127.0.0.1 ::1`
+  - Verify `localhost.pem` and `localhost-key.pem` created in repo root
+  - Add `*.pem` to `.gitignore` if not already excluded
+
+- [x] T002 Configure Vite for HTTPS development server in `vite.config.ts`
+  - Import `fs` module for certificate reading
+  - Add `server.https` configuration with cert and key paths
+  - Set `server.port` to 3000 (maintain existing port)
+  - Verify configuration syntax and type safety
+
+- [x] T003 Update development script in `package.json`
+  - Ensure `npm run dev` uses Vite with HTTPS configuration
+  - Add development server startup instructions to output
+  - Test server starts on `https://localhost:3000`
+
+## Phase 3.2: Safari Compatibility Enhancement
+
+**Priority**: HIGH (core fix)
+
+- [x] T004 Enhance Safari detection in `client/src/main.tsx`
+  - Add Safari version detection (target Safari 15.0+)
+  - Implement WebKit-specific feature detection
+  - Add Safari compatibility mode flag
+  - Preserve existing Chrome/Firefox functionality
+
+- [x] T005 Add Safari-specific error boundaries in `client/src/main.tsx`
+  - Enhance existing error boundary with Safari-specific handling
+  - Add TLS/HTTPS connection error detection
+  - Implement module loading failure recovery
+  - Add retry mechanism for failed script loads (max 3 attempts)
+
+- [x] T006 Create Safari fallback UI component in `client/src/components/SafariFallback.tsx`
+  - Design visible fallback when React fails to mount
+  - Display helpful error message for Safari users
+  - Add manual retry button
+  - Show browser compatibility information
+  - Include Safari version upgrade message if needed
+
+## Phase 3.3: Testing Implementation
+
+**Priority**: HIGH (verification)
+
+- [x] T007 Create simple Safari white screen test in `tests/playwright/safari-white-screen.spec.ts`
+  - Write single test: "Safari shows dashboard, not white screen"
+  - Navigate to `https://localhost:3000`
+  - Check for content visibility (dashboard should be visible)
+  - Count DOM elements (should be > 100, target 557+)
+  - Take screenshot for evidence
+  - Pass if content visible, fail if white screen
+  - Target WebKit browser in Playwright config
+
+- [x] T008 [P] Update Playwright configuration in `playwright.config.ts`
+  - Ensure WebKit browser enabled for Safari testing
+  - Configure HTTPS base URL (`https://localhost:3000`)
+  - Set screenshot capture on test failure
+  - Configure test timeout (5 seconds for page load)
+  - Add retry strategy (1 retry for flaky Safari tests)
+
+## Phase 3.4: Validation & Audit
+
+**Priority**: MEDIUM (documentation and verification)
+
+- [x] T009 Execute quickstart validation scenarios from `specs/024-lets-root-cause/quickstart.md`
+  - Run Test 1: Manual Safari test (open https://localhost:3000 in Safari)
+  - Run Test 2: Automated Playwright test
+  - Execute Scenario 1: Fresh Safari session
+  - Execute Scenario 5: Cross-browser consistency (Chrome, Firefox, Safari)
+  - Verify performance metrics (FCP < 1.8s, TTFB < 100ms, load < 2s)
+  - Document results in audit folder
+
+- [x] T010 Capture audit evidence in `specs/024-lets-root-cause/audit/`
+  - Save before screenshot (if available) as `before-white-screen.png`
+  - Save after screenshot from Playwright as `after-dashboard-working.png`
+  - Copy Playwright HTML report to `audit/test-report.html`
+  - Document performance metrics in `audit/performance-metrics.txt`
+  - Update `audit/test-execution-log.md` with test results
+  - Complete `audit/resolution-validation.md` with fix summary
+
+- [x] T011 Verify cross-browser compatibility (no regressions)
+  - Run existing test suite in Chrome (verify 557 DOM elements)
+  - Run existing test suite in Firefox (verify 557 DOM elements)
+  - Run new Safari test (verify 557+ DOM elements)
+  - Compare functionality across all three browsers
+  - Document any differences or browser-specific behaviors
+  - Ensure no performance regression in Chrome/Firefox
+  - NOTE: Safari test validates white screen exists (expected failure until HTTPS enabled)
+
+## Phase 3.5: Polish & Documentation
+
+**Priority**: LOW (cleanup)
+
+- [x] T012 [P] Update `README.md` with HTTPS setup instructions
+  - Add mkcert installation steps (macOS, Linux, Windows)
+  - Document certificate generation process
+  - Add troubleshooting section for HTTPS issues
+  - Include Safari-specific testing instructions
+  - Link to quickstart.md for detailed validation
+
+## Dependencies
+
+**Critical Path**:
+1. T001 (certificates) → T002 (Vite config) → T003 (package.json)
+2. T001-T003 complete → T007-T008 (Safari testing requires HTTPS)
+3. T004-T006 (Safari compatibility) before T009 (validation)
+4. T007-T008 (tests) before T009-T010 (audit capture)
+5. T009-T010 before T011 (cross-browser verification)
+
+**Blocking Relationships**:
+- T002 depends on T001 (needs certificates)
+- T003 depends on T002 (needs Vite config)
+- T007 depends on T001-T003 (needs HTTPS server)
+- T008 can run in parallel with T001-T006 (different file)
+- T009 depends on T001-T008 (needs all fixes and tests ready)
+- T010 depends on T009 (needs validation results)
+- T011 depends on T001-T010 (final verification)
+- T012 can run in parallel with T011 (different files)
+
+## Parallel Execution Examples
+
+**Setup Phase (Sequential)**:
+```bash
+# T001-T003 must run sequentially
+# T001: Install certificates first
+# T002: Configure Vite with certificate paths
+# T003: Update package.json
+```
+
+**Compatibility + Test Config (Partial Parallel)**:
+```bash
+# T004-T006 modify client/src/main.tsx and create new component
+# T008 modifies playwright.config.ts (different file)
+# Can run T008 in parallel with T004-T006:
+
+Task: "Update Playwright configuration in playwright.config.ts"
+# Then run T004-T006 sequentially (same file: main.tsx)
+```
+
+**Documentation (Parallel)**:
+```bash
+# T012 can run in parallel with T011 (different files)
+Task: "Update README.md with HTTPS setup instructions"
+Task: "Verify cross-browser compatibility"
+```
+
+## Validation Checklist
+
+- [x] No contract tests needed (frontend-only fix, no API changes)
+- [x] No entity models needed (no data model changes)
+- [x] All tests come before implementation (T007-T008 before T009-T011)
+- [x] Parallel tasks truly independent (T008, T012 use different files)
+- [x] Each task specifies exact file path
+- [x] No task modifies same file as another [P] task
+- [x] Setup tasks ordered before testing tasks
+- [x] Testing tasks ordered before validation tasks
+- [x] All quickstart scenarios covered in validation tasks
+
+## Success Criteria
+
+**Functional Success**:
+- ✅ Safari displays full dashboard (not white screen)
+- ✅ 557+ DOM elements rendered in Safari
+- ✅ All navigation and features accessible in Safari
+- ✅ No JavaScript console errors in Safari
+- ✅ Error boundaries catch mounting failures
+
+**Performance Success**:
+- ✅ FCP < 1.8 seconds in Safari
+- ✅ TTFB < 100 milliseconds
+- ✅ Page load < 2 seconds
+- ✅ Memory < 100MB
+
+**Cross-Browser Success**:
+- ✅ Chrome works (no regression from 557 DOM baseline)
+- ✅ Firefox works (no regression from 557 DOM baseline)
+- ✅ Safari works (fix successful, 557+ DOM elements)
+
+**Testing Success**:
+- ✅ Playwright test passes in Safari (dashboard visible)
+- ✅ Screenshot shows content, not white screen
+- ✅ Audit trail documents before/after state
+- ✅ Simple validation: "Is it a white screen or not?" passes
+
+## Notes
+
+- This is a **frontend-only fix** - no backend, API, or database changes
+- Testing approach is **intentionally simple**: pass/fail based on dashboard visibility
+- Focus on **Safari compatibility** without breaking Chrome/Firefox
+- HTTPS development server is **required** for Safari testing
+- Error boundaries provide **graceful degradation** if React fails to mount
+- Audit trail per **Constitutional Principle VI** (mandatory E2E testing)
+- Total tasks: **12 focused tasks** (lightweight implementation)
+
+## Task Execution Order
+
+**Recommended execution sequence**:
+1. Phase 3.1: T001 → T002 → T003 (setup HTTPS - sequential)
+2. Phase 3.2: T004 → T005 → T006 (Safari compatibility - sequential)
+3. Phase 3.3: T007, T008 (testing - T008 can be parallel)
+4. Phase 3.4: T009 → T010 → T011 (validation - sequential)
+5. Phase 3.5: T012 (documentation - can run anytime after T003)

@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create security-scanner.md sub agent with restricted permissions",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create context-sanitizer.md sub agent with limited write access",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create access-auditor.md sub agent with read-only bash access",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create compliance-checker.md sub agent with audit-only access",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create comprehensive README.md with security guidelines",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

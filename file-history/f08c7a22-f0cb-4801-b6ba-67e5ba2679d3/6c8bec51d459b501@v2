@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bb-management-system/schemas/api-epos-sales-request.json",
+  "title": "EPOS Sales API Request Parameters",
+  "description": "Query parameters for GET /api/epos-sales endpoint with configurable limits and server-side filtering",
+  "type": "object",
+  "properties": {
+    "startDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Start of date range filter (inclusive, YYYY-MM-DD format)",
+      "examples": ["2024-01-01", "2024-06-15"]
+    },
+    "endDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "End of date range filter (inclusive, YYYY-MM-DD format)",
+      "examples": ["2024-12-31", "2024-06-30"]
+    },
+    "reportDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Exact report date filter (alternative to date range)",
+      "examples": ["2024-08-22"]
+    },
+    "supplier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Filter by supplier name (exact match, case-sensitive)",
+      "examples": ["ABC Distributors", "XYZ Wholesale"]
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Filter by product category (exact match, case-sensitive)",
+      "examples": ["Beverages", "Snacks", "Dairy"]
+    },
+    "itemCode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "description": "Filter by item code (prefix match for codes <5 chars, exact for longer)",
+      "examples": ["12345", "ABC", "ITEM-001"]
+    },
+    "sortBy": {
+      "type": "string",
+      "enum": ["totalNet", "totalQty", "reportDate"],
+      "default": "totalNet",
+      "description": "Field to sort results by"
+    },
+    "sortOrder": {
+      "type": "string",
+      "enum": ["asc", "desc"],
+      "default": "desc",
+      "description": "Sort direction (ascending or descending)"
+    },
+    "limit": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "enum": [1000, 5000, 10000, 25000, 50000, 100000],
+          "description": "Maximum number of records to return (predefined options)"
+        },
+        {
+          "type": "string",
+          "enum": ["all"],
+          "description": "Special value to request all matching records (capped at 100K)"
+        }
+      ],
+      "default": 10000,
+      "description": "Number of records to return. Server enforces 100K safety cap."
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of records to skip (for pagination with Load More)"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "description": "Default query (10K records, sorted by totalNet desc)",
+      "value": {
+        "limit": 10000,
+        "offset": 0,
+        "sortBy": "totalNet",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "description": "Filtered query with date range and supplier",
+      "value": {
+        "startDate": "2024-01-01",
+        "endDate": "2024-12-31",
+        "supplier": "ABC Distributors",
+        "limit": 25000,
+        "offset": 0,
+        "sortBy": "totalNet",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "description": "Load More (second page)",
+      "value": {
+        "limit": 10000,
+        "offset": 10000,
+        "sortBy": "totalNet",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "description": "All records (capped at 100K)",
+      "value": {
+        "limit": "all",
+        "offset": 0,
+        "sortBy": "reportDate",
+        "sortOrder": "asc"
+      }
+    }
+  ]
+}

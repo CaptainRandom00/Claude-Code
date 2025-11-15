@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import nodemailer from 'nodemailer';
+import { contactSubmissionSchema } from '@/lib/validations';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    // Validate input with Zod schema
+    const validated = contactSubmissionSchema.parse(body);
+
+    // Save to database with new schema
+    try {
+      await db.query(
+        `INSERT INTO contact_submissions (
+          name, email, company, phone, service_interest, budget_range,
+          timeline, message, source, utm_source, utm_medium, utm_campaign,
+          gdpr_consent, marketing_consent, status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'new')
+        RETURNING id`,
+        [
+          validated.name,
+          validated.email,
+          validated.company,
+          validated.phone,
+          validated.service_interest,
+          validated.budget_range,
+          validated.timeline,
+          validated.message,
+          validated.source,
+          validated.utm_source,
+          validated.utm_medium,
+          validated.utm_campaign,
+          validated.gdpr_consent,
+          validated.marketing_consent,
+        ]
+      );
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      return NextResponse.json(
+        { error: 'Failed to save contact submission' },
+        { status: 500 }
+      );
+    }
+
+    // Send email notification
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransporter({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: false,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        const servicesText = validated.service_interest?.join(', ') || 'Not specified';
+
+        await transporter.sendMail({
+          from: process.env.SMTP_USER,
+          to: process.env.ADMIN_EMAIL || process.env.SMTP_USER,
+          replyTo: validated.email,
+          subject: `New Contact Inquiry from ${validated.name}`,
+          html: `
+            <h2>New Contact Form Submission</h2>
+            <hr style="border: 1px solid #e5e5e5; margin: 20px 0;">
+
+            <h3>Contact Information</h3>
+            <p><strong>Name:</strong> ${validated.name}</p>
+            <p><strong>Email:</strong> <a href="mailto:${validated.email}">${validated.email}</a></p>
+            <p><strong>Company:</strong> ${validated.company || 'Not provided'}</p>
+            <p><strong>Phone:</strong> ${validated.phone || 'Not provided'}</p>
+
+            <h3>Project Details</h3>
+            <p><strong>Services Interested:</strong> ${servicesText}</p>
+            <p><strong>Budget Range:</strong> ${validated.budget_range || 'Not specified'}</p>
+            <p><strong>Timeline:</strong> ${validated.timeline || 'Not specified'}</p>
+
+            <h3>Message</h3>
+            <p style="white-space: pre-wrap;">${validated.message}</p>
+
+            <h3>Consent & Tracking</h3>
+            <p><strong>GDPR Consent:</strong> ${validated.gdpr_consent ? 'Yes' : 'No'}</p>
+            <p><strong>Marketing Consent:</strong> ${validated.marketing_consent ? 'Yes' : 'No'}</p>
+            ${validated.utm_source ? `<p><strong>UTM Source:</strong> ${validated.utm_source}</p>` : ''}
+            ${validated.utm_medium ? `<p><strong>UTM Medium:</strong> ${validated.utm_medium}</p>` : ''}
+            ${validated.utm_campaign ? `<p><strong>UTM Campaign:</strong> ${validated.utm_campaign}</p>` : ''}
+
+            <hr style="border: 1px solid #e5e5e5; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666;">
+              This email was sent from the Byte Bridges contact form.
+              Reply directly to this email to respond to ${validated.name}.
+            </p>
+          `,
+        });
+      } catch (emailError) {
+        console.error('Email error:', emailError);
+        // Continue even if email fails
+      }
+    }
+
+    return NextResponse.json(
+      { message: 'Contact form submitted successfully' },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error('Contact form error:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

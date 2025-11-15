@@ -1,0 +1,19 @@
+import { z } from 'zod';
+
+export const EposSalesQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  supplier: z.string().min(1).max(255).optional(),
+  category: z.string().min(1).max(255).optional(),
+  itemCode: z.string().min(1).max(50).optional(),
+  sortBy: z.enum(['totalNet', 'totalQty', 'reportDate']).default('totalNet'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  limit: z.union([
+    z.coerce.number().int().min(1).max(100000),
+    z.literal('all')
+  ]).transform(val => val === 'all' ? 100000 : val).default(10000),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+
+export type EposSalesQuery = z.infer<typeof EposSalesQuerySchema>;

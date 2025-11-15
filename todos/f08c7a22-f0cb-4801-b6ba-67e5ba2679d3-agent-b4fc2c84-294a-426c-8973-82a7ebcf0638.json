@@ -1,0 +1,52 @@
+[
+  {
+    "content": "Create comprehensive unit tests for route scanner functionality",
+    "status": "completed",
+    "activeForm": "Creating comprehensive unit tests for route scanner functionality"
+  },
+  {
+    "content": "Test AST parsing for TypeScript route files",
+    "status": "completed",
+    "activeForm": "Testing AST parsing for TypeScript route files"
+  },
+  {
+    "content": "Test metadata extraction from route decorators",
+    "status": "completed",
+    "activeForm": "Testing metadata extraction from route decorators"
+  },
+  {
+    "content": "Test error handling for malformed files",
+    "status": "completed",
+    "activeForm": "Testing error handling for malformed files"
+  },
+  {
+    "content": "Test edge cases like empty files, missing decorators, invalid syntax",
+    "status": "completed",
+    "activeForm": "Testing edge cases like empty files, missing decorators, invalid syntax"
+  },
+  {
+    "content": "Mock file system operations and TypeScript compiler API",
+    "status": "completed",
+    "activeForm": "Mocking file system operations and TypeScript compiler API"
+  },
+  {
+    "content": "Test incremental scanning functionality",
+    "status": "completed",
+    "activeForm": "Testing incremental scanning functionality"
+  },
+  {
+    "content": "Validate route manifest parsing accuracy",
+    "status": "completed",
+    "activeForm": "Validating route manifest parsing accuracy"
+  },
+  {
+    "content": "Test performance under various file sizes",
+    "status": "completed",
+    "activeForm": "Testing performance under various file sizes"
+  },
+  {
+    "content": "Run tests to ensure >90% code coverage for route-scanner.ts",
+    "status": "in_progress",
+    "activeForm": "Running tests to ensure >90% code coverage for route-scanner.ts"
+  }
+]

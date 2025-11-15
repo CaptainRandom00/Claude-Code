@@ -1,0 +1,150 @@
+# Feature Specification: Fix Sales Aggregation Calendar Navigation and Date Alignment
+
+**Feature Branch**: `026-fix-sales-aggregation`
+**Created**: 2025-10-08
+**Status**: Draft
+**Input**: User description: "Fix Sales Aggregation Calendar Navigation and Date Alignment - Add month/year navigation controls and fix date alignment with day-of-week headers"
+
+## Execution Flow (main)
+```
+1. Parse user description from Input
+   �  Feature is a bug fix for existing calendar component
+2. Extract key concepts from description
+   � Actors: Sales managers, inventory staff viewing aggregated sales data
+   � Actions: Navigate between months, view dates with sales data
+   � Data: Aggregated sales dates highlighted in calendar
+   � Constraints: Must preserve existing date selection and highlighting functionality
+3. For each unclear aspect:
+   � No major clarifications needed - bug fix with clear scope
+4. Fill User Scenarios & Testing section
+   �  Clear user flows for navigation and date verification
+5. Generate Functional Requirements
+   �  Each requirement is testable
+6. Identify Key Entities
+   � No new data entities - UI component fix only
+7. Run Review Checklist
+   �  No implementation details included
+8. Return: SUCCESS (spec ready for planning)
+```
+
+---
+
+## � Quick Guidelines
+-  Focus on WHAT users need and WHY
+- L Avoid HOW to implement (no tech stack, APIs, code structure)
+- =e Written for business stakeholders, not developers
+
+---
+
+## Problem Statement
+
+### Current Issues
+The Aggregated Data Calendar in the Sales Aggregation page (Dashboard � Sales Aggregation � Daily Aggregation tab) has two critical usability problems:
+
+1. **Missing Month/Year Navigation**: Users cannot navigate to different months or years, making it impossible to browse historical aggregated sales data or check future dates
+2. **Date Misalignment**: Calendar dates do not align with their corresponding day-of-week column headers (SU, MO, TU, WE, TH, FR, SA), causing confusion about which day of the week specific dates fall on
+
+### Business Impact
+- Users cannot access historical sales data aggregations beyond the current month
+- Date misalignment leads to incorrect day-of-week assumptions when planning operations
+- Poor user experience reduces adoption of the sales aggregation feature
+- Time wasted navigating away from the calendar to check dates in external tools
+
+---
+
+## User Scenarios & Testing
+
+### Primary User Story
+As a sales manager reviewing aggregated sales data, I need to navigate to any month/year and clearly see which day of the week each date falls on, so that I can analyze historical patterns and plan inventory accordingly.
+
+### Acceptance Scenarios
+
+1. **Given** the calendar is displaying the current month, **When** the user clicks the previous month navigation control, **Then** the calendar displays the previous month's dates with correct day-of-week alignment
+
+2. **Given** the calendar is displaying any month, **When** the user clicks the next month navigation control, **Then** the calendar displays the next month's dates with correct day-of-week alignment
+
+3. **Given** dates with aggregated sales data exist across multiple months, **When** the user navigates to a month containing aggregated data, **Then** those dates are highlighted in blue while maintaining proper alignment
+
+4. **Given** the user is viewing any month, **When** looking at the calendar grid, **Then** all dates align correctly with their day-of-week column headers (e.g., dates falling on Monday appear under the "MO" column)
+
+5. **Given** the user has navigated to a specific month, **When** they click on a date with aggregated data, **Then** the system loads the sales details for that date (existing functionality preserved)
+
+6. **Given** the user needs to view data from several months ago, **When** they use the navigation controls repeatedly, **Then** they can reach any past or future month efficiently
+
+### Edge Cases
+- What happens when navigating to months with no aggregated sales data?
+  � Calendar displays normally with no blue highlights, all navigation remains functional
+
+- How does the system handle the transition between years?
+  � Navigation controls allow seamless movement from December to January and vice versa
+
+- What if the user navigates to dates far in the future?
+  � Calendar displays future dates normally, no dates are highlighted (no future data exists)
+
+- How does the calendar handle months that start on different days of the week?
+  � All months display with correct first-day positioning, maintaining consistent alignment throughout
+
+---
+
+## Requirements
+
+### Functional Requirements
+
+- **FR-001**: System MUST provide visible month/year navigation controls allowing users to move between months
+
+- **FR-002**: System MUST align all calendar dates with their correct day-of-week column headers (SU through SA)
+
+- **FR-003**: System MUST maintain the existing blue highlighting for dates containing aggregated sales data after navigation changes
+
+- **FR-004**: System MUST preserve the existing date selection functionality when users click on specific dates
+
+- **FR-005**: System MUST display a consistent calendar grid layout across all months (6 weeks visible)
+
+- **FR-006**: System MUST allow users to navigate to any past or future month without restrictions
+
+- **FR-007**: System MUST visually distinguish the current date from other dates
+
+- **FR-008**: System MUST display dates from adjacent months in the calendar grid to fill empty cells
+
+- **FR-009**: Navigation controls MUST be immediately visible and recognizable to users without hovering or searching
+
+- **FR-010**: System MUST respond to navigation actions within 200ms to maintain smooth user experience
+
+---
+
+## Review & Acceptance Checklist
+
+### Content Quality
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+### Requirement Completeness
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+---
+
+## Execution Status
+
+- [x] User description parsed
+- [x] Key concepts extracted
+- [x] Ambiguities marked (none identified)
+- [x] User scenarios defined
+- [x] Requirements generated
+- [x] Entities identified (none - UI fix only)
+- [x] Review checklist passed
+
+---
+
+## Success Metrics
+
+- Users can navigate to any month/year within 3 clicks or less
+- 100% of dates align correctly with day-of-week headers
+- Zero reported confusion about day-of-week positioning
+- Existing date selection and highlighting functionality maintained without regression
+- Calendar navigation response time < 200ms for all interactions

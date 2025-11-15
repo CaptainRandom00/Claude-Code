@@ -1,0 +1,297 @@
+-- Migration: Widget-Based Dashboard Framework
+-- Feature: 028-build-a-widget
+-- Date: 2025-10-12
+-- Description: Creates 8 core tables for widget-based dashboard system
+-- Dependencies: Requires existing 'users' table
+-- Note: Excludes optional tables (dashboard_sharing, widget_calculation_cache)
+
+-- ============================================================================
+-- Table 1: widget_definitions
+-- Stores widget type definitions and configurations
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS widget_definitions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    widget_type ENUM('metric', 'chart', 'table', 'alert', 'progress') NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    api_endpoint VARCHAR(500) NOT NULL,
+    http_method ENUM('GET', 'POST', 'PUT', 'DELETE', 'PATCH') DEFAULT 'GET',
+    query_params JSON NULL,
+    calculation_config JSON NOT NULL,
+    visualization_config JSON NOT NULL,
+    refresh_interval INT DEFAULT 60000,
+    error_config JSON NULL,
+    is_system BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Foreign Keys
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+
+    -- Indexes
+    INDEX idx_widget_user (user_id),
+    INDEX idx_widget_type (widget_type),
+    INDEX idx_widget_system (is_system, is_active),
+
+    -- Constraints
+    CONSTRAINT chk_refresh_interval CHECK (refresh_interval BETWEEN 30000 AND 3600000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 2: dashboards
+-- Stores dashboard configurations and metadata
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dashboards (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    global_filters JSON NULL,
+    is_template BOOLEAN DEFAULT FALSE,
+    template_category VARCHAR(100) NULL,
+    is_shared BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Foreign Keys
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Indexes
+    INDEX idx_dashboard_user (user_id, is_active),
+    INDEX idx_dashboard_template (is_template, template_category),
+    INDEX idx_dashboard_shared (is_shared),
+
+    -- Constraints
+    CONSTRAINT chk_name_length CHECK (CHAR_LENGTH(name) BETWEEN 3 AND 255)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 3: dashboard_widgets
+-- Join table linking widgets to dashboards with widget-specific overrides
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dashboard_widgets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dashboard_id INT NOT NULL,
+    widget_definition_id INT NOT NULL,
+    widget_title VARCHAR(255) NULL,
+    config_override JSON NULL,
+    is_visible BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign Keys
+    FOREIGN KEY (dashboard_id) REFERENCES dashboards(id) ON DELETE CASCADE,
+    FOREIGN KEY (widget_definition_id) REFERENCES widget_definitions(id) ON DELETE RESTRICT,
+
+    -- Indexes
+    INDEX idx_dashwidget_dashboard (dashboard_id),
+    INDEX idx_dashwidget_widget (widget_definition_id),
+    INDEX idx_dashwidget_visible (dashboard_id, is_visible, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 4: widget_layouts
+-- Stores widget layout positions per dashboard per responsive breakpoint
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS widget_layouts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dashboard_widget_id INT NOT NULL,
+    breakpoint ENUM('xxs', 'xs', 'sm', 'md', 'lg') NOT NULL,
+    grid_x INT NOT NULL,
+    grid_y INT NOT NULL,
+    grid_w INT NOT NULL,
+    grid_h INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Foreign Keys
+    FOREIGN KEY (dashboard_widget_id) REFERENCES dashboard_widgets(id) ON DELETE CASCADE,
+
+    -- Indexes
+    INDEX idx_layout_dashwidget (dashboard_widget_id, breakpoint),
+    INDEX idx_layout_position (dashboard_widget_id, breakpoint, grid_x, grid_y),
+
+    -- Constraints
+    CONSTRAINT chk_grid_w CHECK (grid_w BETWEEN 2 AND 12),
+    CONSTRAINT chk_grid_h CHECK (grid_h BETWEEN 2 AND 8),
+    CONSTRAINT chk_grid_x CHECK (grid_x >= 0),
+    CONSTRAINT chk_grid_y CHECK (grid_y >= 0),
+
+    -- Unique constraint: one layout per widget per breakpoint
+    UNIQUE KEY unique_widget_breakpoint (dashboard_widget_id, breakpoint)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 5: dashboard_templates
+-- Pre-built dashboard templates for quick creation
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dashboard_templates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    preview_image_url VARCHAR(500) NULL,
+    config JSON NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Indexes
+    INDEX idx_template_category (category, is_active, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 6: template_widgets
+-- Join table for template widget definitions (reusable across templates)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS template_widgets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    template_id INT NOT NULL,
+    widget_definition_id INT NOT NULL,
+    sort_order INT DEFAULT 0,
+
+    -- Foreign Keys
+    FOREIGN KEY (template_id) REFERENCES dashboard_templates(id) ON DELETE CASCADE,
+    FOREIGN KEY (widget_definition_id) REFERENCES widget_definitions(id) ON DELETE CASCADE,
+
+    -- Indexes
+    INDEX idx_tmpwidget_template (template_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 7: api_endpoints_metadata
+-- Metadata about available system API endpoints for widget configuration
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS api_endpoints_metadata (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    endpoint_path VARCHAR(500) NOT NULL,
+    http_method ENUM('GET', 'POST', 'PUT', 'DELETE', 'PATCH') NOT NULL,
+    description TEXT NOT NULL,
+    request_schema JSON NULL,
+    response_schema JSON NOT NULL,
+    requires_auth BOOLEAN DEFAULT TRUE,
+    rate_limit VARCHAR(100) NULL,
+    category VARCHAR(100) NULL,
+    is_deprecated BOOLEAN DEFAULT FALSE,
+    last_scanned TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Indexes
+    INDEX idx_endpoint_path (endpoint_path, http_method),
+    INDEX idx_endpoint_category (category, is_deprecated),
+
+    -- Unique constraint: one entry per endpoint+method combination
+    UNIQUE KEY unique_endpoint_method (endpoint_path, http_method)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Table 8: dashboard_versions
+-- Stores dashboard configuration snapshots for version history
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dashboard_versions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dashboard_id INT NOT NULL,
+    version_number INT NOT NULL,
+    config_snapshot JSON NOT NULL,
+    change_description TEXT NULL,
+    created_by_user_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign Keys
+    FOREIGN KEY (dashboard_id) REFERENCES dashboards(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+
+    -- Indexes
+    INDEX idx_version_dashboard (dashboard_id, version_number DESC),
+    INDEX idx_version_recent (dashboard_id, created_at DESC),
+
+    -- Unique constraint: one version number per dashboard
+    UNIQUE KEY unique_dashboard_version (dashboard_id, version_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Seed Data: System Widget Definitions (3 pre-built widgets)
+-- ============================================================================
+
+-- System widgets are marked with is_system=TRUE and user_id=NULL
+-- These widgets are available to all users for template instantiation
+
+INSERT INTO widget_definitions
+(user_id, widget_type, name, description, api_endpoint, http_method, calculation_config, visualization_config, is_system, is_active)
+VALUES
+-- 1. Total Sales Metric Widget
+(NULL, 'metric', 'Total Sales', 'Displays total sales amount', '/api/sales', 'GET',
+ '{"filters":[],"aggregations":[{"type":"sum","field":"amount","alias":"total_sales"}],"sort":[{"field":"amount","order":"desc"}]}',
+ '{"format":"currency","decimalPlaces":2,"colors":["#10b981"]}',
+ TRUE, TRUE),
+
+-- 2. Monthly Trend Chart Widget
+(NULL, 'chart', 'Monthly Sales Trend', 'Line chart showing sales by month', '/api/sales', 'GET',
+ '{"filters":[],"groupBy":["month"],"aggregations":[{"type":"sum","field":"amount","alias":"monthly_total"}],"sort":[{"field":"month","order":"asc"}]}',
+ '{"chartType":"line","colors":["#3b82f6"],"showLegend":true,"showTooltip":true}',
+ TRUE, TRUE),
+
+-- 3. Top Products Table Widget
+(NULL, 'table', 'Top 10 Products', 'Table showing top-selling products', '/api/products', 'GET',
+ '{"filters":[],"groupBy":["product_name"],"aggregations":[{"type":"sum","field":"sales_amount","alias":"revenue"}],"sort":[{"field":"revenue","order":"desc"}],"limit":10}',
+ '{"format":"currency","decimalPlaces":2}',
+ TRUE, TRUE);
+
+-- ============================================================================
+-- Seed Data: Dashboard Template (Sales Overview)
+-- ============================================================================
+
+-- Template: Sales Overview Dashboard (required per FR-016)
+INSERT INTO dashboard_templates
+(name, description, category, config, is_active, sort_order)
+VALUES
+('Sales Overview', 'Comprehensive sales performance dashboard with key metrics and trends', 'sales',
+ '{"globalFilters":{"dateRange":{"start":"2025-01-01","end":"2025-12-31"}},"widgets":[{"widgetDefinitionId":1,"title":"Total Sales","layouts":{"xxs":{"x":0,"y":0,"w":2,"h":2},"xs":{"x":0,"y":0,"w":4,"h":2},"sm":{"x":0,"y":0,"w":3,"h":2},"md":{"x":0,"y":0,"w":4,"h":2},"lg":{"x":0,"y":0,"w":4,"h":2}}},{"widgetDefinitionId":2,"title":"Monthly Trend","layouts":{"xxs":{"x":0,"y":2,"w":2,"h":3},"xs":{"x":0,"y":2,"w":4,"h":3},"sm":{"x":3,"y":0,"w":3,"h":3},"md":{"x":4,"y":0,"w":6,"h":3},"lg":{"x":4,"y":0,"w":8,"h":3}}},{"widgetDefinitionId":3,"title":"Top Products","layouts":{"xxs":{"x":0,"y":5,"w":2,"h":4},"xs":{"x":0,"y":5,"w":4,"h":4},"sm":{"x":0,"y":3,"w":6,"h":4},"md":{"x":0,"y":3,"w":10,"h":4},"lg":{"x":0,"y":3,"w":12,"h":4}}}]}',
+ TRUE, 1);
+
+-- Link system widgets to Sales Overview template
+INSERT INTO template_widgets (template_id, widget_definition_id, sort_order)
+VALUES
+(1, 1, 1), -- Total Sales widget
+(1, 2, 2), -- Monthly Trend widget
+(1, 3, 3); -- Top Products widget
+
+-- ============================================================================
+-- Migration Verification Queries (for testing)
+-- ============================================================================
+
+-- Verify all 8 tables created:
+-- SELECT COUNT(*) FROM information_schema.tables
+-- WHERE table_schema = DATABASE()
+-- AND table_name IN ('widget_definitions','dashboards','dashboard_widgets','widget_layouts','dashboard_templates','template_widgets','api_endpoints_metadata','dashboard_versions');
+-- Expected: 8
+
+-- Verify seed data:
+-- SELECT COUNT(*) FROM widget_definitions WHERE is_system = TRUE; -- Expected: 3
+-- SELECT COUNT(*) FROM dashboard_templates; -- Expected: 1
+-- SELECT COUNT(*) FROM template_widgets; -- Expected: 3
+
+-- ============================================================================
+-- Rollback Script (use with caution)
+-- ============================================================================
+
+-- To rollback this migration:
+-- DROP TABLE IF EXISTS dashboard_versions;
+-- DROP TABLE IF EXISTS template_widgets;
+-- DROP TABLE IF EXISTS dashboard_templates;
+-- DROP TABLE IF EXISTS api_endpoints_metadata;
+-- DROP TABLE IF EXISTS widget_layouts;
+-- DROP TABLE IF EXISTS dashboard_widgets;
+-- DROP TABLE IF EXISTS dashboards;
+-- DROP TABLE IF EXISTS widget_definitions;

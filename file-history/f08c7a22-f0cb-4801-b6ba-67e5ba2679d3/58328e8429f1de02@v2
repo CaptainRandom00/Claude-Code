@@ -1,0 +1,323 @@
+/**
+ * ROUTE MANIFEST: Dashboard and Widget Management API
+ *
+ * @endpoints
+ * GET    /api/widgets/dashboards                              - List all dashboards for authenticated user
+ * GET    /api/widgets/dashboards/templates                    - List available dashboard templates
+ * GET    /api/widgets/dashboards/templates/:id                - Get template details with widget preview
+ * POST   /api/widgets/dashboards/from-template/:templateId    - Create dashboard from template (US2)
+ * GET    /api/widgets/dashboards/:id                          - Get dashboard with widgets
+ * PUT    /api/widgets/dashboards/:id                          - Update dashboard (name, filters, etc.)
+ * DELETE /api/widgets/dashboards/:id                          - Soft delete dashboard
+ *
+ * @auth Required for all endpoints (requireAuth middleware)
+ * @integrates dashboard-service, drizzle-orm-mysql
+ * @schemas Dashboard, DashboardTemplate, DashboardWidget
+ * @performance API response time <200ms per Constitution requirement
+ * @feature 028-build-a-widget (User Story 2)
+ */
+
+import express from 'express';
+import { dashboardService } from './services/dashboard-service';
+import { logger } from './utils/logger';
+import { requireAuth } from './middleware/auth';
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(requireAuth);
+
+// ============================================================================
+// Template Routes (US2)
+// ============================================================================
+
+/**
+ * GET /api/widgets/dashboards/templates
+ * List all active dashboard templates
+ * @query category - Optional category filter
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const category = req.query.category as string | undefined;
+    const templates = await dashboardService.getTemplates(category);
+
+    res.json({
+      success: true,
+      templates,
+      count: templates.length,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch dashboard templates', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboard templates',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/widgets/dashboards/templates/:id
+ * Get template details with widget preview
+ */
+router.get('/templates/:id', async (req, res) => {
+  try {
+    const templateId = parseInt(req.params.id);
+
+    if (isNaN(templateId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid template ID',
+      });
+    }
+
+    const template = await dashboardService.getTemplateById(templateId);
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      template,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch template details', {
+      templateId: req.params.id,
+      error: error.message
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch template details',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/widgets/dashboards/from-template/:templateId
+ * Create a new dashboard from a template
+ * @body name - Optional custom dashboard name
+ */
+router.post('/from-template/:templateId', async (req, res) => {
+  try {
+    const templateId = parseInt(req.params.templateId);
+    const userId = req.user?.id || 1; // Default to user 1 for now
+    const customName = req.body.name as string | undefined;
+
+    if (isNaN(templateId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid template ID',
+      });
+    }
+
+    const dashboard = await dashboardService.createDashboardFromTemplate(
+      templateId,
+      userId,
+      customName
+    );
+
+    logger.info('Dashboard created from template', {
+      dashboardId: dashboard.id,
+      templateId,
+      userId,
+      widgetCount: dashboard.widgets.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      dashboard,
+    });
+  } catch (error: any) {
+    logger.error('Failed to create dashboard from template', {
+      templateId: req.params.templateId,
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create dashboard from template',
+      message: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// Dashboard Routes
+// ============================================================================
+
+/**
+ * GET /api/widgets/dashboards
+ * List all dashboards for authenticated user
+ * @query includeInactive - Include inactive dashboards (default: false)
+ */
+router.get('/', async (req, res) => {
+  try {
+    const userId = req.user?.id || 1; // Default to user 1 for now
+    const includeInactive = req.query.includeInactive === 'true';
+
+    const dashboards = await dashboardService.getByUser(userId, includeInactive);
+
+    res.json({
+      success: true,
+      dashboards,
+      count: dashboards.length,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch dashboards', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboards',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/widgets/dashboards/:id
+ * Get dashboard with widgets
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const dashboardId = parseInt(req.params.id);
+
+    if (isNaN(dashboardId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dashboard ID',
+      });
+    }
+
+    const dashboard = await dashboardService.getById(dashboardId);
+
+    if (!dashboard) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dashboard not found',
+      });
+    }
+
+    const widgets = await dashboardService.getWidgets(dashboardId);
+
+    res.json({
+      success: true,
+      dashboard: {
+        ...dashboard,
+        widgets,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch dashboard', {
+      dashboardId: req.params.id,
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboard',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/widgets/dashboards/:id
+ * Update dashboard (name, description, global filters)
+ * @body name - Dashboard name
+ * @body description - Dashboard description
+ * @body globalFilters - Global filter configuration
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const dashboardId = parseInt(req.params.id);
+    const userId = req.user?.id || 1;
+
+    if (isNaN(dashboardId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dashboard ID',
+      });
+    }
+
+    const { name, description, globalFilters } = req.body;
+
+    const dashboard = await dashboardService.update(
+      dashboardId,
+      { name, description, globalFilters },
+      userId
+    );
+
+    logger.info('Dashboard updated', {
+      dashboardId,
+      userId,
+      changes: { name, description, globalFilters },
+    });
+
+    res.json({
+      success: true,
+      dashboard,
+    });
+  } catch (error: any) {
+    logger.error('Failed to update dashboard', {
+      dashboardId: req.params.id,
+      error: error.message,
+    });
+
+    const status = error.message.includes('Unauthorized') ? 403 :
+                   error.message.includes('not found') ? 404 : 500;
+
+    res.status(status).json({
+      success: false,
+      error: 'Failed to update dashboard',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/widgets/dashboards/:id
+ * Soft delete dashboard (sets isActive = false)
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const dashboardId = parseInt(req.params.id);
+    const userId = req.user?.id || 1;
+
+    if (isNaN(dashboardId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dashboard ID',
+      });
+    }
+
+    await dashboardService.delete(dashboardId, userId);
+
+    logger.info('Dashboard deleted', {
+      dashboardId,
+      userId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Dashboard deleted successfully',
+    });
+  } catch (error: any) {
+    logger.error('Failed to delete dashboard', {
+      dashboardId: req.params.id,
+      error: error.message,
+    });
+
+    const status = error.message.includes('Unauthorized') ? 403 :
+                   error.message.includes('not found') ? 404 : 500;
+
+    res.status(status).json({
+      success: false,
+      error: 'Failed to delete dashboard',
+      message: error.message,
+    });
+  }
+});
+
+export default router;

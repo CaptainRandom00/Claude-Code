@@ -1,0 +1,618 @@
+/**
+ * UserGuideSection Component
+ * Feature: 029-complete-user-guide
+ * Purpose: Display feature guides with tabbed interface (Overview, Tasks, Common Tasks, Troubleshooting)
+ */
+
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { CheckCircle2, Clock, AlertCircle, Info, Lightbulb, XCircle } from 'lucide-react';
+import { ScreenshotViewer } from './ScreenshotViewer';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type FeatureId =
+  | 'dashboard'
+  | 'widget-dashboards'
+  | 'widget-builder'
+  | 'widget-templates'
+  | 'stock-control'
+  | 'stock-ordering'
+  | 'sales-analytics'
+  | 'case-sizes'
+  | 'stock-profiles'
+  | 'supplier-profiles'
+  | 'sales-aggregation'
+  | 'waste'
+  | 'expiry-management'
+  | 'tasks'
+  | 'reports'
+  | 'data-upload'
+  | 'settings';
+
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export interface OverviewSection {
+  description: string;
+  targetUsers: string[];
+  benefits: string[];
+  prerequisites?: string[];
+  previewScreenshot: string;
+}
+
+export interface GettingStartedSection {
+  navigation: {
+    steps: string[];
+    screenshot: string;
+  };
+  interfaceOverview: {
+    description: string;
+    screenshot: string;
+    keyElements: Array<{
+      name: string;
+      description: string;
+    }>;
+  };
+}
+
+export interface TaskStep {
+  stepNumber: number;
+  title: string;
+  instructions: string[];
+  screenshots: string[];
+  expectedResult?: string;
+  note?: string;
+  tips?: string;
+  warnings?: string[];
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  difficulty: DifficultyLevel;
+  estimatedTime: number;
+  description: string;
+  steps: TaskStep[];
+  tips?: string[];
+  commonErrors?: Array<{
+    error: string;
+    solution: string;
+  }>;
+  relatedTasks?: string[];
+}
+
+export interface QuickReference {
+  name: string;
+  description: string;
+  quickSteps: string[];
+  taskId?: string;
+}
+
+export interface TroubleshootingEntry {
+  issue: string;
+  symptoms: string[];
+  causes?: string[];
+  solution: string[];
+  screenshots?: string[];
+}
+
+export interface FeatureMetadata {
+  difficulty: DifficultyLevel;
+  estimatedReadTime: number;
+  lastUpdated: string;
+  version: string;
+}
+
+export interface UserGuideSectionProps {
+  id: FeatureId;
+  title: string;
+  icon: string;
+  overview: OverviewSection;
+  gettingStarted: GettingStartedSection;
+  tasks: Task[];
+  commonTasks?: QuickReference[];
+  troubleshooting?: TroubleshootingEntry[];
+  relatedFeatures?: FeatureId[];
+  metadata: FeatureMetadata;
+  onSectionChange?: (section: string) => void;
+  onTaskExpand?: (taskId: string) => void;
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function UserGuideSection({
+  id,
+  title,
+  overview,
+  gettingStarted,
+  tasks,
+  commonTasks = [],
+  troubleshooting = [],
+  relatedFeatures = [],
+  metadata,
+  onSectionChange,
+  onTaskExpand
+}: UserGuideSectionProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    onSectionChange?.(value);
+  };
+
+  const handleTaskExpand = (taskId: string) => {
+    setExpandedTask(taskId === expandedTask ? null : taskId);
+    onTaskExpand?.(taskId);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">{title}</h2>
+            <p className="text-muted-foreground mt-2">
+              {overview.description}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <DifficultyBadge difficulty={metadata.difficulty} />
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {metadata.estimatedReadTime} min read
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabbed Content */}
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="tasks">
+            Tasks ({tasks.length})
+          </TabsTrigger>
+          <TabsTrigger value="common">
+            Quick Reference
+          </TabsTrigger>
+          <TabsTrigger value="troubleshooting">
+            Troubleshooting
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          <OverviewContent
+            overview={overview}
+            gettingStarted={gettingStarted}
+            relatedFeatures={relatedFeatures}
+          />
+        </TabsContent>
+
+        {/* Tasks Tab */}
+        <TabsContent value="tasks" className="space-y-4">
+          <TasksContent
+            tasks={tasks}
+            expandedTask={expandedTask}
+            onTaskExpand={handleTaskExpand}
+          />
+        </TabsContent>
+
+        {/* Quick Reference Tab */}
+        <TabsContent value="common" className="space-y-4">
+          <QuickReferenceContent commonTasks={commonTasks} />
+        </TabsContent>
+
+        {/* Troubleshooting Tab */}
+        <TabsContent value="troubleshooting" className="space-y-4">
+          <TroubleshootingContent troubleshooting={troubleshooting} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Footer Metadata */}
+      <div className="text-sm text-muted-foreground border-t pt-4">
+        Last updated: {new Date(metadata.lastUpdated).toLocaleDateString()} • Version {metadata.version}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+function DifficultyBadge({ difficulty }: { difficulty: DifficultyLevel }) {
+  const variants = {
+    beginner: { color: 'bg-green-100 text-green-800', label: 'Beginner' },
+    intermediate: { color: 'bg-yellow-100 text-yellow-800', label: 'Intermediate' },
+    advanced: { color: 'bg-red-100 text-red-800', label: 'Advanced' }
+  };
+
+  const variant = variants[difficulty];
+
+  return (
+    <Badge className={variant.color}>
+      {variant.label}
+    </Badge>
+  );
+}
+
+function OverviewContent({
+  overview,
+  gettingStarted,
+  relatedFeatures
+}: {
+  overview: OverviewSection;
+  gettingStarted: GettingStartedSection;
+  relatedFeatures: FeatureId[];
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Preview Screenshot */}
+      <ScreenshotViewer
+        src={`/docs/screenshots/${overview.previewScreenshot}`}
+        alt={`${overview.previewScreenshot} overview`}
+        caption="Feature overview"
+      />
+
+      {/* Target Users */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Who should use this?</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {overview.targetUsers.map((user, index) => (
+              <Badge key={index} variant="secondary">
+                {user}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Benefits */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Key Benefits</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {overview.benefits.map((benefit, index) => (
+              <li key={index} className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Prerequisites */}
+      {overview.prerequisites && overview.prerequisites.length > 0 && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Prerequisites</AlertTitle>
+          <AlertDescription>
+            <ul className="mt-2 space-y-1">
+              {overview.prerequisites.map((prereq, index) => (
+                <li key={index}>• {prereq}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Getting Started */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Getting Started</CardTitle>
+          <CardDescription>How to access this feature</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-medium mb-2">Navigation</h4>
+            <ol className="space-y-1 list-decimal list-inside">
+              {gettingStarted.navigation.steps.map((step, index) => (
+                <li key={index}>{step}</li>
+              ))}
+            </ol>
+            <div className="mt-4">
+              <ScreenshotViewer
+                src={`/docs/screenshots/${gettingStarted.navigation.screenshot}`}
+                alt="Navigation steps"
+                caption="How to navigate to this feature"
+              />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">Interface Overview</h4>
+            <p className="text-sm text-muted-foreground mb-4">
+              {gettingStarted.interfaceOverview.description}
+            </p>
+            <ScreenshotViewer
+              src={`/docs/screenshots/${gettingStarted.interfaceOverview.screenshot}`}
+              alt="Interface overview"
+              caption="Understanding the interface"
+            />
+            <div className="mt-4 space-y-2">
+              {gettingStarted.interfaceOverview.keyElements.map((element, index) => (
+                <div key={index} className="flex gap-2">
+                  <Badge variant="outline">{element.name}</Badge>
+                  <span className="text-sm">{element.description}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Related Features */}
+      {relatedFeatures.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Related Features</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {relatedFeatures.map((feature, index) => (
+                <Badge key={index} variant="outline" className="cursor-pointer hover:bg-accent">
+                  {feature}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function TasksContent({
+  tasks,
+  expandedTask,
+  onTaskExpand
+}: {
+  tasks: Task[];
+  expandedTask: string | null;
+  onTaskExpand: (taskId: string) => void;
+}) {
+  return (
+    <Accordion type="single" collapsible value={expandedTask || undefined}>
+      {tasks.map((task) => (
+        <AccordionItem key={task.id} value={task.id}>
+          <AccordionTrigger
+            onClick={() => onTaskExpand(task.id)}
+            className="hover:no-underline"
+          >
+            <div className="flex items-center justify-between w-full pr-4">
+              <div className="flex items-center gap-3">
+                <span className="font-medium">{task.title}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <DifficultyBadge difficulty={task.difficulty} />
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {task.estimatedTime} min
+                </Badge>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6 pt-4">
+              <p className="text-muted-foreground">{task.description}</p>
+
+              {/* Steps */}
+              <div className="space-y-6">
+                {task.steps.map((step) => (
+                  <Card key={step.stepNumber}>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Badge variant="outline">{step.stepNumber}</Badge>
+                        {step.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <ol className="space-y-2 list-disc list-inside">
+                        {step.instructions.map((instruction, index) => (
+                          <li key={index}>{instruction}</li>
+                        ))}
+                      </ol>
+
+                      {step.screenshots.map((screenshot, index) => (
+                        <ScreenshotViewer
+                          key={index}
+                          src={`/docs/screenshots/${screenshot}`}
+                          alt={`${step.title} screenshot`}
+                        />
+                      ))}
+
+                      {step.expectedResult && (
+                        <Alert>
+                          <CheckCircle2 className="h-4 w-4" />
+                          <AlertTitle>Expected Result</AlertTitle>
+                          <AlertDescription>{step.expectedResult}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {step.tips && (
+                        <Alert>
+                          <Lightbulb className="h-4 w-4" />
+                          <AlertDescription>{step.tips}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {step.note && (
+                        <Alert>
+                          <Info className="h-4 w-4" />
+                          <AlertDescription>{step.note}</AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Tips */}
+              {task.tips && task.tips.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4" />
+                      Tips
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-1">
+                      {task.tips.map((tip, index) => (
+                        <li key={index} className="text-sm">✓ {tip}</li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Common Errors */}
+              {task.commonErrors && task.commonErrors.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <XCircle className="h-4 w-4" />
+                      Common Errors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {task.commonErrors.map((error, index) => (
+                        <div key={index}>
+                          <p className="text-sm font-medium">❌ {error.error}</p>
+                          <p className="text-sm text-muted-foreground ml-6">{error.solution}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
+}
+
+function QuickReferenceContent({ commonTasks }: { commonTasks: QuickReference[] }) {
+  if (commonTasks.length === 0) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          No quick reference guides available for this feature yet.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {commonTasks.map((task, index) => (
+        <Card key={index}>
+          <CardHeader>
+            <CardTitle className="text-base">{task.name}</CardTitle>
+            <CardDescription>{task.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol className="space-y-1 list-decimal list-inside text-sm">
+              {task.quickSteps.map((step, stepIndex) => (
+                <li key={stepIndex}>{step}</li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function TroubleshootingContent({ troubleshooting }: { troubleshooting: TroubleshootingEntry[] }) {
+  if (troubleshooting.length === 0) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          No troubleshooting guides available for this feature yet.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {troubleshooting.map((entry, index) => (
+        <Card key={index}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {entry.issue}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {entry.symptoms.length > 0 && (
+              <div>
+                <h4 className="font-medium text-sm mb-2">Symptoms:</h4>
+                <ul className="space-y-1 text-sm">
+                  {entry.symptoms.map((symptom, i) => (
+                    <li key={i}>• {symptom}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {entry.causes && entry.causes.length > 0 && (
+              <div>
+                <h4 className="font-medium text-sm mb-2">Possible Causes:</h4>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {entry.causes.map((cause, i) => (
+                    <li key={i}>• {cause}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <h4 className="font-medium text-sm mb-2">Solution:</h4>
+              <ol className="space-y-1 list-decimal list-inside text-sm">
+                {entry.solution.map((step, i) => (
+                  <li key={i}>{step}</li>
+                ))}
+              </ol>
+            </div>
+
+            {entry.screenshots && entry.screenshots.length > 0 && (
+              <div className="space-y-2">
+                {entry.screenshots.map((screenshot, i) => (
+                  <ScreenshotViewer
+                    key={i}
+                    src={`/docs/screenshots/${screenshot}`}
+                    alt={`Troubleshooting: ${entry.issue}`}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}

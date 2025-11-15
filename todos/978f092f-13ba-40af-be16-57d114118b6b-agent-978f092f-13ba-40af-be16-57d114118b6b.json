@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Run Puppeteer scan to identify all hardcoded 'As Featured In' content",
+    "status": "completed",
+    "priority": "high",
+    "id": "scan-hardcoded-content"
+  },
+  {
+    "content": "Analyze current replacement logic in template files",
+    "status": "completed",
+    "priority": "high",
+    "id": "analyze-replacement-logic"
+  },
+  {
+    "content": "Improve detection pattern for hardcoded content",
+    "status": "completed",
+    "priority": "medium",
+    "id": "improve-detection-pattern"
+  },
+  {
+    "content": "Replace any remaining hardcoded content with reusable component",
+    "status": "completed",
+    "priority": "high",
+    "id": "replace-hardcoded-content"
+  },
+  {
+    "content": "Standardize all page templates to use reusable component",
+    "status": "completed",
+    "priority": "medium",
+    "id": "standardize-templates"
+  },
+  {
+    "content": "Test all pages for consistent layout and functionality",
+    "status": "completed",
+    "priority": "medium",
+    "id": "test-all-pages"
+  }
+]

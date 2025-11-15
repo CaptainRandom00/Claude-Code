@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Modify API to auto-detect EPOS datasets",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create automatic aggregation calculation engine",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Add auto-detection for new sales data",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Update frontend to show processed data by default",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Add manual trigger button for recalculation",
+    "status": "completed",
+    "priority": "low",
+    "id": "5"
+  }
+]

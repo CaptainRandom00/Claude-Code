@@ -1,0 +1,17 @@
+[
+  {
+    "content": "T015-T019: All 5 priority guides",
+    "status": "completed",
+    "activeForm": "Guides complete"
+  },
+  {
+    "content": "Fix screenshot loading issue",
+    "status": "completed",
+    "activeForm": "Screenshots now accessible"
+  },
+  {
+    "content": "T020-T022: Component tests",
+    "status": "pending",
+    "activeForm": "Pending"
+  }
+]

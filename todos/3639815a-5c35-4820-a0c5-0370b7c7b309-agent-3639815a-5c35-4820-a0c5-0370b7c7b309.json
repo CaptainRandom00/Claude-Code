@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create osx-xcode branch for Xcode development",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create /osx/ directory structure for Xcode project",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Set up Xcode-specific .gitignore",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create build integration scripts",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Update documentation for Xcode workflow",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Create Xcode project setup guide",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

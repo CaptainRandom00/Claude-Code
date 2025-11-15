@@ -1,0 +1,216 @@
+// Blog API - Single post operations
+// GET /api/blog/[id] - Get single blog post
+// PUT /api/blog/[id] - Update blog post (admin only)
+// DELETE /api/blog/[id] - Delete blog post (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { blogPostUpdateSchema } from '@/lib/validations';
+
+type RouteParams = {
+  params: {
+    id: string;
+  };
+};
+
+// GET /api/blog/[id] - Get single blog post
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = params;
+
+    // Support both numeric ID and slug
+    const isNumeric = /^\d+$/.test(id);
+
+    const query = isNumeric
+      ? 'SELECT * FROM blog_posts WHERE id = $1'
+      : 'SELECT * FROM blog_posts WHERE slug = $1';
+
+    const result = await db.query(query, [isNumeric ? parseInt(id) : id]);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Blog post not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching blog post:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch blog post' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/blog/[id] - Update blog post (admin only)
+export async function PUT(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+    const body = await request.json();
+
+    // Validate input
+    const validated = blogPostUpdateSchema.parse({ ...body, id: parseInt(id) });
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (validated.slug !== undefined) {
+      updates.push(`slug = $${paramIndex}`);
+      values.push(validated.slug);
+      paramIndex++;
+    }
+    if (validated.title !== undefined) {
+      updates.push(`title = $${paramIndex}`);
+      values.push(validated.title);
+      paramIndex++;
+    }
+    if (validated.excerpt !== undefined) {
+      updates.push(`excerpt = $${paramIndex}`);
+      values.push(validated.excerpt);
+      paramIndex++;
+    }
+    if (validated.content !== undefined) {
+      updates.push(`content = $${paramIndex}`);
+      values.push(validated.content);
+      paramIndex++;
+    }
+    if (validated.featured_image !== undefined) {
+      updates.push(`featured_image = $${paramIndex}`);
+      values.push(validated.featured_image);
+      paramIndex++;
+    }
+    if (validated.category !== undefined) {
+      updates.push(`category = $${paramIndex}`);
+      values.push(validated.category);
+      paramIndex++;
+    }
+    if (validated.tags !== undefined) {
+      updates.push(`tags = $${paramIndex}`);
+      values.push(validated.tags);
+      paramIndex++;
+    }
+    if (validated.published !== undefined) {
+      updates.push(`published = $${paramIndex}`);
+      values.push(validated.published);
+      paramIndex++;
+
+      // Auto-set published_at when publishing
+      if (validated.published && validated.published_at === undefined) {
+        updates.push(`published_at = CURRENT_TIMESTAMP`);
+      }
+    }
+    if (validated.published_at !== undefined) {
+      updates.push(`published_at = $${paramIndex}`);
+      values.push(validated.published_at);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    values.push(parseInt(id));
+
+    const query = `
+      UPDATE blog_posts
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Blog post not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error updating blog post:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error.code === '23505') { // Unique violation
+      return NextResponse.json(
+        { error: 'A blog post with this slug already exists' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update blog post' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/blog/[id] - Delete blog post (admin only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+
+    const result = await db.query(
+      'DELETE FROM blog_posts WHERE id = $1 RETURNING id',
+      [parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Blog post not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error deleting blog post:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete blog post' },
+      { status: 500 }
+    );
+  }
+}

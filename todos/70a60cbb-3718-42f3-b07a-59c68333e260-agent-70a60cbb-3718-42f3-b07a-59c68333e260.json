@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Fix SQL injection vulnerability in routes-stock-profiles.ts",
+    "status": "completed"
+  },
+  {
+    "content": "Remove authentication bypass or secure it properly",
+    "status": "completed"
+  },
+  {
+    "content": "Add security headers and middleware",
+    "status": "completed"
+  },
+  {
+    "content": "Fix race condition in stock control data fetching",
+    "status": "completed"
+  },
+  {
+    "content": "Implement debounced search",
+    "status": "in_progress"
+  },
+  {
+    "content": "Fix memory leak from event listeners",
+    "status": "pending"
+  },
+  {
+    "content": "Add null checks for currentPrice formatting",
+    "status": "pending"
+  },
+  {
+    "content": "Add database indexes for performance",
+    "status": "pending"
+  },
+  {
+    "content": "Add input validation schemas",
+    "status": "pending"
+  },
+  {
+    "content": "Improve error handling",
+    "status": "pending"
+  }
+]

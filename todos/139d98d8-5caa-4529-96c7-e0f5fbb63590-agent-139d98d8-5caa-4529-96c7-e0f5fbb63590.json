@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Reset and test SSH connection to staging server",
+    "status": "completed",
+    "priority": "high",
+    "id": "99"
+  },
+  {
+    "content": "Clone Git repository on server and deploy bb-uber-tutors theme",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "100"
+  },
+  {
+    "content": "Activate bb-uber-tutors theme on staging",
+    "status": "pending",
+    "priority": "high",
+    "id": "101"
+  },
+  {
+    "content": "Verify theme deployment and test staging site",
+    "status": "pending",
+    "priority": "high",
+    "id": "102"
+  },
+  {
+    "content": "Configure basic WordPress settings for staging",
+    "status": "pending",
+    "priority": "medium",
+    "id": "103"
+  }
+]

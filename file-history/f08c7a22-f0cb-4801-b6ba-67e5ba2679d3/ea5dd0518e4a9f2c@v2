@@ -1,0 +1,576 @@
+# Implementation Plan: Sales Analytics Data Access Enhancement
+
+**Branch**: `027-fix-sales-analytics` | **Date**: 2025-10-10 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/027-fix-sales-analytics/spec.md`
+
+## Execution Flow (/plan command scope)
+```
+1. ✅ Load feature spec from Input path
+   → Feature spec loaded successfully
+2. ✅ Fill Technical Context
+   → Project Type: web (React frontend + Express backend)
+   → Structure Decision: Option 2 (frontend/ + backend/)
+3. ✅ Fill Constitution Check section
+   → Based on constitution.md v1.8.0
+4. ✅ Evaluate Constitution Check section
+   → Initial check: PASS (no violations)
+   → Progress updated: Initial Constitution Check
+5. ✅ Execute Phase 0 → research.md
+   → No NEEDS CLARIFICATION markers found
+6. ✅ Execute Phase 1 → contracts, data-model.md, quickstart.md, CLAUDE.md
+7. ✅ Re-evaluate Constitution Check
+   → Post-Design check: PASS (no new violations)
+   → Progress updated: Post-Design Constitution Check
+8. ✅ Plan Phase 2 → Task generation approach described
+9. ✅ STOP - Ready for /tasks command
+```
+
+**IMPORTANT**: The /plan command STOPS at step 9. Phases 2-4 are executed by other commands:
+- Phase 2: /tasks command creates tasks.md
+- Phase 3-4: Implementation execution (manual or via tools)
+
+## Summary
+
+This feature enhances the Sales Analytics dashboard to remove the hardcoded 10,000 record limitation and implement true server-side filtering. Currently, users can only view 10,000 records maximum, and filters only operate on the loaded subset rather than querying the full database.
+
+**Technical Approach**:
+1. Add configurable record limit dropdown (1K, 5K, 10K, 25K, 50K, All) in frontend
+2. Modify `/api/epos-sales` endpoint to accept dynamic limit parameter
+3. Implement server-side filtering where filters apply BEFORE limit
+4. Add COUNT query to return total matching records (metadata)
+5. Update response format to include: `{ data: [], totalCount: number, limit: number, hasMore: boolean }`
+6. Add performance safeguards (warnings >25K, confirmation for "All", 100K safety cap)
+7. Implement "Load More" incremental loading functionality
+8. Comprehensive Playwright E2E tests for all scenarios
+
+## Technical Context
+**Language/Version**: TypeScript 5.x, Node.js 18+, React 18+
+**Primary Dependencies**: Express 4.x, TanStack Query 5.x, shadcn/ui, Playwright 1.49+
+**Storage**: MySQL 8.0+ via Drizzle ORM, direct SQL for performance-critical queries
+**Testing**: Playwright (E2E browser automation), Jest (unit tests), direct DB queries for validation
+**Target Platform**: Web browsers (Chrome, Firefox, Safari) + Node.js server
+**Project Type**: web (frontend + backend architecture)
+**Performance Goals**:
+- API response <200ms for filtered queries with COUNT
+- Frontend remains responsive with 50K+ records loaded
+- No browser crashes with maximum 100K safety cap
+**Constraints**:
+- Maintain existing TanStack Query caching (60s stale, 5min cache)
+- Preserve backward compatibility with existing filters
+- Maximum 100K records enforced for browser safety
+- Sub-200ms API response constitutional requirement
+**Scale/Scope**:
+- Database: 493,958 current EPOS sales records
+- Expected growth: ~10K records/month
+- Users: 10-50 concurrent analysts
+- Filters: 6 different criteria (date range, item, category, supplier, sort)
+
+## Constitution Check
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+### I. Data-First Architecture ✅
+- **Applies**: Yes - modifying data retrieval and filtering logic
+- **Compliance**:
+  - No new entities (using existing epos_sales_summaries table)
+  - Adding metadata fields to response (totalCount, hasMore)
+  - Server-side filtering enforces data integrity
+
+### II. Modular Route Organization ✅
+- **Applies**: Yes - modifying `/api/epos-sales` endpoint
+- **Compliance**:
+  - Extending existing routes-epos.ts (no new route file needed)
+  - Standardized response format maintained: `{ data: [], meta: { totalCount, limit, hasMore } }`
+  - RESTful conventions preserved
+
+### III. Component-Based UI Development ✅
+- **Applies**: Yes - modifying sales-analytics.tsx component
+- **Compliance**:
+  - Modifications contained within existing SalesAnalytics component
+  - Using shadcn/ui Select component for limit dropdown
+  - TanStack Query for server state (existing pattern)
+  - TypeScript interfaces for all new props and response types
+
+### IV. File Processing Excellence ⚠️
+- **Applies**: No - not modifying file upload/processing
+- **Note**: Feature focuses on data retrieval, not import
+
+### V. Performance & Monitoring ✅
+- **Applies**: Yes - critical performance consideration
+- **Compliance**:
+  - Target: <200ms API response (includes COUNT query)
+  - Database: Add composite index on (report_date, supplier, category, item_code) for filtered queries
+  - Frontend: Virtualized rendering for >1000 records
+  - Winston logging for slow queries (>200ms threshold)
+  - Performance warnings to users (>25K records)
+
+### VI. End-to-End Testing & Audit Trail (NON-NEGOTIABLE) ✅
+- **Applies**: Yes - comprehensive Playwright testing required
+- **Compliance**:
+  - **Audit Structure**: Create `specs/027-fix-sales-analytics/audit/` with subdirectories:
+    - `test-runs/` - Playwright execution logs
+    - `screenshots/` - Visual evidence of UI states
+    - `failures/` - Root cause analysis documentation
+    - `validation/` - Re-test confirmation reports
+  - **Testing Workflow**:
+    1. Initial Playwright E2E test suite (6+ test scenarios from spec)
+    2. Document failures with browser automation screenshots
+    3. Root cause analysis → implement fixes
+    4. Re-test with Playwright → document resolution
+    5. Final validation report with performance metrics
+  - **Test Coverage**:
+    - Record limit selection (all 6 options: 1K, 5K, 10K, 25K, 50K, All)
+    - Server-side filtering verification (compare with direct DB queries)
+    - Total count accuracy across filter combinations
+    - Performance warnings at thresholds (>25K, All Records)
+    - Confirmation dialogs and user flows
+    - Multi-browser testing (Chrome, Firefox, Safari)
+  - **Platform**: Web interface → Playwright browser automation mandatory
+
+### VII. Security & Authentication ✅
+- **Applies**: Yes - API endpoint modifications
+- **Compliance**:
+  - Session-based authentication (existing middleware)
+  - Input validation with Zod for limit parameter
+  - SQL injection prevention via parameterized queries
+  - Rate limiting (existing middleware on /api routes)
+
+### VIII. Testing & Verification ✅
+- **Applies**: Yes - extensive E2E testing required
+- **Compliance**:
+  - Playwright tests for all 6 acceptance scenarios from spec
+  - Screenshot capture for visual states
+  - Test datasets: 100, 1K, 10K, 50K+ records
+  - Database validation queries to verify server-side filtering
+
+### IX. API Documentation and Route Mapping System ✅
+- **Applies**: Yes - modifying existing API endpoint
+- **Compliance**:
+  - Update route manifest in routes-epos.ts with new parameters
+  - Document new response format: `{ data: [], meta: { totalCount, limit, hasMore } }`
+  - Update @param JSDoc tags for limit, offset parameters
+  - Update sales-analytics.tsx @apiDependencies documentation
+  - No new routes (extending existing `/api/epos-sales`)
+
+### X. Intelligent API Development & Reuse ✅
+- **Applies**: Yes - API feature detected
+- **Conditional Execution**:
+  - Keywords detected: "API", "endpoint", "server-side filtering", "backend"
+  - File patterns: `server/routes-epos.ts` modifications
+- **Compliance**:
+  - **SPEC PHASE**: Execute `npm run routes:search "epos sales filter"` → `.specify/memory/route-search-results.txt`
+  - **PLAN PHASE**: Execute `npm run routes:analyze` → `.specify/memory/route-analysis.json`
+  - **TASK PHASE**: Execute `npm run routes:export` → `.specify/memory/route-export.json`
+  - **POST-IMPLEMENTATION**: Execute `npm run routes:update` → `.specify/memory/route-update.log`
+  - **Reuse**: Extending existing `/api/epos-sales` endpoint (no new route needed)
+
+**Initial Constitution Check**: ✅ PASS
+**Post-Design Constitution Check**: ✅ PASS (verified after Phase 1)
+
+## Project Structure
+
+### Documentation (this feature)
+```
+specs/027-fix-sales-analytics/
+├── plan.md              # This file (/plan command output)
+├── research.md          # Phase 0 output (/plan command)
+├── data-model.md        # Phase 1 output (/plan command)
+├── quickstart.md        # Phase 1 output (/plan command)
+├── contracts/           # Phase 1 output (/plan command)
+│   ├── api-epos-sales-request.schema.json
+│   ├── api-epos-sales-response.schema.json
+│   └── tests/
+│       └── epos-sales-api.contract.test.ts
+├── audit/               # Principle VI audit trail structure
+│   ├── test-runs/       # Playwright execution logs
+│   ├── screenshots/     # Visual evidence
+│   ├── failures/        # Root cause analysis
+│   └── validation/      # Re-test reports
+└── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
+```
+
+### Source Code (repository root)
+```
+# Option 2: Web application (current project structure)
+server/
+├── routes-epos.ts       # MODIFY: Add limit/offset params, COUNT query, metadata response
+└── services/
+    └── epos-analytics-service.ts  # NEW: Extract query logic for testability
+
+client/src/
+├── components/
+│   └── dashboard/
+│       └── sales-analytics.tsx  # MODIFY: Add limit selector, "Load More", warnings
+├── hooks/
+│   └── use-record-limit.ts      # NEW: Limit state management
+└── types/
+    └── sales-analytics.ts       # MODIFY: Add metadata types
+
+tests/
+├── playwright/
+│   ├── sales-analytics-limits.spec.ts      # NEW: E2E limit selection
+│   ├── sales-analytics-filtering.spec.ts   # NEW: E2E server-side filtering
+│   └── sales-analytics-performance.spec.ts # NEW: E2E warnings/safeguards
+└── contract/
+    └── epos-sales-api.contract.test.ts     # NEW: API contract validation
+```
+
+**Structure Decision**: Option 2 (web application) - existing frontend/ + server/ structure
+
+## Phase 0: Outline & Research
+
+### Research Tasks
+
+1. **Performance Impact of COUNT Queries**
+   - Decision: Use SQL_CALC_FOUND_ROWS or separate COUNT query
+   - Research: Benchmark both approaches with 500K records
+   - Rationale: Need to maintain <200ms API response
+   - Alternatives: Estimate from LIMIT results (rejected - inaccurate)
+
+2. **Browser Memory Limits**
+   - Decision: 100K record hard cap across all browsers
+   - Research: Test memory usage with 50K, 100K, 150K records in Chrome/Firefox/Safari
+   - Rationale: Prevent browser crashes
+   - Alternatives: Dynamic limit based on available memory (rejected - complexity)
+
+3. **TanStack Query Pagination Strategies**
+   - Decision: Infinite query with "Load More" for incremental loading
+   - Research: Compare useInfiniteQuery vs manual pagination
+   - Rationale: Better UX than page numbers for large datasets
+   - Alternatives: Traditional pagination (rejected - poor UX for 50K+ records)
+
+4. **SQL Query Optimization**
+   - Decision: Composite index on (report_date, supplier, category, item_code)
+   - Research: EXPLAIN ANALYZE with various filter combinations
+   - Rationale: Ensure <200ms response with COUNT + LIMIT
+   - Alternatives: Full-text search indexes (rejected - overkill for current filters)
+
+5. **Playwright Test Data Management**
+   - Decision: Seed database with known test datasets (100, 1K, 10K, 50K records)
+   - Research: Best practices for E2E test data isolation
+   - Rationale: Reliable test execution across environments
+   - Alternatives: Mock API responses (rejected - must test real DB filtering)
+
+**Output**: research.md with findings from all 5 research tasks
+
+## Phase 1: Design & Contracts
+
+### 1. Data Model (`data-model.md`)
+
+**Existing Entities** (no schema changes required):
+- `epos_sales_summaries` table (existing)
+  - Fields: id, report_date, item_code, description, total_qty, total_net, supplier, category
+  - No modifications needed
+
+**New TypeScript Interfaces**:
+```typescript
+// API Response Metadata
+interface QueryMetadata {
+  totalCount: number;      // Total records matching filters (before limit)
+  limit: number;           // Applied record limit
+  offset: number;          // Starting position (for "Load More")
+  hasMore: boolean;        // True if more records available
+  filtered: boolean;       // True if any filters applied
+}
+
+// Enhanced API Response
+interface EposSalesResponse {
+  data: EposSalesRecord[];
+  meta: QueryMetadata;
+}
+
+// Record Limit Options
+type RecordLimit = 1000 | 5000 | 10000 | 25000 | 50000 | 'all';
+
+// Limit Configuration
+interface LimitConfig {
+  value: RecordLimit;
+  warning: boolean;        // Show warning if >25000
+  confirmation: boolean;   // Require confirmation if 'all'
+}
+```
+
+### 2. API Contracts (`/contracts/`)
+
+**Modified Endpoint**: `GET /api/epos-sales`
+
+**Request Schema** (`api-epos-sales-request.schema.json`):
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "startDate": { "type": "string", "format": "date" },
+    "endDate": { "type": "string", "format": "date" },
+    "reportDate": { "type": "string", "format": "date" },
+    "supplier": { "type": "string" },
+    "category": { "type": "string" },
+    "itemCode": { "type": "string" },
+    "sortBy": { "type": "string", "enum": ["totalNet", "totalQty", "reportDate"] },
+    "sortOrder": { "type": "string", "enum": ["asc", "desc"] },
+    "limit": {
+      "oneOf": [
+        { "type": "integer", "enum": [1000, 5000, 10000, 25000, 50000, 100000] },
+        { "type": "string", "enum": ["all"] }
+      ]
+    },
+    "offset": { "type": "integer", "minimum": 0 }
+  }
+}
+```
+
+**Response Schema** (`api-epos-sales-response.schema.json`):
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["data", "meta"],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reportDate", "itemCode", "totalNet"],
+        "properties": {
+          "id": { "type": "integer" },
+          "reportDate": { "type": "string", "format": "date" },
+          "itemCode": { "type": "string" },
+          "description": { "type": "string" },
+          "totalQty": { "type": "number" },
+          "totalNet": { "type": "number" },
+          "supplierName": { "type": "string" },
+          "categoryName": { "type": "string" }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["totalCount", "limit", "offset", "hasMore", "filtered"],
+      "properties": {
+        "totalCount": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "hasMore": { "type": "boolean" },
+        "filtered": { "type": "boolean" }
+      }
+    }
+  }
+}
+```
+
+**Contract Test** (`tests/contract/epos-sales-api.contract.test.ts`):
+```typescript
+import { test, expect } from '@playwright/test';
+import Ajv from 'ajv';
+import requestSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-request.schema.json';
+import responseSchema from '../../specs/027-fix-sales-analytics/contracts/api-epos-sales-response.schema.json';
+
+const ajv = new Ajv();
+
+test.describe('EPOS Sales API Contract', () => {
+  test('should accept valid request with limit parameter', async ({ request }) => {
+    const params = {
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
+      limit: 5000,
+      offset: 0
+    };
+
+    const validate = ajv.compile(requestSchema);
+    expect(validate(params)).toBe(true);
+
+    const response = await request.get('/api/epos-sales', { params });
+    expect(response.ok()).toBe(true);
+  });
+
+  test('should return response with metadata', async ({ request }) => {
+    const response = await request.get('/api/epos-sales?limit=1000');
+    const data = await response.json();
+
+    const validate = ajv.compile(responseSchema);
+    const valid = validate(data);
+
+    if (!valid) {
+      console.error('Validation errors:', validate.errors);
+    }
+
+    expect(valid).toBe(true);
+    expect(data).toHaveProperty('data');
+    expect(data).toHaveProperty('meta');
+    expect(data.meta).toHaveProperty('totalCount');
+    expect(data.meta).toHaveProperty('limit');
+    expect(data.meta).toHaveProperty('hasMore');
+  });
+
+  test('should enforce 100K safety cap', async ({ request }) => {
+    const response = await request.get('/api/epos-sales?limit=all');
+    const data = await response.json();
+
+    expect(data.data.length).toBeLessThanOrEqual(100000);
+    if (data.meta.totalCount > 100000) {
+      expect(data.meta.limit).toBe(100000);
+    }
+  });
+});
+```
+
+### 3. Quickstart Manual Test Scenarios (`quickstart.md`)
+
+**Scenario 1**: Change record limit and verify count
+1. Navigate to Sales Analytics → Detailed Data
+2. Note current "X records loaded" indicator
+3. Select "25,000 records" from limit dropdown
+4. Verify: Warning appears "⚠️ Loading large datasets may impact browser performance"
+5. Verify: Data refetches and displays "Showing 25,000 of [total] records"
+6. Verify: Browser remains responsive
+
+**Scenario 2**: Server-side filtering verification
+1. Open browser DevTools → Network tab
+2. Apply filter: Item Code = "12345"
+3. Verify: API request includes `itemCode=12345&limit=10000`
+4. Verify: Response shows filtered totalCount (not 10000)
+5. Change limit to 1000
+6. Verify: New API request with updated limit
+7. Verify: Display shows "Showing 1,000 of [filtered total] records (filtered)"
+
+**Scenario 3**: "All Records" flow
+1. Select "All Records" from limit dropdown
+2. Verify: Confirmation dialog appears with estimated count
+3. Click "Cancel" → no API request, limit unchanged
+4. Select "All Records" again
+5. Click "Confirm" → API request with `limit=all`
+6. Verify: Safety cap enforced if >100K
+7. Verify: Loading spinner during fetch
+
+### 4. Update Agent Context (`CLAUDE.md`)
+
+Execute agent context update script:
+```bash
+.specify/scripts/bash/update-agent-context.sh claude
+```
+
+**New Technology Context** (incremental addition):
+- Feature: Sales Analytics record limit and server-side filtering
+- Changes:
+  - Modified: `server/routes-epos.ts` (add limit/offset params, COUNT query)
+  - Modified: `client/src/components/dashboard/sales-analytics.tsx` (limit selector UI)
+  - Added: `server/services/epos-analytics-service.ts` (query logic extraction)
+  - Added: `client/src/hooks/use-record-limit.ts` (limit state management)
+- Testing: Playwright E2E tests for limits, filtering, performance warnings
+- Performance: Composite index on (report_date, supplier, category, item_code)
+
+**Output**: Updated CLAUDE.md with new feature context, keeping <150 lines
+
+## Phase 2: Task Planning Approach
+*This section describes what the /tasks command will do - DO NOT execute during /plan*
+
+**Task Generation Strategy**:
+1. Load `.specify/templates/tasks-template.md` as base structure
+2. Generate tasks from Phase 1 design artifacts:
+   - **Contract tests** (from contracts/) → Tasks T001-T003 [P]
+   - **Database optimization** (from research.md) → Task T004
+   - **Backend implementation** (from data-model.md) → Tasks T005-T010
+   - **Frontend implementation** (from data-model.md) → Tasks T011-T018
+   - **E2E tests** (from quickstart.md + spec scenarios) → Tasks T019-T026
+   - **Audit trail** (Principle VI requirement) → Tasks T027-T030
+   - **Documentation** (route manifest, CLAUDE.md) → Tasks T031-T033
+
+**Ordering Strategy**:
+- **TDD Order**: Contract tests → E2E tests (failing) → Implementation → E2E tests (passing)
+- **Dependency Order**:
+  1. Database optimization (independent) [P]
+  2. Contract tests (independent) [P]
+  3. Backend service layer → Backend route modifications
+  4. Frontend hooks → Frontend UI components
+  5. E2E test execution → Failure documentation → Re-test
+  6. Final validation and audit trail completion
+- **Parallelization**: Mark [P] for tasks operating on different files with no dependencies
+
+**Estimated Task Breakdown**:
+- **T001-T003**: Contract test creation and initial execution (3 tasks) [P]
+- **T004**: Database index creation and verification (1 task)
+- **T005-T010**: Backend implementation (6 tasks):
+  - T005: Extract query logic to service layer [P]
+  - T006: Implement COUNT query with filters
+  - T007: Add limit/offset parameter handling
+  - T008: Add metadata to response format
+  - T009: Implement 100K safety cap
+  - T010: Add input validation with Zod
+- **T011-T018**: Frontend implementation (8 tasks):
+  - T011: Create use-record-limit hook [P]
+  - T012: Add limit dropdown UI
+  - T013: Add warning dialog component
+  - T014: Add confirmation dialog component
+  - T015: Implement "Load More" button
+  - T016: Update TanStack Query with new params
+  - T017: Update record count display
+  - T018: Add loading/error states
+- **T019-T026**: E2E Playwright tests (8 tasks):
+  - T019: Limit selection test suite [P]
+  - T020: Server-side filtering verification test [P]
+  - T021: Total count accuracy test [P]
+  - T022: Performance warning test [P]
+  - T023: Confirmation dialog test [P]
+  - T024: "Load More" incremental loading test [P]
+  - T025: Cross-browser validation (Chrome/Firefox/Safari)
+  - T026: Large dataset stress test (50K+ records)
+- **T027-T030**: Audit trail and validation (4 tasks):
+  - T027: Create audit/ folder structure
+  - T028: Document initial test failures with screenshots
+  - T029: Document fixes and re-test results
+  - T030: Generate final validation report
+- **T031-T033**: Documentation (3 tasks) [P]:
+  - T031: Update route manifest in routes-epos.ts
+  - T032: Update CLAUDE.md with feature context
+  - T033: Execute route registry update command
+
+**Total Estimated Tasks**: 33 tasks
+**Parallel Opportunities**: 12 tasks marked [P]
+**Critical Path**: Contract tests → Backend → Frontend → E2E tests → Audit trail
+
+**IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
+
+## Phase 3+: Future Implementation
+*These phases are beyond the scope of the /plan command*
+
+**Phase 3**: Task execution (/tasks command creates tasks.md)
+**Phase 4**: Implementation (execute tasks.md following TDD and constitutional principles)
+**Phase 5**: Validation (run Playwright tests, execute quickstart.md, performance validation, audit trail completion)
+
+## Complexity Tracking
+*Fill ONLY if Constitution Check has violations that must be justified*
+
+No constitutional violations detected. All changes align with existing architectural patterns:
+- Extending existing route (no new route file)
+- Modifying existing component (no new component)
+- Following TanStack Query patterns (existing pattern)
+- Playwright E2E testing (Principle VI compliance)
+- Performance optimization with indexes (Principle V compliance)
+
+## Progress Tracking
+*This checklist is updated during execution flow*
+
+**Phase Status**:
+- [x] Phase 0: Research complete (/plan command)
+- [x] Phase 1: Design complete (/plan command)
+- [x] Phase 2: Task planning complete (/plan command - describe approach only)
+- [ ] Phase 3: Tasks generated (/tasks command)
+- [ ] Phase 4: Implementation complete
+- [ ] Phase 5: Validation passed
+
+**Gate Status**:
+- [x] Initial Constitution Check: PASS
+- [x] Post-Design Constitution Check: PASS
+- [x] All NEEDS CLARIFICATION resolved (none found)
+- [x] Complexity deviations documented (none - no violations)
+
+**Artifact Generation**:
+- [x] research.md created
+- [x] data-model.md created
+- [x] contracts/ created with schemas and tests
+- [x] quickstart.md created
+- [x] CLAUDE.md updated
+- [x] audit/ folder structure planned (created in Phase 3)
+
+---
+*Based on Constitution v1.8.0 - See `/. specify/memory/constitution.md`*
+*Plan execution complete - Ready for /tasks command*

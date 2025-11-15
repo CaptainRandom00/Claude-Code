@@ -1,0 +1,347 @@
+import 'dotenv/config';
+import express, { type Request, Response, NextFunction } from "express";
+import os from "os";
+import compression from "compression";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { createServer as createHttpServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
+import fs from 'fs';
+import path from 'path';
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import { logger, loggerMiddleware } from './utils/logger';
+import { setupAuth } from "./auth";
+// SECURITY: Import secure session configuration
+import { createSecureSessionConfig, sessionSecurityMiddleware, sessionMonitoring } from './config/session';
+// SECURITY: Import secure error handling
+import { secureErrorHandler } from './utils/secure-errors';
+// WebSocket services
+import WebSocketService from './services/websocket-service';
+import WasteNotificationService from './services/waste-notification-service';
+
+const app = express();
+
+// Create HTTP or HTTPS server based on environment (Feature 024: Safari compatibility)
+const useHttps = process.env.HTTPS === 'true';
+let server;
+
+if (useHttps) {
+  // Check if certificates exist
+  const certPath = path.resolve(import.meta.dirname, '..', 'localhost.pem');
+  const keyPath = path.resolve(import.meta.dirname, '..', 'localhost-key.pem');
+
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    const httpsOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    };
+    server = createHttpsServer(httpsOptions, app);
+    logger.info('🔒 HTTPS server enabled for Safari compatibility');
+  } else {
+    logger.warn('⚠️  HTTPS requested but certificates not found. Falling back to HTTP.');
+    logger.warn(`   Missing: ${certPath} or ${keyPath}`);
+    logger.warn('   Run: mkcert localhost 127.0.0.1 ::1');
+    server = createHttpServer(app);
+  }
+} else {
+  server = createHttpServer(app);
+}
+
+// Initialize WebSocket services
+const webSocketService = new WebSocketService();
+const wasteNotificationService = new WasteNotificationService();
+
+// Connect services
+wasteNotificationService.setWebSocketService(webSocketService);
+
+// CORS configuration - MUST be before other middleware
+app.use(cors({
+  origin: process.env.NODE_ENV === 'development' ? true : false,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400
+}));
+
+// Security middleware with optimized configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"], // Allow WebSocket connections
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Optimized rate limiting - only in production with endpoint-specific rules
+if (process.env.NODE_ENV === 'production') {
+  // General rate limiting
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200, // Increased from 100 for better UX
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting for static assets and WebSocket connections
+    skip: (req) => req.url.startsWith('/assets/') || req.url.startsWith('/static/') || req.url.startsWith('/ws')
+  });
+
+  app.use(limiter);
+
+  // API-specific rate limiting (more restrictive for data endpoints)
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100, // More generous for API usage
+    message: 'Too many API requests from this IP, please try again later.',
+    // Skip for dashboard endpoints which are frequently accessed
+    skip: (req) => req.url.startsWith('/api/dashboard/')
+  });
+
+  app.use('/api/', apiLimiter);
+
+  // Upload-specific rate limiting (most restrictive)
+  const uploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10, // Limited uploads per window
+    message: 'Too many upload requests from this IP, please try again later.'
+  });
+
+  app.use('/api/uploads/', uploadLimiter);
+}
+
+// Optimized compression middleware
+app.use(compression({
+  threshold: 1024, // Only compress responses larger than 1kb
+  level: 6, // Good balance of compression vs CPU
+  filter: (req, res) => {
+    // Don't compress if explicitly disabled
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+
+    // Compress JSON API responses and static assets
+    const contentType = res.getHeader('content-type') as string;
+    if (contentType && (
+      contentType.includes('application/json') ||
+      contentType.includes('text/') ||
+      contentType.includes('application/javascript') ||
+      contentType.includes('text/css')
+    )) {
+      return true;
+    }
+
+    // Use compression's default filter for other types
+    return compression.filter(req, res);
+  }
+}));
+
+// Basic middleware
+app.use(express.json({ limit: '10mb' })); // Increased limit for file uploads
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// SECURITY: Secure session configuration with comprehensive protection
+import session from 'express-session';
+app.use(session(createSecureSessionConfig()));
+
+// SECURITY: Additional session security middleware
+app.use(sessionSecurityMiddleware());
+app.use(sessionMonitoring());
+
+// Set up authentication
+setupAuth(app);
+
+// Initialize optimized logging middleware
+app.use(loggerMiddleware.access);
+app.use(loggerMiddleware.error);
+
+// Make WebSocket services available to routes
+app.set('webSocketService', webSocketService);
+app.set('wasteNotificationService', wasteNotificationService);
+
+// Log startup
+logger.app.info('Starting BB Management System server with optimized architecture and WebSocket support...');
+
+// Performance monitoring middleware (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const path = req.path;
+    let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (path.startsWith("/api")) {
+        let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+
+        // Log slow requests
+        if (duration > 1000) {
+          logger.performance.warn('Slow API request detected', {
+            method: req.method,
+            path,
+            duration,
+            statusCode: res.statusCode
+          });
+        }
+
+        // Log response size for large responses
+        if (capturedJsonResponse) {
+          const responseSize = JSON.stringify(capturedJsonResponse).length;
+          if (responseSize > 1024 * 100) { // 100KB
+            try {
+              if (logger.performance && typeof logger.performance.info === 'function') {
+                logger.performance.info('Large API response', {
+                  method: req.method,
+                  path,
+                  responseSize,
+                  duration
+                });
+              } else {
+                console.warn('Performance logger not available, skipping large response logging');
+              }
+            } catch (error) {
+              console.error('Error logging large response:', error);
+            }
+          }
+        }
+
+        if (capturedJsonResponse && process.env.DEBUG_API === 'true') {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        }
+        log(logLine);
+      }
+    });
+
+    next();
+  });
+}
+
+(async () => {
+  try {
+    // Initialize WebSocket service
+    webSocketService.initialize(server);
+    logger.app.info('WebSocket service initialized successfully');
+
+    // Register optimized routes
+    await registerRoutes(app);
+
+    // SECURITY: Secure error handling middleware to prevent information disclosure
+    app.use(secureErrorHandler());
+
+    // Serve uploaded images (Feature 025: Product Image Management)
+    // Must be before Vite middleware to intercept /uploads/* requests
+    const uploadsPath = path.resolve(import.meta.dirname, '..', 'public', 'uploads');
+    app.use('/uploads', express.static(uploadsPath, {
+      maxAge: '1d', // Cache for 1 day in production
+      etag: true,
+      lastModified: true,
+      index: false, // Don't serve directory listings
+    }));
+    logger.app.info('Static file serving configured for uploads', { path: uploadsPath });
+
+    // Setup Vite or static serving
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+      logger.app.info('Vite development server initialized');
+    } else {
+      serveStatic(app);
+      logger.app.info('Static serving initialized for production');
+    }
+
+    // Start server with optimized configuration
+    const port = process.env.PORT || 3005;
+    const host = process.env.HOST || '0.0.0.0';
+
+    server.listen(Number(port), host, () => {
+      logger.app.info('🚀 BB Management System server started successfully', {
+        host,
+        port,
+        environment: app.get("env"),
+        optimizations: [
+          'Service Layer Architecture',
+          'Unified File Processing',
+          'Optimized Middleware Chain',
+          'Enhanced Error Handling',
+          'Performance Monitoring',
+          'Real-time WebSocket Integration'
+        ]
+      });
+
+      const protocol = useHttps ? 'https' : 'http';
+      const wsProtocol = useHttps ? 'wss' : 'ws';
+
+      log(`🎯 Server ready on ${host}:${port} ${useHttps ? '(HTTPS)' : '(HTTP)'}`);
+      log(`📡 WebSocket endpoint: ${wsProtocol}://${host}:${port}/ws`);
+
+      if (host === '0.0.0.0') {
+        log(`📡 Access the application at:`);
+        log(`  - ${protocol}://localhost:${port}`);
+        log(`  - ${protocol}://127.0.0.1:${port}`);
+
+        // Try to get local IP address
+        const interfaces = os.networkInterfaces();
+        Object.keys(interfaces).forEach(name => {
+          interfaces[name]?.forEach(iface => {
+            if ('IPv4' !== iface.family || iface.internal !== false) return;
+            log(`  - ${protocol}://${iface.address}:${port}`);
+          });
+        });
+      }
+
+      // Log architecture improvements
+      logger.app.info('🏗️  Architecture optimizations active', {
+        serviceLayer: 'Analytics and File Processing services implemented',
+        routeOptimization: 'Consolidated dashboard and upload routes',
+        middlewareOptimization: 'Environment-specific middleware application',
+        errorHandling: 'Standardized API response format',
+        performance: 'Request monitoring and logging',
+        realTime: 'WebSocket-based real-time updates for waste management'
+      });
+
+      // Start notification service cleanup interval
+      setInterval(() => {
+        wasteNotificationService.cleanup();
+      }, 60 * 60 * 1000); // Cleanup every hour
+    });
+
+    // Graceful shutdown
+    const shutdown = () => {
+      logger.app.info('Shutting down server gracefully...');
+
+      webSocketService.shutdown();
+
+      server.close(() => {
+        logger.app.info('Server closed successfully');
+        process.exit(0);
+      });
+
+      // Force close after 10 seconds
+      setTimeout(() => {
+        logger.app.error('Force closing server');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+  } catch (error) {
+    logger.app.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+})();

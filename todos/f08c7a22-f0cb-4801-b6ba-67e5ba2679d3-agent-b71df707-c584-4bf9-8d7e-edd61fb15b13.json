@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create comprehensive unit tests for CLI commands: routes:list, routes:find, routes:deps, routes:consumers",
+    "status": "in_progress",
+    "activeForm": "Creating comprehensive unit tests for CLI commands"
+  },
+  {
+    "content": "Test command logic, output formatting, error handling, and performance",
+    "status": "pending",
+    "activeForm": "Testing command logic, output formatting, error handling, and performance"
+  },
+  {
+    "content": "Mock file system and route registry operations",
+    "status": "pending",
+    "activeForm": "Mocking file system and route registry operations"
+  },
+  {
+    "content": "Test argument parsing, validation, and edge cases",
+    "status": "pending",
+    "activeForm": "Testing argument parsing, validation, and edge cases"
+  },
+  {
+    "content": "Validate output accuracy and formatting consistency",
+    "status": "pending",
+    "activeForm": "Validating output accuracy and formatting consistency"
+  },
+  {
+    "content": "Test performance scenarios and large data handling",
+    "status": "pending",
+    "activeForm": "Testing performance scenarios and large data handling"
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "content": "Research WordPress integration patterns and hooks for PHP 8.0+",
+    "status": "completed",
+    "priority": "high",
+    "id": "research-php-wordpress-patterns"
+  },
+  {
+    "content": "Research security patterns for input validation and sanitization",
+    "status": "completed",
+    "priority": "high",
+    "id": "research-security-patterns"
+  },
+  {
+    "content": "Research GDPR compliance implementation patterns",
+    "status": "completed",
+    "priority": "high",
+    "id": "research-gdpr-compliance"
+  },
+  {
+    "content": "Research session management and authentication patterns",
+    "status": "completed",
+    "priority": "high",
+    "id": "research-session-auth"
+  },
+  {
+    "content": "Research database interaction patterns with WordPress",
+    "status": "completed",
+    "priority": "medium",
+    "id": "research-database-patterns"
+  },
+  {
+    "content": "Research object-oriented programming in WordPress context",
+    "status": "in_progress",
+    "priority": "medium",
+    "id": "research-oop-wordpress"
+  },
+  {
+    "content": "Research error handling and logging patterns",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-error-handling"
+  },
+  {
+    "content": "Research performance optimization techniques",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-performance-optimization"
+  },
+  {
+    "content": "Research testing approaches (PHPUnit, integration testing)",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-testing-approaches"
+  },
+  {
+    "content": "Research modern PHP 8.0+ features (attributes, enums, match expressions)",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-modern-php-features"
+  },
+  {
+    "content": "Research memory management and resource optimization",
+    "status": "pending",
+    "priority": "low",
+    "id": "research-memory-management"
+  },
+  {
+    "content": "Research code quality and standards (PSR compliance)",
+    "status": "pending",
+    "priority": "low",
+    "id": "research-code-quality"
+  },
+  {
+    "content": "Compile comprehensive reference guide with examples and patterns",
+    "status": "pending",
+    "priority": "high",
+    "id": "compile-reference-guide"
+  }
+]

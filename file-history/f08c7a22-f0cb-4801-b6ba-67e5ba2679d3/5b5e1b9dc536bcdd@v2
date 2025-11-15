@@ -1,0 +1,431 @@
+# Quickstart Validation: Product Image Management
+
+**Feature**: 025-product-image-management
+**Purpose**: Step-by-step manual validation that feature works as specified
+**Audience**: QA testers, product owners, developers
+**Estimated Time**: 15 minutes
+
+---
+
+## Prerequisites
+
+### System Setup
+- [ ] Development server running: `npm run dev`
+- [ ] Server accessible at: http://localhost:3000
+- [ ] MySQL database with `product_profiles` table
+- [ ] User authenticated in system (any role)
+- [ ] Sample product exists (e.g., item code `10033`)
+
+### Test Assets
+- [ ] Prepare 5 test images:
+  - `test-image-1.jpg` (~5MB, 1800x1600px)
+  - `test-image-2.png` (~3MB, 1400x1200px)
+  - `test-image-3.webp` (~2MB, 1200x1200px)
+  - `test-image-4.jpg` (~8MB, 2400x1800px)
+  - `test-image-5.jpg` (~1MB, 800x600px)
+- [ ] Prepare 1 invalid test file:
+  - `test-invalid.pdf` (any size)
+- [ ] Prepare 1 oversized test image:
+  - `test-oversized.jpg` (>10MB)
+
+---
+
+## Test Scenario 1: First-Time Image Upload
+
+**Goal**: Verify initial upload flow with compression and empty state
+
+### Steps
+
+1. **Navigate to Product Edit**
+   - [ ] Go to Dashboard
+   - [ ] Click "Stock Profiles" card
+   - [ ] Find product `10033` (or any product)
+   - [ ] Click "Edit" button
+   - ✅ **Expected**: Edit Product popup opens
+
+2. **Verify Empty State**
+   - [ ] Scroll to "Product Images (Max 5)" section
+   - ✅ **Expected**: Empty state message displayed
+   - ✅ **Expected**: "No images yet. Drag images here or click to browse"
+   - ✅ **Expected**: Upload icon visible
+   - ✅ **Expected**: Badge shows "0/5"
+
+3. **Upload First Image (Drag-Drop)**
+   - [ ] Drag `test-image-1.jpg` onto upload zone
+   - ✅ **Expected**: Drop zone highlights during drag-over
+   - ✅ **Expected**: Progress indicator appears
+   - ✅ **Expected**: Compression stats displayed (e.g., "Original: 5MB → Compressed: 800KB")
+   - ✅ **Expected**: Toast notification "1 image uploaded successfully!"
+   - ✅ **Expected**: Thumbnail appears in grid (150x150px)
+   - ✅ **Expected**: Gold star badge on thumbnail (primary image)
+   - ✅ **Expected**: Badge updates to "1/5"
+
+4. **Upload Additional Images (File Browser)**
+   - [ ] Click "Browse" button
+   - [ ] Select `test-image-2.png` and `test-image-3.webp`
+   - ✅ **Expected**: Upload progress for both images
+   - ✅ **Expected**: Compression stats for each image
+   - ✅ **Expected**: Toast notification "2 images uploaded successfully!"
+   - ✅ **Expected**: 3 thumbnails in grid (4-column layout)
+   - ✅ **Expected**: Badge updates to "3/5"
+   - ✅ **Expected**: Gold star remains on first image only
+
+5. **Save Product**
+   - [ ] Click "Save" button on Edit Product popup
+   - ✅ **Expected**: Toast notification "Product updated successfully"
+   - ✅ **Expected**: Modal closes
+
+6. **Verify Persistence**
+   - [ ] Reopen same product for editing
+   - ✅ **Expected**: All 3 images still visible in grid
+   - ✅ **Expected**: Badge shows "3/5"
+   - ✅ **Expected**: Primary image (first one) has gold star
+
+---
+
+## Test Scenario 2: Image Limit Enforcement
+
+**Goal**: Verify 5-image maximum is enforced
+
+### Steps
+
+1. **Upload to Limit**
+   - [ ] With product already having 3 images, upload `test-image-4.jpg` and `test-image-5.jpg`
+   - ✅ **Expected**: Both images upload successfully
+   - ✅ **Expected**: Badge shows "5/5 (max)"
+   - ✅ **Expected**: Upload button becomes disabled
+
+2. **Attempt 6th Upload**
+   - [ ] Try to drag `test-image-1.jpg` onto upload zone
+   - ✅ **Expected**: Upload zone does not highlight
+   - ✅ **Expected**: Error toast "Maximum 5 images reached"
+   - ✅ **Expected**: No upload progress shown
+
+3. **Delete Image to Re-enable Upload**
+   - [ ] Click on any thumbnail
+   - [ ] Click "Delete" button in carousel
+   - [ ] Confirm deletion
+   - ✅ **Expected**: Badge updates to "4/5"
+   - ✅ **Expected**: Upload button becomes enabled
+   - ✅ **Expected**: Can now upload 1 more image
+
+---
+
+## Test Scenario 3: Carousel Viewer Navigation
+
+**Goal**: Verify full-size image viewing and keyboard navigation
+
+### Steps
+
+1. **Open Carousel**
+   - [ ] With product having 4-5 images, click on 2nd thumbnail
+   - ✅ **Expected**: Carousel opens in full-screen mode
+   - ✅ **Expected**: Selected image displays at 800x800px (or smaller if original is smaller)
+   - ✅ **Expected**: Image counter shows "Image 2 of 4" (or 5)
+   - ✅ **Expected**: Previous/next arrow buttons visible
+
+2. **Navigate with Arrow Buttons**
+   - [ ] Click "Next" arrow
+   - ✅ **Expected**: Image 3 displays
+   - ✅ **Expected**: Counter updates to "Image 3 of 4"
+   - [ ] Click "Previous" arrow twice
+   - ✅ **Expected**: Image 1 displays
+   - ✅ **Expected**: Counter updates to "Image 1 of 4"
+
+3. **Navigate with Keyboard**
+   - [ ] Press Right arrow key
+   - ✅ **Expected**: Moves to next image (Image 2)
+   - [ ] Press Left arrow key
+   - ✅ **Expected**: Moves to previous image (Image 1)
+   - [ ] Press ESC key
+   - ✅ **Expected**: Carousel closes, grid view returns
+
+4. **Verify Wrap-Around**
+   - [ ] Navigate to last image (Image 4 or 5)
+   - [ ] Press Right arrow
+   - ✅ **Expected**: Wraps to first image (Image 1)
+   - [ ] Navigate to first image
+   - [ ] Press Left arrow
+   - ✅ **Expected**: Wraps to last image
+
+---
+
+## Test Scenario 4: Primary Image Management
+
+**Goal**: Verify primary image designation and indicator
+
+### Steps
+
+1. **Verify Initial Primary**
+   - [ ] Open product with multiple images
+   - ✅ **Expected**: First image has gold star badge in grid
+   - ✅ **Expected**: Only one image has star (not multiple)
+
+2. **Change Primary Image**
+   - [ ] Click on 3rd thumbnail
+   - [ ] In carousel, click "Set as Primary" button
+   - ✅ **Expected**: Toast notification "Image set as primary"
+   - ✅ **Expected**: Carousel remains open on same image
+   - [ ] Press ESC to close carousel
+   - ✅ **Expected**: Gold star now appears on 3rd thumbnail
+   - ✅ **Expected**: No star on 1st thumbnail (previous primary)
+
+3. **Verify Primary After Save**
+   - [ ] Click "Save" on Edit Product popup
+   - [ ] Reopen product for editing
+   - ✅ **Expected**: 3rd image still has gold star
+   - ✅ **Expected**: Primary designation persisted
+
+---
+
+## Test Scenario 5: Image Deletion
+
+**Goal**: Verify deletion with confirmation and reordering
+
+### Steps
+
+1. **Delete Non-Primary Image**
+   - [ ] Open product with 4-5 images
+   - [ ] Click on 2nd thumbnail (not primary)
+   - [ ] Click "Delete" button in carousel
+   - ✅ **Expected**: Confirmation dialog appears
+   - ✅ **Expected**: Message: "Are you sure you want to delete this image?"
+
+2. **Cancel Deletion**
+   - [ ] Click "Cancel" button
+   - ✅ **Expected**: Dialog closes
+   - ✅ **Expected**: Image remains in grid
+
+3. **Confirm Deletion**
+   - [ ] Click "Delete" button again
+   - [ ] Click "Confirm" button
+   - ✅ **Expected**: Carousel closes
+   - ✅ **Expected**: Deleted image removed from grid immediately
+   - ✅ **Expected**: Remaining images reorder (3rd becomes 2nd, etc.)
+   - ✅ **Expected**: Badge updates (e.g., "4/5" → "3/5")
+   - ✅ **Expected**: Toast notification "Image deleted successfully"
+
+4. **Delete Primary Image**
+   - [ ] Click on primary image (gold star)
+   - [ ] Delete and confirm
+   - ✅ **Expected**: Image deleted
+   - ✅ **Expected**: Gold star automatically moves to first remaining image
+   - ✅ **Expected**: Badge updates
+
+5. **Delete All Images**
+   - [ ] Delete remaining images one by one
+   - ✅ **Expected**: After last deletion, empty state returns
+   - ✅ **Expected**: Badge shows "0/5"
+   - ✅ **Expected**: "No images yet" message displays
+
+---
+
+## Test Scenario 6: File Validation
+
+**Goal**: Verify server-side validation for file type, size, dimensions
+
+### Steps
+
+1. **Invalid File Type**
+   - [ ] Attempt to upload `test-invalid.pdf`
+   - ✅ **Expected**: Upload rejected immediately
+   - ✅ **Expected**: Error toast "Only JPG, JPEG, PNG, WEBP formats accepted"
+   - ✅ **Expected**: No image added to grid
+
+2. **File Size Exceeded**
+   - [ ] Attempt to upload `test-oversized.jpg` (>10MB)
+   - ✅ **Expected**: Upload rejected before processing
+   - ✅ **Expected**: Error toast "File size exceeds 10MB limit"
+
+3. **Image Dimensions Too Small**
+   - [ ] Create/upload image with dimensions 50x50px
+   - ✅ **Expected**: Upload rejected
+   - ✅ **Expected**: Error toast "Image too small. Minimum 100x100 pixels required"
+
+4. **Valid Upload After Errors**
+   - [ ] Upload valid `test-image-5.jpg` (1MB, 800x600px)
+   - ✅ **Expected**: Upload succeeds
+   - ✅ **Expected**: Compression and thumbnail generation work correctly
+
+---
+
+## Test Scenario 7: Performance Validation
+
+**Goal**: Verify performance meets constitutional requirements
+
+### Steps
+
+1. **API Response Time**
+   - [ ] Open browser DevTools (Network tab)
+   - [ ] Click on product to open edit modal
+   - [ ] Check network request for `/api/product-profiles/:itemCode`
+   - ✅ **Expected**: Response time <200ms (constitutional requirement)
+
+2. **Compression Time**
+   - [ ] Upload large image (`test-image-4.jpg`, ~8MB)
+   - [ ] Measure time from upload start to toast notification
+   - ✅ **Expected**: Total time <5 seconds (NFR-025.5)
+
+3. **Thumbnail Generation**
+   - [ ] Upload image and observe grid appearance
+   - ✅ **Expected**: Thumbnail visible within 2 seconds (NFR-025.6)
+
+4. **Multiple Concurrent Uploads**
+   - [ ] Upload 5 images simultaneously (drag all 5 at once)
+   - ✅ **Expected**: All images process without errors
+   - ✅ **Expected**: Progress indicators for each image
+   - ✅ **Expected**: Total time <30 seconds for 5 images
+
+---
+
+## Test Scenario 8: Edge Cases
+
+**Goal**: Verify handling of unusual situations
+
+### Steps
+
+1. **Network Failure Simulation**
+   - [ ] Open DevTools → Network tab
+   - [ ] Set throttling to "Offline"
+   - [ ] Attempt to upload image
+   - ✅ **Expected**: Timeout after 30 seconds
+   - ✅ **Expected**: Error toast "Upload failed - network error. Please retry."
+   - ✅ **Expected**: "Retry" button appears
+   - [ ] Set throttling back to "Online"
+   - [ ] Click "Retry"
+   - ✅ **Expected**: Upload succeeds
+
+2. **Close Modal During Upload**
+   - [ ] Start uploading large image
+   - [ ] Immediately try to close modal (click X or ESC)
+   - ✅ **Expected**: Warning dialog "Upload in progress. Cancel upload and close?"
+   - [ ] Click "Cancel" (stay on modal)
+   - ✅ **Expected**: Upload continues
+   - ✅ **Expected**: Modal remains open
+
+3. **Save Product During Upload**
+   - [ ] Start uploading image
+   - [ ] Immediately click "Save" button
+   - ✅ **Expected**: Save button disabled during upload
+   - ✅ **Expected**: After upload completes, save button re-enables
+
+4. **Rapid Delete Clicks**
+   - [ ] Open carousel on any image
+   - [ ] Click "Delete" button 5 times rapidly
+   - ✅ **Expected**: Only one confirmation dialog appears
+   - ✅ **Expected**: Image deleted only once (not 5 times)
+
+---
+
+## Accessibility Validation
+
+**Goal**: Verify keyboard navigation and screen reader support
+
+### Steps
+
+1. **Keyboard Navigation**
+   - [ ] Tab through Edit Product modal
+   - ✅ **Expected**: Upload button receives focus
+   - ✅ **Expected**: Each thumbnail receives focus in order
+   - [ ] Press Enter on focused thumbnail
+   - ✅ **Expected**: Carousel opens
+
+2. **Screen Reader Support** (if available)
+   - [ ] Enable VoiceOver (Mac) or NVDA (Windows)
+   - [ ] Navigate to image upload section
+   - ✅ **Expected**: "Product Images, 3 of 5 maximum" announced
+   - ✅ **Expected**: "Primary image" announced for starred thumbnail
+   - ✅ **Expected**: Upload button announced as clickable
+
+---
+
+## Database Verification
+
+**Goal**: Verify data persistence in database
+
+### Steps
+
+1. **Check Image Metadata**
+   ```sql
+   SELECT item_code, primary_image_path, image_count, image_metadata, last_image_updated
+   FROM product_profiles
+   WHERE item_code = '10033';
+   ```
+   - ✅ **Expected**: `image_count` matches number of images uploaded
+   - ✅ **Expected**: `primary_image_path` matches starred image
+   - ✅ **Expected**: `image_metadata` JSON array has correct structure
+   - ✅ **Expected**: `last_image_updated` timestamp recent
+
+2. **Verify File System**
+   ```bash
+   ls -lh /uploads/product-images/10033/
+   ```
+   - ✅ **Expected**: Original images (*.webp) exist
+   - ✅ **Expected**: Thumbnails (*_thumb.webp) exist
+   - ✅ **Expected**: File sizes reduced (60-80% smaller than originals)
+
+---
+
+## Regression Testing
+
+**Goal**: Verify no breaking changes to existing functionality
+
+### Steps
+
+1. **Product Editing (Without Images)**
+   - [ ] Open product with no images
+   - [ ] Edit description, category, supplier
+   - [ ] Click "Save"
+   - ✅ **Expected**: Product updates successfully (same as before feature)
+
+2. **Product Listing**
+   - [ ] View Stock Profiles grid
+   - ✅ **Expected**: All products display correctly
+   - ✅ **Expected**: No errors in console
+   - ✅ **Expected**: Pagination works
+
+3. **Search and Filter**
+   - [ ] Use supplier filter
+   - [ ] Use category filter
+   - ✅ **Expected**: Filters work as before
+   - ✅ **Expected**: Results accurate
+
+---
+
+## Cleanup
+
+### After Testing
+
+- [ ] Delete test product images from database:
+  ```sql
+  UPDATE product_profiles
+  SET primary_image_path = NULL, image_metadata = '[]', image_count = 0
+  WHERE item_code = '10033';
+  ```
+
+- [ ] Delete test images from file system:
+  ```bash
+  rm -rf /uploads/product-images/10033/
+  ```
+
+- [ ] Stop development server: `Ctrl+C`
+
+---
+
+## Success Criteria
+
+**Feature is considered validated when**:
+
+- [ ] All 8 test scenarios pass without errors
+- [ ] Performance requirements met (<200ms API, <5s compression)
+- [ ] Accessibility requirements met (keyboard navigation, ARIA)
+- [ ] Database integrity maintained (correct counts, paths, timestamps)
+- [ ] File system integrity maintained (no orphaned files)
+- [ ] No regressions in existing product profile functionality
+- [ ] All edge cases handled gracefully with clear error messages
+
+---
+
+**Quickstart Validation Status**: Ready for Execution
+**Estimated Validation Time**: 15 minutes
+**Last Updated**: 2025-10-07

@@ -1,0 +1,77 @@
+import { chromium } from 'playwright';
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+
+  // Capture console messages
+  const logs = [];
+  page.on('console', msg => logs.push(`[${msg.type()}] ${msg.text()}`));
+
+  // Capture errors
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+
+  console.log('📍 Navigating to dashboard 2...');
+  await page.goto('http://localhost:3000/dashboards/2', { waitUntil: 'networkidle' });
+
+  console.log('⏳ Waiting 8 seconds for all requests...');
+  await page.waitForTimeout(8000);
+
+  // Check network responses for widget data fetch
+  console.log('\n🌐 Making direct API call for widget 25 data...');
+  const response = await page.evaluate(async () => {
+    const res = await fetch('http://localhost:3000/api/widgets/data/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgetDefinitionId: 25 })
+    });
+    return await res.json();
+  });
+
+  console.log('API Response:', JSON.stringify(response, null, 2));
+
+  // Check if ChartWidget is in the DOM
+  const chartWidgetCode = await page.evaluate(() => {
+    const scripts = Array.from(document.querySelectorAll('script'));
+    const hasChartWidget = scripts.some(s => s.textContent.includes('ChartWidget'));
+    return hasChartWidget;
+  });
+  console.log(`\n🔍 ChartWidget code loaded: ${chartWidgetCode}`);
+
+  // Check for React errors
+  console.log('\n📋 Console Logs (last 20):');
+  logs.slice(-20).forEach(log => console.log(log));
+
+  console.log('\n❌ JavaScript Errors:');
+  if (errors.length === 0) {
+    console.log('No JavaScript errors');
+  } else {
+    errors.forEach(err => console.log(err));
+  }
+
+  // Check what's rendered in the Monthly Sales widget
+  const widgetContent = await page.evaluate(() => {
+    const widgets = Array.from(document.querySelectorAll('[class*="card"]'));
+    const monthlySalesWidget = widgets.find(w =>
+      w.textContent.includes('Monthly Sales Trend')
+    );
+    if (monthlySalesWidget) {
+      return {
+        found: true,
+        innerHTML: monthlySalesWidget.innerHTML.substring(0, 1000),
+        hasError: monthlySalesWidget.innerHTML.includes('Error'),
+        hasLoading: monthlySalesWidget.innerHTML.includes('Loading'),
+        hasNoData: monthlySalesWidget.innerHTML.includes('No data'),
+        hasSvg: monthlySalesWidget.querySelector('svg') !== null
+      };
+    }
+    return { found: false };
+  });
+
+  console.log('\n📦 Monthly Sales Widget Content:');
+  console.log(JSON.stringify(widgetContent, null, 2));
+
+  await page.waitForTimeout(3000);
+  await browser.close();
+})();

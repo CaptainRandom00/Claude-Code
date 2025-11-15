@@ -1,0 +1,140 @@
+// Zod validation schemas for Byte Bridges Enterprise
+// Generated: 2025-11-08
+
+import { z } from 'zod';
+
+// Blog Post Validation
+export const blogPostSchema = z.object({
+  slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  title: z.string().min(1).max(500),
+  excerpt: z.string().max(1000).optional().nullable(),
+  content: z.string().min(1),
+  featured_image: z.string().url().max(500).optional().nullable(),
+  author_id: z.string().uuid().optional().nullable(),
+  category: z.string().max(100).optional().nullable(),
+  tags: z.array(z.string()).optional().nullable(),
+  published: z.boolean().default(false),
+  published_at: z.date().optional().nullable(),
+});
+
+export const blogPostUpdateSchema = blogPostSchema.partial().extend({
+  id: z.number().int().positive(),
+});
+
+// Case Study Validation
+export const caseStudySchema = z.object({
+  slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  title: z.string().min(1).max(500),
+  client_name: z.string().min(1).max(255),
+  industry: z.string().min(1).max(100),
+  services_used: z.array(z.string()).min(1, 'At least one service is required').optional().nullable(),
+  challenge: z.string().min(1),
+  solution: z.string().min(1),
+  results: z.string().min(1),
+  technologies: z.array(z.string()).optional().nullable(),
+  featured_image: z.string().url().max(500).optional().nullable(),
+  metrics: z.record(z.any()).optional().nullable(),
+  published: z.boolean().default(false),
+  published_at: z.date().optional().nullable(),
+});
+
+export const caseStudyUpdateSchema = caseStudySchema.partial().extend({
+  id: z.number().int().positive(),
+});
+
+// Testimonial Validation
+export const testimonialSchema = z.object({
+  client_name: z.string().min(1).max(255),
+  client_company: z.string().min(1).max(255),
+  client_role: z.string().max(255).optional().nullable(),
+  client_photo: z.string().url().max(500).optional().nullable(),
+  quote: z.string().min(10, 'Quote must be at least 10 characters'),
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  industry: z.string().max(100).optional().nullable(),
+  service_related: z.string().max(100).optional().nullable(),
+  featured: z.boolean().default(false),
+  display_order: z.number().int().default(0),
+  published: z.boolean().default(false),
+});
+
+export const testimonialUpdateSchema = testimonialSchema.partial().extend({
+  id: z.number().int().positive(),
+});
+
+// Contact Submission Validation
+export const contactSubmissionSchema = z.object({
+  name: z.string().min(1).max(255),
+  email: z.string().email().max(255),
+  phone: z.string().max(50).optional().nullable(),
+  company: z.string().max(255).optional().nullable(),
+  service_interest: z.array(z.string()).optional().nullable(),
+  budget_range: z.enum(['$10k-$25k', '$25k-$50k', '$50k-$100k', '$100k+', 'Not sure']).optional().nullable(),
+  timeline: z.enum(['Immediate', '1-3 months', '3-6 months', '6+ months', 'Flexible']).optional().nullable(),
+  message: z.string().min(10, 'Message must be at least 10 characters'),
+  source: z.string().max(100).optional().nullable(),
+  utm_source: z.string().max(100).optional().nullable(),
+  utm_medium: z.string().max(100).optional().nullable(),
+  utm_campaign: z.string().max(100).optional().nullable(),
+  gdpr_consent: z.boolean().refine((val) => val === true, {
+    message: 'You must consent to data processing',
+  }),
+  marketing_consent: z.boolean().default(false),
+});
+
+export const contactSubmissionUpdateSchema = z.object({
+  id: z.number().int().positive(),
+  status: z.enum(['new', 'contacted', 'in_progress', 'converted', 'closed']).optional(),
+  admin_notes: z.string().optional().nullable(),
+  contacted_at: z.date().optional().nullable(),
+});
+
+// Search Query Validation
+export const searchQuerySchema = z.object({
+  query: z.string().min(1).max(200),
+  types: z.array(z.enum(['blog', 'case_study', 'service', 'industry'])).optional(),
+  limit: z.number().int().min(1).max(100).default(20),
+  offset: z.number().int().min(0).default(0),
+});
+
+// Admin Auth Validation
+export const adminLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+// Pagination Validation
+export const paginationSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(20),
+  sort: z.string().optional(),
+  order: z.enum(['asc', 'desc']).default('desc'),
+});
+
+// Filter Schemas
+export const blogFilterSchema = z.object({
+  category: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  published: z.boolean().optional(),
+  author_id: z.string().uuid().optional(),
+});
+
+export const caseStudyFilterSchema = z.object({
+  industry: z.string().optional(),
+  services_used: z.array(z.string()).optional(),
+  published: z.boolean().optional(),
+});
+
+export const testimonialFilterSchema = z.object({
+  industry: z.string().optional(),
+  service_related: z.string().optional(),
+  featured: z.boolean().optional(),
+  published: z.boolean().optional(),
+  min_rating: z.number().int().min(1).max(5).optional(),
+});
+
+export const contactSubmissionFilterSchema = z.object({
+  status: z.enum(['new', 'contacted', 'in_progress', 'converted', 'closed']).optional(),
+  service_interest: z.array(z.string()).optional(),
+  budget_range: z.string().optional(),
+  timeline: z.string().optional(),
+});

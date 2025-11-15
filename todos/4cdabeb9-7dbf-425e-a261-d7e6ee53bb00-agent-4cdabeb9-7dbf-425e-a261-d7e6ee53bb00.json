@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Fix dashboard API response handling - blocksResponse.blocks vs blocksResponse",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Fix block creation form field detection and validation",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create visual editor component for drag-and-drop block building",
+    "status": "pending",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Build comprehensive Docker/Playwright test suite",
+    "status": "pending",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Verify database operations are working correctly",
+    "status": "pending",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Document work in progress status and commit to git",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Create real metrics dashboard from actual project data",
+    "status": "completed",
+    "priority": "high",
+    "id": "7"
+  }
+]

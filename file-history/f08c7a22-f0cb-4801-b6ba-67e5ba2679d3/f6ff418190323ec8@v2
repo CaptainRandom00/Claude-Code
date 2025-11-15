@@ -1,0 +1,181 @@
+#!/usr/bin/env node
+
+/**
+ * Chart Widget Verification Script
+ * Opens dashboard, verifies chart widget renders, captures screenshots
+ */
+
+import { chromium } from 'playwright';
+import { mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+
+const BASE_URL = 'http://localhost:3000';
+const DASHBOARD_ID = 2;
+const SCREENSHOT_DIR = 'test-screenshots/chart-widget';
+
+// Create screenshot directory
+if (!existsSync(SCREENSHOT_DIR)) {
+  await mkdir(SCREENSHOT_DIR, { recursive: true });
+}
+
+console.log('\n' + '='.repeat(70));
+console.log('📊 CHART WIDGET VERIFICATION');
+console.log('='.repeat(70) + '\n');
+
+const browser = await chromium.launch({ headless: false });
+const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+
+try {
+  // ============================================================================
+  // Step 1: Navigate to Dashboard
+  // ============================================================================
+  console.log(`\n📝 Step 1: Navigate to Dashboard ${DASHBOARD_ID}`);
+  await page.goto(`${BASE_URL}/dashboards/${DASHBOARD_ID}`, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-01-dashboard-loaded.png` });
+  console.log('   ✅ Dashboard loaded');
+
+  // ============================================================================
+  // Step 2: Check for Chart Widget
+  // ============================================================================
+  console.log('\n📝 Step 2: Verify Chart Widget Exists');
+  const chartWidget = await page.$('svg.recharts-surface');
+  if (!chartWidget) {
+    console.log('   ⚠️  Chart widget SVG not found, checking for widget containers...');
+    const widgetContainers = await page.$$('[class*="widget"]');
+    console.log(`   Found ${widgetContainers.length} widget containers`);
+  } else {
+    console.log('   ✅ Chart widget SVG found!');
+  }
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-02-chart-check.png` });
+
+  // ============================================================================
+  // Step 3: Scroll to Find Chart
+  // ============================================================================
+  console.log('\n📝 Step 3: Scroll to Locate Chart Widget');
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-03-top-of-page.png` });
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' });
+  });
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-04-mid-page.png` });
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  });
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-05-bottom-page.png` });
+
+  // ============================================================================
+  // Step 4: Extract Chart Data
+  // ============================================================================
+  console.log('\n📝 Step 4: Analyze Chart Rendering');
+  const chartInfo = await page.evaluate(() => {
+    const svg = document.querySelector('svg.recharts-surface');
+    if (!svg) return null;
+
+    const bars = document.querySelectorAll('.recharts-bar-rectangle path, .recharts-rectangle');
+    const lines = document.querySelectorAll('.recharts-line-curve');
+    const areas = document.querySelectorAll('.recharts-area-curve');
+    const pies = document.querySelectorAll('.recharts-pie-sector');
+
+    return {
+      svgWidth: svg.getAttribute('width'),
+      svgHeight: svg.getAttribute('height'),
+      barCount: bars.length,
+      lineCount: lines.length,
+      areaCount: areas.length,
+      pieCount: pies.length,
+      viewBox: svg.getAttribute('viewBox'),
+    };
+  });
+
+  if (chartInfo) {
+    console.log('\n   ✨ CHART RENDERING DETAILS:');
+    console.log(`      SVG Dimensions: ${chartInfo.svgWidth} x ${chartInfo.svgHeight}`);
+    console.log(`      ViewBox: ${chartInfo.viewBox}`);
+    console.log(`      Bar Elements: ${chartInfo.barCount}`);
+    console.log(`      Line Elements: ${chartInfo.lineCount}`);
+    console.log(`      Area Elements: ${chartInfo.areaCount}`);
+    console.log(`      Pie Elements: ${chartInfo.pieCount}`);
+
+    if (chartInfo.barCount > 0) {
+      console.log('\n   🎉 BAR CHART SUCCESSFULLY RENDERED!');
+    } else if (chartInfo.lineCount > 0) {
+      console.log('\n   🎉 LINE CHART SUCCESSFULLY RENDERED!');
+    } else if (chartInfo.areaCount > 0) {
+      console.log('\n   🎉 AREA CHART SUCCESSFULLY RENDERED!');
+    } else if (chartInfo.pieCount > 0) {
+      console.log('\n   🎉 PIE CHART SUCCESSFULLY RENDERED!');
+    }
+  } else {
+    console.log('   ⚠️  No Recharts SVG detected');
+  }
+
+  // ============================================================================
+  // Step 5: Test Chart Interactivity
+  // ============================================================================
+  console.log('\n📝 Step 5: Test Chart Interactivity');
+  const chart = await page.$('svg.recharts-surface');
+  if (chart) {
+    await chart.hover();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-06-chart-hover.png` });
+
+    const hasTooltip = await page.evaluate(() => {
+      const tooltip = document.querySelector('.recharts-tooltip-wrapper');
+      return tooltip && tooltip.style.display !== 'none';
+    });
+
+    if (hasTooltip) {
+      console.log('   ✅ Tooltip appears on hover');
+    } else {
+      console.log('   ℹ️  Tooltip not visible (may require specific bar hover)');
+    }
+  }
+
+  // ============================================================================
+  // Step 6: Capture Full Page
+  // ============================================================================
+  console.log('\n📝 Step 6: Capture Full Dashboard');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1000);
+  await page.screenshot({
+    path: `${SCREENSHOT_DIR}/verify-07-full-dashboard.png`,
+    fullPage: true
+  });
+  console.log('   ✅ Full dashboard captured');
+
+  // ============================================================================
+  // Step 7: Widget Count
+  // ============================================================================
+  console.log('\n📝 Step 7: Dashboard Widget Summary');
+  const widgetCount = await page.evaluate(() => {
+    const metrics = document.querySelectorAll('[class*="metric"]').length;
+    const charts = document.querySelectorAll('svg.recharts-surface').length;
+    const total = document.querySelectorAll('[class*="widget"]').length;
+    return { metrics, charts, total };
+  });
+
+  console.log(`   Total Widgets: ${widgetCount.total}`);
+  console.log(`   Metric Widgets: ${widgetCount.metrics}`);
+  console.log(`   Chart Widgets: ${widgetCount.charts}`);
+
+  console.log('\n' + '='.repeat(70));
+  console.log('✅ CHART WIDGET VERIFICATION COMPLETE');
+  console.log('='.repeat(70));
+  console.log(`📸 Screenshots saved to: ${SCREENSHOT_DIR}/`);
+  console.log(`🎯 Chart Widgets Found: ${widgetCount.charts}`);
+  console.log('='.repeat(70) + '\n');
+
+} catch (error) {
+  console.error(`\n❌ Error: ${error.message}`);
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/verify-error.png` });
+} finally {
+  await browser.close();
+}

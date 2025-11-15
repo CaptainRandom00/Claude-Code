@@ -1,0 +1,62 @@
+[
+  {
+    "content": "Update web development service page with realistic timelines plus wiggle room",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Update mobile apps service page with realistic timelines plus wiggle room",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Update custom software service page with realistic timelines plus wiggle room",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update pricing page turnaround times to align with service capabilities",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Update retail industry page process timelines",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Update ecommerce industry page process timelines",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Update FAQ sections with realistic timeline information and disclaimers",
+    "status": "pending",
+    "priority": "low",
+    "id": "7"
+  },
+  {
+    "content": "Review and update other service pages with timeline consistency",
+    "status": "pending",
+    "priority": "low",
+    "id": "8"
+  },
+  {
+    "content": "Replace US compliance standards with UK/Global ones on industries page",
+    "status": "completed",
+    "priority": "high",
+    "id": "9"
+  },
+  {
+    "content": "Make relevant compliance standards clickable with links to existing pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "10"
+  }
+]

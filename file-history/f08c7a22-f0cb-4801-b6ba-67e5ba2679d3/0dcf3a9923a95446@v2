@@ -1,0 +1,172 @@
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./index.css";
+import SafariFallback from "./components/SafariFallback";
+
+// Enhanced Safari and WebKit compatibility for React 18
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+// Error boundary component for Safari compatibility (Feature 024)
+function SafariErrorBoundary({ children }: { children: React.ReactNode }) {
+  try {
+    return <>{children}</>;
+  } catch (error) {
+    console.error("Safari Error Boundary caught:", error);
+    const safariVersion = getSafariVersion();
+    return (
+      <SafariFallback
+        error={error instanceof Error ? error : String(error)}
+        browserInfo={navigator.userAgent}
+        safariVersion={safariVersion}
+      />
+    );
+  }
+}
+
+// Safari version detection (Feature 024: Safari White Screen Fix)
+const getSafariVersion = (): number | null => {
+  const match = navigator.userAgent.match(/Version\/(\d+\.\d+)/);
+  return match ? parseFloat(match[1]) : null;
+};
+
+// Safari-specific initialization with multiple fallback strategies
+const initializeApp = () => {
+  try {
+    // Strategy 1: Standard React 18 createRoot
+    console.log("Initializing React app with createRoot...");
+    const root = createRoot(rootElement);
+
+    // Detect Safari/WebKit and add additional safety measures (Feature 024)
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isWebKit = /webkit/i.test(navigator.userAgent);
+    const safariVersion = getSafariVersion();
+
+    if (isSafari || isWebKit) {
+      console.log(`Safari/WebKit detected - applying compatibility mode (Version: ${safariVersion || 'unknown'})`);
+
+      // Check for minimum Safari version (15.0+)
+      if (safariVersion && safariVersion < 15.0) {
+        console.warn(`Safari ${safariVersion} detected - please upgrade to Safari 15.0+ for best experience`);
+      }
+
+      // Add extra DOM ready check for Safari
+      setTimeout(() => {
+        try {
+          root.render(
+            <SafariErrorBoundary>
+              <App />
+            </SafariErrorBoundary>
+          );
+        } catch (safariError) {
+          console.error("Safari render error:", safariError);
+          fallbackRender();
+        }
+      }, 100);
+    } else {
+      // Standard render for other browsers
+      root.render(<App />);
+    }
+
+  } catch (error) {
+    console.error("Failed to initialize React app:", error);
+    fallbackRender();
+  }
+};
+
+// Fallback rendering for critical failures
+const fallbackRender = () => {
+  console.log("Using fallback render method");
+
+  rootElement.innerHTML = `
+    <div style="
+      padding: 20px;
+      font-family: monospace;
+      background: #000;
+      color: #00ff00;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    ">
+      <h1 style="color: #00ff00; margin-bottom: 20px;">BB Management System</h1>
+      <p style="color: #ffff00; margin-bottom: 10px;">🔧 Initializing application...</p>
+      <p style="color: #666; font-size: 12px;">If this message persists, there may be a browser compatibility issue.</p>
+      <p style="color: #666; font-size: 12px;">Browser: ${navigator.userAgent}</p>
+      <button
+        onclick="window.location.reload()"
+        style="
+          padding: 10px 20px;
+          margin-top: 20px;
+          background: #00ff00;
+          color: #000;
+          border: none;
+          cursor: pointer;
+          font-family: monospace;
+          font-weight: bold;
+        "
+      >
+        RELOAD
+      </button>
+    </div>
+  `;
+
+  // Attempt to retry initialization after a delay
+  setTimeout(() => {
+    try {
+      console.log("Retrying React initialization...");
+      const root = createRoot(rootElement);
+      root.render(<App />);
+    } catch (retryError) {
+      console.error("Retry failed:", retryError);
+    }
+  }, 2000);
+};
+
+// Module loading retry mechanism for Safari TLS/HTTPS issues (Feature 024)
+let moduleLoadAttempts = 0;
+const MAX_MODULE_RETRIES = 3;
+
+// Detect module loading failures (Safari TLS/HTTPS connection errors)
+window.addEventListener('error', (event) => {
+  if (event.message?.includes('Failed to load') ||
+      event.message?.includes('TLS') ||
+      event.message?.includes('certificate')) {
+    console.error('Safari module loading error detected:', event.message);
+
+    if (moduleLoadAttempts < MAX_MODULE_RETRIES) {
+      moduleLoadAttempts++;
+      console.log(`Retrying module load (attempt ${moduleLoadAttempts}/${MAX_MODULE_RETRIES})...`);
+      setTimeout(() => window.location.reload(), 1000 * moduleLoadAttempts);
+    } else {
+      console.error('Max retry attempts reached. Please check HTTPS configuration.');
+      fallbackRender();
+    }
+  }
+}, true);
+
+// Multi-stage initialization with DOM readiness detection
+const startInitialization = () => {
+  console.log(`DOM readyState: ${document.readyState}`);
+  console.log(`User Agent: ${navigator.userAgent}`);
+  console.log(`Protocol: ${window.location.protocol}`);
+  console.log(`Origin: ${window.location.origin}`);
+
+  if (document.readyState === 'loading') {
+    console.log("DOM still loading, waiting for DOMContentLoaded...");
+    document.addEventListener('DOMContentLoaded', initializeApp);
+  } else if (document.readyState === 'interactive') {
+    console.log("DOM interactive, waiting for full load...");
+    setTimeout(initializeApp, 100);
+  } else {
+    console.log("DOM complete, initializing immediately...");
+    initializeApp();
+  }
+};
+
+// Start the initialization process
+startInitialization();

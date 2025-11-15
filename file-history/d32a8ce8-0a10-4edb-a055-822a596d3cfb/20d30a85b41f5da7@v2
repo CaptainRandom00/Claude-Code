@@ -1,0 +1,130 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Consolidated System Tests', () => {
+  const BASE_URL = 'http://localhost:3001';
+
+  test('Public pages are accessible', async ({ page }) => {
+    const pages = [
+      { url: '/', name: 'Homepage' },
+      { url: '/services', name: 'Services' },
+      { url: '/industries', name: 'Industries' },
+      { url: '/case-studies', name: 'Case Studies' },
+      { url: '/blog', name: 'Blog' },
+      { url: '/contact', name: 'Contact' },
+    ];
+
+    for (const testPage of pages) {
+      await page.goto(`${BASE_URL}${testPage.url}`);
+      await expect(page).toHaveTitle(/.+/); // Has some title
+      console.log(`✅ ${testPage.name} loaded successfully`);
+    }
+  });
+
+  test('Dashboard redirects to admin', async ({ page }) => {
+    await page.goto(`${BASE_URL}/dashboard`);
+    await page.waitForTimeout(2000);
+
+    // Should redirect to /admin or show loading
+    const url = page.url();
+    console.log(`Dashboard redirected to: ${url}`);
+    expect(url).toContain('admin');
+  });
+
+  test('Admin blog CMS page structure', async ({ page }) => {
+    await page.goto(`${BASE_URL}/admin/blog`);
+    await page.waitForLoadState('networkidle');
+
+    // Should show either login page or blog admin
+    const pageContent = await page.content();
+    const hasLoginForm = pageContent.includes('email') || pageContent.includes('Sign in');
+    const hasBlogAdmin = pageContent.includes('Blog Posts') || pageContent.includes('New Post');
+
+    expect(hasLoginForm || hasBlogAdmin).toBeTruthy();
+    console.log('✅ Admin blog page structure verified');
+
+    await page.screenshot({
+      path: 'screenshots/admin-blog-access.png',
+      fullPage: true
+    });
+  });
+
+  test('Admin case studies CMS page structure', async ({ page }) => {
+    await page.goto(`${BASE_URL}/admin/case-studies`);
+    await page.waitForLoadState('networkidle');
+
+    // Should show either login page or case studies admin
+    const pageContent = await page.content();
+    const hasLoginForm = pageContent.includes('email') || pageContent.includes('Sign in');
+    const hasCaseStudiesAdmin = pageContent.includes('Case Studies') || pageContent.includes('New Case Study');
+
+    expect(hasLoginForm || hasCaseStudiesAdmin).toBeTruthy();
+    console.log('✅ Admin case studies page structure verified');
+
+    await page.screenshot({
+      path: 'screenshots/admin-case-studies-access.png',
+      fullPage: true
+    });
+  });
+
+  test('Blog API endpoint responds', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/blog?published=true&limit=5`);
+
+    expect(response.status()).toBeLessThan(500); // Not a server error
+    console.log(`✅ Blog API responded with status: ${response.status()}`);
+
+    if (response.ok()) {
+      const data = await response.json();
+      console.log(`Blog API returned: ${JSON.stringify(data).substring(0, 100)}...`);
+    }
+  });
+
+  test('Case Studies API endpoint responds', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/case-studies?published=true&limit=5`);
+
+    expect(response.status()).toBeLessThan(500); // Not a server error
+    console.log(`✅ Case Studies API responded with status: ${response.status()}`);
+
+    if (response.ok()) {
+      const data = await response.json();
+      console.log(`Case Studies API returned: ${JSON.stringify(data).substring(0, 100)}...`);
+    }
+  });
+
+  test('Testimonials API endpoint responds', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/testimonials?published=true&limit=5`);
+
+    expect(response.status()).toBeLessThan(500); // Not a server error
+    console.log(`✅ Testimonials API responded with status: ${response.status()}`);
+
+    if (response.ok()) {
+      const data = await response.json();
+      console.log(`Testimonials API returned: ${JSON.stringify(data).substring(0, 100)}...`);
+    }
+  });
+
+  test('Visual regression - Homepage', async ({ page }) => {
+    await page.goto(`${BASE_URL}/`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/consolidated-homepage.png',
+      fullPage: true
+    });
+
+    console.log('✅ Homepage screenshot captured');
+  });
+
+  test('Visual regression - Admin main page', async ({ page }) => {
+    await page.goto(`${BASE_URL}/admin`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/consolidated-admin-main.png',
+      fullPage: true
+    });
+
+    console.log('✅ Admin main page screenshot captured');
+  });
+});

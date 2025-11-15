@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Analyze current private tuition section layout and content",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Identify areas for improvement in private tuition presentation",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Fix mobile sidebar visibility issues",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Enhance above-fold content and preview cards",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Improve content hierarchy and reduce overwhelming length",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Test fine-tuned private tuition section",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Commit private tuition improvements",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  }
+]

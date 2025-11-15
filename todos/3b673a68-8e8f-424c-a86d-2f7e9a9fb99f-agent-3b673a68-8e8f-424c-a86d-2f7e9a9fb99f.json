@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Fix API response format mismatch in simple-backend.js",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Update simple backend login response to match frontend expectations",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test login functionality after fix",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Restart backend with updated response format",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Create focused Puppeteer login test to debug Failed to fetch error",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Fix CORS configuration in simple-backend.js to allow credentials",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Update test script to fix waitForTimeout issue",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Restart backend and test login functionality",
+    "status": "completed",
+    "priority": "high",
+    "id": "8"
+  }
+]

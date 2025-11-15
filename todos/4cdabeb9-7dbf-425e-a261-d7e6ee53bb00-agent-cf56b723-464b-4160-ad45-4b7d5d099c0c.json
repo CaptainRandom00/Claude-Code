@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Examine Block Builder codebase structure and identify key components",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Check Block Builder REST API endpoints and database interaction",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Analyze dashboard component block fetching and display logic",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Test block creation and retrieval process for errors",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Examine database query logic in PHP backend",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Review visual editor implementation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

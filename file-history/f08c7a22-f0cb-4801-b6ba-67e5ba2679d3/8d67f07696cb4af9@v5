@@ -1,0 +1,80 @@
+/**
+ * @file ProductImageManager.tsx
+ * @description Main component for managing product images with upload, view, and delete functionality
+ * Feature: 025-product-image-management
+ */
+
+import React, { useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ImageUploadZone } from './ImageUploadZone';
+import { useProductImages } from '@/hooks/useProductImages';
+import type { ProductImage } from '../../../../shared/types/product-images';
+
+interface ProductImageManagerProps {
+  itemCode: string;
+  images: ProductImage[];
+  imageCount: number;
+  onUpdate: () => void;
+}
+
+const MAX_IMAGES = 5;
+
+/**
+ * ProductImageManager component for managing product images
+ */
+export function ProductImageManager({
+  itemCode,
+  images: initialImages,
+  imageCount: initialCount,
+  onUpdate,
+}: ProductImageManagerProps) {
+  const {
+    images,
+    imageCount,
+    upload,
+    refetch,
+  } = useProductImages(itemCode);
+
+  // Use fetched data if available, otherwise use props
+  const displayCount = imageCount || initialCount;
+
+  /**
+   * Handle upload success
+   */
+  const handleUploadSuccess = useCallback(async (images: ProductImage[]) => {
+    await refetch();
+    onUpdate();
+  }, [refetch, onUpdate]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Product Images</CardTitle>
+          <Badge variant={displayCount >= MAX_IMAGES ? 'destructive' : 'secondary'}>
+            {displayCount}/{MAX_IMAGES} {displayCount >= MAX_IMAGES ? '(max)' : ''}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Upload zone */}
+        <ImageUploadZone
+          itemCode={itemCode}
+          currentCount={displayCount}
+          onUploadSuccess={handleUploadSuccess}
+        />
+
+        {/* Upload progress indicator */}
+        {upload.isLoading && (
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Uploading images...</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

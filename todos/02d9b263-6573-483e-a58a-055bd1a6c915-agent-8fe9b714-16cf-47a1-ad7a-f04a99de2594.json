@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Create projects overview page with grid/list view",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create individual project dashboard page",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create project edit/new pages",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update main navigation to include Projects",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create project-specific components (ProjectListView, ProjectCard, etc.)",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Create backend API routes for projects",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Enhance task components for project integration",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Implement project hierarchy and advanced features",
+    "status": "pending",
+    "priority": "low",
+    "id": "8"
+  }
+]

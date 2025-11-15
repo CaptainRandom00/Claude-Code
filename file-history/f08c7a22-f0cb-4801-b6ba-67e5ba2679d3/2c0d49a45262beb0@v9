@@ -1,0 +1,645 @@
+/**
+ * Widget Dashboard Routes
+ * Feature: 028-build-a-widget
+ *
+ * API routes for widget dashboard framework
+ */
+
+import type { Express, Request, Response } from 'express';
+import { widgetService } from './services/widget-service';
+import { dashboardService } from './services/dashboard-service';
+import {
+  widgetDefinitionSchema,
+  updateWidgetDefinitionSchema,
+  dashboardSchema,
+  updateDashboardSchema,
+  dashboardWidgetSchema,
+  widgetLayoutSchema,
+  restoreVersionSchema,
+} from './validation/widget-schemas';
+
+/**
+ * Register widget dashboard routes
+ * @param app - Express application instance
+ */
+export function registerWidgetDashboardRoutes(app: Express): void {
+  // ========================================================================
+  // Widget Definition Routes (contracts §1)
+  // ========================================================================
+
+  /**
+   * GET /api/widgets/definitions
+   * List all widget definitions for the current user
+   */
+  app.get('/api/widgets/definitions', async (req: Request, res: Response) => {
+    try {
+      // TODO: Get userId from session/auth (req.user.id)
+      const userId = 1; // Placeholder
+      const includeSystem = req.query.includeSystem !== 'false';
+
+      const widgets = await widgetService.getByUser(userId, includeSystem);
+      res.json(widgets);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/widgets/definitions/:id
+   * Get single widget definition by ID
+   */
+  app.get('/api/widgets/definitions/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const widget = await widgetService.getById(id);
+
+      if (!widget) {
+        return res.status(404).json({ error: 'Widget definition not found' });
+      }
+
+      res.json(widget);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/widgets/definitions
+   * Create new widget definition
+   */
+  app.post('/api/widgets/definitions', async (req: Request, res: Response) => {
+    try {
+      // Validate request body
+      const validated = widgetDefinitionSchema.parse(req.body);
+
+      // TODO: Set userId from session/auth
+      if (!validated.userId) {
+        validated.userId = 1; // Placeholder
+      }
+
+      const widget = await widgetService.create(validated);
+      res.status(201).json(widget);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * PATCH /api/widgets/definitions/:id
+   * Update widget definition
+   */
+  app.patch('/api/widgets/definitions/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validated = updateWidgetDefinitionSchema.parse(req.body);
+
+      const widget = await widgetService.update(id, validated);
+      res.json(widget);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * DELETE /api/widgets/definitions/:id
+   * Delete widget definition
+   */
+  app.delete('/api/widgets/definitions/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = 1; // TODO: Get from session/auth
+
+      await widgetService.delete(id, userId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========================================================================
+  // Dashboard Routes (contracts §2)
+  // ========================================================================
+
+  /**
+   * GET /api/widgets/dashboards
+   * List all dashboards for current user
+   */
+  app.get('/api/widgets/dashboards', async (req: Request, res: Response) => {
+    try {
+      const userId = 1; // TODO: Get from session/auth
+      const dashboards = await dashboardService.getByUser(userId);
+      res.json(dashboards);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/widgets/dashboards/:id
+   * Get single dashboard by ID with widgets
+   */
+  app.get('/api/widgets/dashboards/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const dashboard = await dashboardService.getById(id);
+
+      if (!dashboard) {
+        return res.status(404).json({ error: 'Dashboard not found' });
+      }
+
+      // Get widgets for this dashboard
+      const widgets = await dashboardService.getWidgets(id);
+
+      res.json({ ...dashboard, widgets });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/widgets/dashboards
+   * Create new dashboard
+   */
+  app.post('/api/widgets/dashboards', async (req: Request, res: Response) => {
+    try {
+      const validated = dashboardSchema.parse(req.body);
+
+      // TODO: Set userId from session/auth
+      if (!validated.userId) {
+        validated.userId = 1; // Placeholder
+      }
+
+      const dashboard = await dashboardService.create(validated);
+      res.status(201).json(dashboard);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * PATCH /api/widgets/dashboards/:id
+   * Update dashboard
+   */
+  app.patch('/api/widgets/dashboards/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = 1; // TODO: Get from session/auth
+      const validated = updateDashboardSchema.parse(req.body);
+
+      const dashboard = await dashboardService.update(id, validated, userId);
+      res.json(dashboard);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * PUT /api/widgets/dashboards/:id
+   * Update dashboard (name, description, global filters)
+   * Feature: 028-build-a-widget (User Story 2 - T041)
+   */
+  app.put('/api/widgets/dashboards/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = 1; // TODO: Get from session/auth
+
+      const updates = {
+        ...req.body,
+        id,
+      };
+
+      const dashboard = await dashboardService.update(id, updates, userId);
+      res.json(dashboard);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * DELETE /api/widgets/dashboards/:id
+   * Delete dashboard (soft delete)
+   */
+  app.delete('/api/widgets/dashboards/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = 1; // TODO: Get from session/auth
+
+      await dashboardService.delete(id, userId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/widgets/dashboards/:id/widgets
+   * Add widget to dashboard
+   */
+  app.post('/api/widgets/dashboards/:id/widgets', async (req: Request, res: Response) => {
+    try {
+      const dashboardId = parseInt(req.params.id);
+      const validated = dashboardWidgetSchema.parse({
+        ...req.body,
+        dashboardId,
+      });
+
+      const widget = await dashboardService.addWidget(validated);
+      res.status(201).json(widget);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/widgets/dashboards/:id/versions
+   * Get version history for dashboard
+   */
+  app.get('/api/widgets/dashboards/:id/versions', async (req: Request, res: Response) => {
+    try {
+      const dashboardId = parseInt(req.params.id);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+
+      const versions = await dashboardService.getVersions(dashboardId, limit);
+      res.json(versions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/widgets/dashboards/:id/versions/:versionNumber/restore
+   * Restore dashboard to specific version
+   */
+  app.post('/api/widgets/dashboards/:id/versions/:versionNumber/restore', async (req: Request, res: Response) => {
+    try {
+      const dashboardId = parseInt(req.params.id);
+      const versionNumber = parseInt(req.params.versionNumber);
+      const userId = 1; // TODO: Get from session/auth
+
+      const dashboard = await dashboardService.restoreVersion(dashboardId, versionNumber, userId);
+      res.json(dashboard);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========================================================================
+  // Widget Layout Routes
+  // ========================================================================
+
+  /**
+   * PUT /api/widgets/layouts
+   * Set widget layout for specific breakpoint
+   */
+  app.put('/api/widgets/layouts', async (req: Request, res: Response) => {
+    try {
+      const validated = widgetLayoutSchema.parse(req.body);
+      const layout = await dashboardService.setLayout(validated);
+      res.json(layout);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========================================================================
+  // Dashboard Template Routes (User Story 2)
+  // ========================================================================
+
+  /**
+   * GET /api/widgets/templates
+   * List all dashboard templates
+   */
+  app.get('/api/widgets/templates', async (req: Request, res: Response) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const templates = await dashboardService.getTemplates(category);
+      res.json({
+        success: true,
+        templates,
+        count: templates.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch templates',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
+   * GET /api/widgets/templates/:id
+   * Get template with widget preview
+   */
+  app.get('/api/widgets/templates/:id', async (req: Request, res: Response) => {
+    try {
+      const templateId = parseInt(req.params.id);
+
+      if (isNaN(templateId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid template ID',
+        });
+      }
+
+      const template = await dashboardService.getTemplateById(templateId);
+
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          error: 'Template not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        template,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch template',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /api/widgets/dashboards/from-template/:templateId
+   * Create dashboard from template (User Story 2)
+   */
+  app.post('/api/widgets/dashboards/from-template/:templateId', async (req: Request, res: Response) => {
+    try {
+      const templateId = parseInt(req.params.templateId);
+      const userId = 1; // TODO: Get from session/auth
+      const customName = req.body.name as string | undefined;
+
+      if (isNaN(templateId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid template ID',
+        });
+      }
+
+      const dashboard = await dashboardService.createDashboardFromTemplate(
+        templateId,
+        userId,
+        customName
+      );
+
+      res.status(201).json({
+        success: true,
+        dashboard,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create dashboard from template',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /api/widgets/data/fetch
+   * Fetch and calculate widget data
+   */
+  app.post('/api/widgets/data/fetch', async (req: Request, res: Response) => {
+    try {
+      const { widgetDefinitionId, overrideParams } = req.body;
+
+      if (!widgetDefinitionId) {
+        return res.status(400).json({ error: 'widgetDefinitionId is required' });
+      }
+
+      // Get widget definition
+      const widget = await widgetService.getById(widgetDefinitionId);
+
+      if (!widget) {
+        return res.status(404).json({ error: 'Widget definition not found' });
+      }
+
+      // Fetch data from API endpoint
+      // For now, return mock data - will implement actual fetch in production
+      const mockData = await generateMockData(widget.widgetType);
+
+      // Apply calculations
+      const calculatedData = await widgetService.applyCalculations(
+        mockData,
+        widget.calculationConfig
+      );
+
+      res.json({
+        widgetId: widget.id,
+        widgetType: widget.widgetType,
+        data: calculatedData,
+        lastFetched: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========================================================================
+  // API Metadata Routes (User Story 3 - API Discovery)
+  // ========================================================================
+
+  /**
+   * GET /api/widgets/metadata/endpoints
+   * List available API endpoints for widget configuration (T053 - US3)
+   */
+  app.get('/api/widgets/metadata/endpoints', async (req: Request, res: Response) => {
+    try {
+      const { db } = await import('./db');
+      const { apiEndpointsMetadata } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const endpoints = await db
+        .select()
+        .from(apiEndpointsMetadata)
+        .where(eq(apiEndpointsMetadata.isDeprecated, false));
+
+      res.json({
+        success: true,
+        endpoints,
+        count: endpoints.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch API endpoints',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
+   * GET /api/widgets/metadata/endpoints/:id/schema
+   * Get detailed schema for specific endpoint (T054 - US3)
+   */
+  app.get('/api/widgets/metadata/endpoints/:id/schema', async (req: Request, res: Response) => {
+    try {
+      const endpointId = parseInt(req.params.id);
+
+      if (isNaN(endpointId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid endpoint ID',
+        });
+      }
+
+      const { db } = await import('./db');
+      const { apiEndpointsMetadata } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const [endpoint] = await db
+        .select()
+        .from(apiEndpointsMetadata)
+        .where(eq(apiEndpointsMetadata.id, endpointId))
+        .limit(1);
+
+      if (!endpoint) {
+        return res.status(404).json({
+          success: false,
+          error: 'Endpoint not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        endpoint,
+        schema: endpoint.responseSchema,
+        availableFields: endpoint.availableFields,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch endpoint schema',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /api/widgets/data/preview
+   * Preview widget data with calculations in real-time (T055 - US3)
+   * Must respond <500ms per FR-031
+   */
+  app.post('/api/widgets/data/preview', async (req: Request, res: Response) => {
+    try {
+      const { apiEndpoint, calculationConfig, filters } = req.body;
+
+      if (!apiEndpoint) {
+        return res.status(400).json({
+          success: false,
+          error: 'apiEndpoint is required',
+        });
+      }
+
+      // Validate configuration with endpoint whitelist (T058)
+      const validation = await widgetService.validateConfiguration(
+        apiEndpoint,
+        calculationConfig || {}
+      );
+
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: 'Configuration validation failed',
+          validationErrors: validation.errors,
+        });
+      }
+
+      // For now, return mock preview data
+      // TODO: Implement actual data fetching from real endpoint in production
+      const mockData = await generateMockData('metric');
+
+      // Use optimized preview method (T059)
+      const previewResult = await widgetService.previewData(
+        mockData,
+        calculationConfig || {}
+      );
+
+      res.json({
+        success: true,
+        ...previewResult,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('❌ Preview generation error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Preview generation failed',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      });
+    }
+  });
+
+  console.log('✅ Widget dashboard routes registered');
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Generate mock data for widgets (temporary - will use real API in production)
+ */
+async function generateMockData(widgetType: string): Promise<any[]> {
+  switch (widgetType) {
+    case 'metric':
+      return [
+        { amount: 125430.50, date: new Date().toISOString() },
+      ];
+
+    case 'chart':
+      return [
+        { month: 'Jan', sales: 45000 },
+        { month: 'Feb', sales: 52000 },
+        { month: 'Mar', sales: 48000 },
+        { month: 'Apr', sales: 61000 },
+        { month: 'May', sales: 58000 },
+        { month: 'Jun', sales: 67000 },
+      ];
+
+    case 'table':
+      return [
+        { product: 'Product A', revenue: 25000, quantity: 120 },
+        { product: 'Product B', revenue: 18000, quantity: 95 },
+        { product: 'Product C', revenue: 15000, quantity: 80 },
+        { product: 'Product D', revenue: 12000, quantity: 65 },
+        { product: 'Product E', revenue: 10000, quantity: 55 },
+      ];
+
+    case 'alert':
+      return [
+        { message: 'Low stock alert: Product A', severity: 'warning', timestamp: new Date().toISOString() },
+        { message: 'Expiry soon: Product B (3 days)', severity: 'error', timestamp: new Date().toISOString() },
+      ];
+
+    default:
+      return [];
+  }
+}

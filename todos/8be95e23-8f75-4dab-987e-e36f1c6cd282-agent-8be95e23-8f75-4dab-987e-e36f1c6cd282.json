@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Continue Phase 3.6: Frontend Pages & Components",
+    "status": "completed",
+    "activeForm": "Completing Phase 3.6 Frontend implementation"
+  },
+  {
+    "content": "Complete remaining Next.js pages (T061-T063)",
+    "status": "completed",
+    "activeForm": "Implementing remaining Next.js pages"
+  },
+  {
+    "content": "Implement remaining React components (T064-T067, T071-T073)",
+    "status": "completed",
+    "activeForm": "Implementing remaining React components"
+  },
+  {
+    "content": "Complete forms and hooks (T074-T076)",
+    "status": "completed",
+    "activeForm": "Implementing forms and hooks"
+  },
+  {
+    "content": "Set up frontend services (T077-T082)",
+    "status": "completed",
+    "activeForm": "Setting up frontend services"
+  },
+  {
+    "content": "Begin Phase 3.7: Frontend Styling & Layout",
+    "status": "pending",
+    "activeForm": "Starting Phase 3.7 Frontend styling"
+  }
+]

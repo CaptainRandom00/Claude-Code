@@ -1,0 +1,872 @@
+# Research Document: Byte Bridges Enterprise Website
+
+**Feature**: 001-byte-bridges-enterprise
+**Date**: 2025-11-07
+**Status**: Complete
+
+## Executive Summary
+
+This research document covers the technology decisions, best practices, and architectural patterns for building the Byte Bridges enterprise consultancy website. All NEEDS CLARIFICATION items from the technical context have been resolved through research and established patterns.
+
+## 1. Framework Selection: Next.js 14 with App Router
+
+### Decision
+Use Next.js 14.1.0 with the App Router (not Pages Router)
+
+### Rationale
+- **Server Components by default**: Better performance, smaller bundle sizes
+- **Streaming SSR**: Improved perceived performance with Suspense
+- **Route handlers**: Clean API routes replacing old API pages
+- **Layout system**: Better code reuse and nested layouts
+- **Metadata API**: Built-in SEO optimization
+- **Already in use**: Project dependencies show Next.js 14.1.0 installed
+
+### Alternatives Considered
+- **Pages Router**: Older, more documented, but missing modern features
+- **Remix**: Great DX but smaller ecosystem, steeper learning curve
+- **Astro**: Excellent for static sites but less suitable for admin panel needs
+- **Pure React + Express**: More control but requires more boilerplate
+
+### Implementation Notes
+```typescript
+// Example App Router structure
+app/
+├── (public)/          // Route group for public pages
+│   ├── layout.tsx     // Public layout
+│   └── page.tsx       // Homepage
+├── (admin)/           // Route group for admin
+│   ├── layout.tsx     // Admin layout with auth
+│   └── dashboard/
+└── api/               // Route handlers
+    └── blog/
+        └── route.ts   // API endpoint
+```
+
+## 2. Authentication: NextAuth v4
+
+### Decision
+Use NextAuth v4 with Credentials provider for admin authentication
+
+### Rationale
+- **Industry standard**: Most popular auth solution for Next.js
+- **Session management**: Built-in JWT or database sessions
+- **Middleware integration**: Easy route protection
+- **Type-safe**: Excellent TypeScript support
+- **Already installed**: Package.json shows next-auth@^4.24.0
+
+### Alternatives Considered
+- **Clerk**: Fully managed but overkill for simple admin auth
+- **Auth0**: Enterprise-grade but unnecessary for this use case
+- **Custom JWT solution**: More control but reinventing the wheel
+- **Supabase Auth**: Good but introduces another service dependency
+
+### Implementation Notes
+```typescript
+// lib/auth/config.ts
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { compare } from "bcryptjs"
+import { query } from "@/lib/db"
+
+export const authOptions = {
+  providers: [
+    CredentialsProvider({
+      credentials: {
+        email: { type: "email" },
+        password: { type: "password" }
+      },
+      async authorize(credentials) {
+        const user = await query(
+          'SELECT * FROM users WHERE email = $1',
+          [credentials.email]
+        )
+        if (user && await compare(credentials.password, user.password_hash)) {
+          return { id: user.id, email: user.email }
+        }
+        return null
+      }
+    })
+  ],
+  session: { strategy: "jwt" },
+  pages: {
+    signIn: "/signin",
+    error: "/auth/error"
+  }
+}
+```
+
+### Security Considerations
+- Password hashing with bcrypt (cost factor: 12)
+- HTTPS only in production
+- CSRF protection via NextAuth
+- Rate limiting on signin endpoint
+- Session timeout: 7 days
+
+## 3. Database: PostgreSQL with pg Driver
+
+### Decision
+PostgreSQL 14+ with node-postgres (pg) client library
+
+### Rationale
+- **Relational model**: Blog posts, case studies have clear relationships
+- **Full-text search**: Built-in `tsvector` for content search
+- **JSON support**: Flexible for tags, metadata
+- **ACID compliance**: Data integrity for content management
+- **Already configured**: db.ts exists, package.json has pg@^8.11.3
+
+### Alternatives Considered
+- **Prisma ORM**: Better DX but adds complexity, migration overhead
+- **Drizzle ORM**: Lightweight but less mature ecosystem
+- **MongoDB**: Good for flexibility but overkill for structured content
+- **SQLite**: Simple but lacks full-text search, not production-ready
+
+### Schema Design Principles
+```sql
+-- Normalized structure
+-- Use SERIAL or UUID for IDs
+-- Timestamps: created_at, updated_at (UTC)
+-- Soft deletes: deleted_at (nullable)
+-- Indexes on foreign keys and search fields
+-- Text search indexes for content
+
+CREATE TABLE blog_posts (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  content TEXT NOT NULL,
+  author_id INTEGER REFERENCES users(id),
+  category VARCHAR(100),
+  tags TEXT[],
+  published BOOLEAN DEFAULT false,
+  published_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  search_vector tsvector GENERATED ALWAYS AS (
+    to_tsvector('english', title || ' ' || content)
+  ) STORED
+);
+
+CREATE INDEX idx_blog_posts_search ON blog_posts USING GIN(search_vector);
+CREATE INDEX idx_blog_posts_published ON blog_posts(published, published_at DESC);
+```
+
+### Connection Pooling
+```typescript
+// lib/db.ts
+import { Pool } from 'pg'
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,                 // Maximum pool size
+  idleTimeoutMillis: 30000, // Close idle connections after 30s
+  connectionTimeoutMillis: 2000
+})
+
+export async function query(text: string, params?: any[]) {
+  const start = Date.now()
+  const res = await pool.query(text, params)
+  const duration = Date.now() - start
+  console.log('Executed query', { text, duration, rows: res.rowCount })
+  return res.rows
+}
+```
+
+## 4. Styling: TailwindCSS with WCAG 2.1 AA Compliance
+
+### Decision
+TailwindCSS 3.4+ with custom accessibility-focused configuration
+
+### Rationale
+- **Utility-first**: Rapid development, consistent spacing/colors
+- **Responsive design**: Mobile-first breakpoints out of the box
+- **Accessibility**: Built-in focus rings, screen reader utilities
+- **Performance**: Purges unused styles in production
+- **Already integrated**: tailwind.config.ts exists
+
+### WCAG 2.1 Level AA Requirements
+```typescript
+// tailwind.config.ts
+export default {
+  theme: {
+    extend: {
+      colors: {
+        // All color combinations must meet 4.5:1 contrast ratio
+        primary: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          // ... ensure AA contrast
+          600: '#0284c7', // Primary CTA - 4.52:1 on white
+          700: '#0369a1',
+          900: '#0c4a6e'
+        }
+      },
+      fontSize: {
+        // Minimum 16px for body text
+        base: ['16px', { lineHeight: '1.5' }],
+        lg: ['18px', { lineHeight: '1.6' }],
+        // Heading scale with proper contrast
+      },
+      spacing: {
+        // Touch targets minimum 44x44px
+        'touch': '44px'
+      }
+    }
+  },
+  plugins: [
+    require('@tailwindcss/forms'),        // Accessible form styles
+    require('@tailwindcss/typography'),   // Prose content styling
+  ]
+}
+```
+
+### Accessibility Checklist
+- ✅ Color contrast 4.5:1 for normal text, 3:1 for large text
+- ✅ Focus indicators visible (outline-2 outline-offset-2)
+- ✅ Touch targets 44x44px minimum
+- ✅ Semantic HTML (headings, landmarks, lists)
+- ✅ ARIA labels where needed
+- ✅ Keyboard navigation support
+- ✅ Screen reader testing with VoiceOver/NVDA
+
+### Animation Guidelines
+```typescript
+// Respect prefers-reduced-motion
+// framer-motion config
+import { motion } from 'framer-motion'
+
+const variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: 'easeOut'
+    }
+  }
+}
+
+// Use motion.div with variants
+<motion.div
+  variants={variants}
+  initial="hidden"
+  animate="visible"
+  // Respects prefers-reduced-motion automatically
+/>
+```
+
+## 5. Forms: React Hook Form + Zod Validation
+
+### Decision
+React Hook Form 7+ with Zod schema validation
+
+### Rationale
+- **Type safety**: Zod schemas generate TypeScript types
+- **Performance**: Uncontrolled inputs, minimal re-renders
+- **Validation**: Client-side + server-side with same schemas
+- **Multi-step forms**: Built-in support for complex flows
+- **Already installed**: Both libraries in package.json
+
+### Multi-Step Contact Form Pattern
+```typescript
+// lib/validation.ts
+import { z } from 'zod'
+
+export const contactFormSchema = z.object({
+  // Step 1: Basic Info
+  name: z.string().min(2, "Name required"),
+  email: z.string().email("Valid email required"),
+  company: z.string().optional(),
+
+  // Step 2: Project Details
+  serviceInterest: z.enum([
+    'custom-software',
+    'web-development',
+    'mobile-apps',
+    'cloud-solutions',
+    'ai-integration',
+    'consulting'
+  ]),
+  budgetRange: z.enum(['<50k', '50k-100k', '100k-250k', '250k+']),
+  timeline: z.enum(['urgent', '1-3-months', '3-6-months', '6+ months']),
+
+  // Step 3: Message
+  projectDetails: z.string().min(50, "Please provide more details"),
+
+  // Privacy
+  gdprConsent: z.boolean().refine(val => val === true, {
+    message: "You must accept the privacy policy"
+  })
+})
+
+export type ContactFormData = z.infer<typeof contactFormSchema>
+```
+
+### Server-Side Validation
+```typescript
+// app/api/contact/route.ts
+import { contactFormSchema } from '@/lib/validation'
+
+export async function POST(req: Request) {
+  const body = await req.json()
+
+  // Validate with Zod
+  const result = contactFormSchema.safeParse(body)
+
+  if (!result.success) {
+    return Response.json({
+      error: 'Validation failed',
+      details: result.error.flatten()
+    }, { status: 400 })
+  }
+
+  // Process valid data
+  const data = result.data
+  // ... save to database, send email
+}
+```
+
+## 6. Testing Strategy: Playwright E2E + Visual Regression
+
+### Decision
+Playwright for end-to-end and visual regression testing
+
+### Rationale
+- **Cross-browser**: Chromium, Firefox, WebKit support
+- **Accessibility testing**: Built-in ARIA/role assertions
+- **Visual regression**: Screenshot comparison
+- **Fast execution**: Parallel test runner
+- **Already configured**: playwright.config.ts exists
+
+### Test Pyramid
+```
+         /\
+        /  \       E2E Tests (Playwright)
+       /____\      - Critical user flows
+      /      \     - Cross-browser compatibility
+     /        \
+    /__________\   Visual Regression (Playwright)
+   /            \  - Component snapshots
+  /              \ - Layout consistency
+ /________________\
+Integration Tests     Unit Tests
+- API endpoints       - Utility functions
+- Database ops        - Validation schemas
+- Email sending       - Pure logic
+```
+
+### Critical Test Scenarios
+```typescript
+// tests/e2e/contact.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Contact Form', () => {
+  test('should complete multi-step form submission', async ({ page }) => {
+    await page.goto('/contact')
+
+    // Step 1: Basic Info
+    await page.fill('input[name="name"]', 'John Doe')
+    await page.fill('input[name="email"]', 'john@example.com')
+    await page.click('button:has-text("Next")')
+
+    // Step 2: Project Details
+    await page.selectOption('select[name="serviceInterest"]', 'web-development')
+    await page.selectOption('select[name="budgetRange"]', '50k-100k')
+    await page.click('button:has-text("Next")')
+
+    // Step 3: Message
+    await page.fill('textarea[name="projectDetails"]', 'Need a new website...')
+    await page.check('input[name="gdprConsent"]')
+
+    // Submit
+    await page.click('button:has-text("Submit")')
+
+    // Verify success
+    await expect(page.locator('.success-message')).toBeVisible()
+    await expect(page.locator('.success-message')).toContainText(
+      'We will contact you within 24 hours'
+    )
+  })
+
+  test('should validate required fields', async ({ page }) => {
+    await page.goto('/contact')
+    await page.click('button:has-text("Next")')
+
+    // Check validation errors
+    await expect(page.locator('text=Name required')).toBeVisible()
+    await expect(page.locator('text=Valid email required')).toBeVisible()
+  })
+
+  test('should be accessible', async ({ page }) => {
+    await page.goto('/contact')
+
+    // Check ARIA labels
+    await expect(page.locator('form')).toHaveAttribute('aria-label')
+
+    // Check keyboard navigation
+    await page.keyboard.press('Tab')
+    const focused = page.locator(':focus')
+    await expect(focused).toHaveAttribute('name', 'name')
+
+    // Check focus indicators
+    const outline = await focused.evaluate(el =>
+      window.getComputedStyle(el).outlineWidth
+    )
+    expect(parseInt(outline)).toBeGreaterThan(0)
+  })
+})
+```
+
+### Visual Regression Setup
+```typescript
+// tests/visual/visual-regression.spec.ts
+test('Homepage visual consistency', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForLoadState('networkidle')
+
+  // Full page screenshot
+  await expect(page).toHaveScreenshot('homepage.png', {
+    fullPage: true,
+    animations: 'disabled'
+  })
+
+  // Component screenshot
+  const hero = page.locator('.hero-section')
+  await expect(hero).toHaveScreenshot('hero-section.png')
+})
+```
+
+## 7. Google Analytics Integration (GDPR Compliant)
+
+### Decision
+Google Analytics 4 with consent management and cookie banner
+
+### Rationale
+- **Industry standard**: Most widely used analytics platform
+- **GDPR compliance**: Can be configured for ICO requirements
+- **Event tracking**: Custom events for conversions
+- **Next.js integration**: Use next/script for optimal loading
+- **Requirement**: Specified in FR-014
+
+### Implementation Pattern
+```typescript
+// components/GoogleAnalytics.tsx
+'use client'
+
+import Script from 'next/script'
+import { useEffect } from 'react'
+
+export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
+  useEffect(() => {
+    // Check consent before initializing
+    const consent = localStorage.getItem('cookie-consent')
+    if (consent === 'accepted') {
+      // @ts-ignore
+      window.dataLayer = window.dataLayer || []
+      function gtag(...args: any[]) {
+        // @ts-ignore
+        window.dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      gtag('config', measurementId, {
+        anonymize_ip: true,  // GDPR requirement
+        cookie_flags: 'SameSite=None;Secure'
+      })
+    }
+  }, [measurementId])
+
+  return (
+    <>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
+        strategy="afterInteractive"
+      />
+    </>
+  )
+}
+```
+
+### Consent Management
+```typescript
+// components/CookieBanner.tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+
+export function CookieBanner() {
+  const [showBanner, setShowBanner] = useState(false)
+
+  useEffect(() => {
+    const consent = localStorage.getItem('cookie-consent')
+    if (!consent) setShowBanner(true)
+  }, [])
+
+  const acceptCookies = () => {
+    localStorage.setItem('cookie-consent', 'accepted')
+    setShowBanner(false)
+    window.location.reload() // Reload to initialize GA
+  }
+
+  const declineCookies = () => {
+    localStorage.setItem('cookie-consent', 'declined')
+    setShowBanner(false)
+  }
+
+  if (!showBanner) return null
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-4 z-50">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <p>
+          We use cookies to improve your experience and analyze site traffic.
+          <a href="/privacy" className="underline ml-2">Learn more</a>
+        </p>
+        <div className="flex gap-4">
+          <button onClick={declineCookies} className="px-4 py-2">
+            Decline
+          </button>
+          <button
+            onClick={acceptCookies}
+            className="px-4 py-2 bg-blue-600 rounded"
+          >
+            Accept
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+### Custom Event Tracking
+```typescript
+// lib/analytics.ts
+export function trackEvent(action: string, category: string, label?: string, value?: number) {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', action, {
+      event_category: category,
+      event_label: label,
+      value: value
+    })
+  }
+}
+
+// Usage in components
+trackEvent('contact_form_submit', 'engagement', 'header_cta')
+trackEvent('case_study_view', 'content', 'healthcare-platform', 1)
+```
+
+## 8. Email Service: Nodemailer with SMTP
+
+### Decision
+Nodemailer with configurable SMTP (supports Gmail, SendGrid, AWS SES, etc.)
+
+### Rationale
+- **Flexible**: Works with any SMTP provider
+- **Template support**: Can use HTML templates
+- **Attachments**: Support for file attachments (future)
+- **Already installed**: nodemailer@^6.9.0 in package.json
+- **Requirement**: FR-006 specifies email notifications
+
+### Configuration
+```typescript
+// lib/email.ts
+import nodemailer from 'nodemailer'
+
+const transporter = nodemailer.createTransporter({
+  host: process.env.EMAIL_HOST,       // smtp.gmail.com
+  port: parseInt(process.env.EMAIL_PORT || '587'),
+  secure: false,                      // true for 465, false for other ports
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD  // App password for Gmail
+  }
+})
+
+export async function sendContactNotification(data: ContactFormData) {
+  const html = `
+    <h2>New Contact Form Submission</h2>
+    <p><strong>Name:</strong> ${data.name}</p>
+    <p><strong>Email:</strong> ${data.email}</p>
+    <p><strong>Company:</strong> ${data.company || 'N/A'}</p>
+    <p><strong>Service Interest:</strong> ${data.serviceInterest}</p>
+    <p><strong>Budget Range:</strong> ${data.budgetRange}</p>
+    <p><strong>Timeline:</strong> ${data.timeline}</p>
+    <h3>Project Details:</h3>
+    <p>${data.projectDetails}</p>
+  `
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: process.env.CONTACT_EMAIL,    // Single admin email (FR-006)
+    subject: `New Contact: ${data.serviceInterest} - ${data.company || data.name}`,
+    html
+  })
+}
+
+export async function sendConfirmationEmail(to: string, name: string) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to,
+    subject: 'Thank you for contacting Byte Bridges',
+    html: `
+      <h2>Hi ${name},</h2>
+      <p>Thank you for your interest in Byte Bridges. We have received your inquiry and will respond within 24 hours.</p>
+      <p>Best regards,<br/>The Byte Bridges Team</p>
+    `
+  })
+}
+```
+
+### Environment Variables
+```env
+# .env.local
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=notifications@bytebridges.com
+EMAIL_PASSWORD=app_specific_password
+EMAIL_FROM=Byte Bridges <noreply@bytebridges.com>
+CONTACT_EMAIL=info@bytebridges.com
+```
+
+## 9. Performance Optimization
+
+### Decision
+Implement comprehensive performance optimization strategy
+
+### Key Techniques
+
+#### Image Optimization
+```typescript
+// Use Next.js Image component
+import Image from 'next/image'
+
+<Image
+  src="/images/hero.jpg"
+  alt="Byte Bridges team"
+  width={1200}
+  height={600}
+  priority  // For above-the-fold images
+  placeholder="blur"
+  blurDataURL="data:image/..."
+/>
+```
+
+#### Code Splitting
+```typescript
+// Dynamic imports for heavy components
+import dynamic from 'next/dynamic'
+
+const AdminDashboard = dynamic(() => import('@/components/admin/Dashboard'), {
+  loading: () => <LoadingSpinner />,
+  ssr: false  // Client-only component
+})
+```
+
+#### Static Data
+```typescript
+// Serve static content from JSON
+// data/services.json
+export const services = [
+  {
+    id: 'custom-software',
+    title: 'Custom Software Development',
+    description: '...',
+    icon: '/icons/code.svg'
+  },
+  // ...
+]
+
+// Import in server component
+import { services } from '@/data/services.json'
+```
+
+#### Caching Strategy
+```typescript
+// API route with cache headers
+export async function GET() {
+  const posts = await getBlogPosts()
+
+  return Response.json(posts, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'
+    }
+  })
+}
+
+// Revalidate on-demand
+import { revalidatePath } from 'next/cache'
+
+export async function POST(req: Request) {
+  // ... create blog post
+  revalidatePath('/blog')
+  return Response.json({ success: true })
+}
+```
+
+### Performance Targets
+- ✅ Lighthouse Score: >90 all categories
+- ✅ First Contentful Paint: <1.5s
+- ✅ Time to Interactive: <3.5s
+- ✅ Largest Contentful Paint: <2.5s
+- ✅ Cumulative Layout Shift: <0.1
+- ✅ First Input Delay: <100ms
+
+## 10. ICO Data Retention Compliance
+
+### Decision
+Implement automated data retention policy aligned with ICO guidelines
+
+### ICO Requirements
+- Personal data kept no longer than necessary
+- Regular review and deletion of outdated data
+- Clear retention periods communicated to users
+- Right to erasure (GDPR Article 17)
+
+### Implementation
+```sql
+-- Database schema with retention
+CREATE TABLE contact_submissions (
+  id SERIAL PRIMARY KEY,
+  -- ... contact fields
+  created_at TIMESTAMP DEFAULT NOW(),
+  retention_until TIMESTAMP DEFAULT (NOW() + INTERVAL '2 years'),
+  -- 2 years is typical for B2B leads
+  deleted_at TIMESTAMP
+);
+
+-- Scheduled cleanup job (run monthly)
+DELETE FROM contact_submissions
+WHERE retention_until < NOW()
+  AND deleted_at IS NULL;
+
+-- Soft delete function for GDPR requests
+CREATE FUNCTION gdpr_delete_submission(submission_id INTEGER)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE contact_submissions
+  SET
+    email = 'deleted@privacy.local',
+    name = 'DELETED',
+    company = NULL,
+    project_details = 'DELETED BY USER REQUEST',
+    deleted_at = NOW()
+  WHERE id = submission_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Privacy Policy Requirements
+- Clearly state retention period (2 years for leads)
+- Explain purpose of data collection
+- Provide contact for data requests
+- Include cookie policy for Google Analytics
+
+## 11. Search Functionality
+
+### Decision
+PostgreSQL full-text search with tsvector
+
+### Rationale
+- **Built-in**: No external service needed
+- **Fast**: GIN indexes provide excellent performance
+- **Flexible**: Supports ranking, highlighting, phrase matching
+- **Cost-effective**: No additional API costs
+
+### Implementation
+```sql
+-- Create search index
+CREATE INDEX idx_blog_search ON blog_posts USING GIN(search_vector);
+CREATE INDEX idx_case_studies_search ON case_studies USING GIN(
+  to_tsvector('english', title || ' ' || challenge || ' ' || solution)
+);
+
+-- Search query
+SELECT
+  id,
+  title,
+  ts_headline('english', content, query) as snippet,
+  ts_rank(search_vector, query) as rank
+FROM blog_posts,
+  to_tsquery('english', 'nextjs & typescript') as query
+WHERE search_vector @@ query
+ORDER BY rank DESC
+LIMIT 10;
+```
+
+### Search API
+```typescript
+// app/api/search/route.ts
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const q = searchParams.get('q')
+
+  if (!q) {
+    return Response.json({ error: 'Query required' }, { status: 400 })
+  }
+
+  // Search across multiple content types
+  const [blogResults, caseStudyResults] = await Promise.all([
+    searchBlogPosts(q),
+    searchCaseStudies(q)
+  ])
+
+  return Response.json({
+    query: q,
+    results: {
+      blog: blogResults,
+      caseStudies: caseStudyResults
+    },
+    total: blogResults.length + caseStudyResults.length
+  })
+}
+```
+
+## 12. Deployment & DevOps
+
+### Decision
+Vercel for hosting, Supabase or Neon for PostgreSQL
+
+### Rationale
+- **Vercel**: First-class Next.js support, automatic deployments, edge functions
+- **Database options**:
+  - **Neon**: Serverless Postgres, generous free tier, branching
+  - **Supabase**: Postgres + additional features, good free tier
+  - **Railway**: Simple deployment, Postgres included
+  - **AWS RDS**: Production-grade but more expensive
+
+### Environment Setup
+```env
+# .env.local (development)
+DATABASE_URL=postgresql://user:pass@localhost:5432/byte_bridges
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=local_dev_secret
+NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+
+# .env.production (Vercel)
+DATABASE_URL=[Neon/Supabase connection string]
+NEXTAUTH_URL=https://bytebridges.com
+NEXTAUTH_SECRET=[generated secret]
+NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+EMAIL_HOST=smtp.sendgrid.net
+EMAIL_USER=apikey
+EMAIL_PASSWORD=[SendGrid API key]
+```
+
+### CI/CD Pipeline
+- **Git push** → Automatic Vercel deployment
+- **Preview deployments** for pull requests
+- **Production deployment** on merge to main
+- **Database migrations** via manual trigger or Prisma Migrate
+
+## Research Summary
+
+All technical decisions have been made based on:
+1. **Existing codebase analysis**: Next.js 14, TypeScript, PostgreSQL already in use
+2. **Best practices**: Industry-standard patterns for each technology
+3. **Requirements**: WCAG AA, ICO compliance, Google Analytics, admin auth
+4. **Performance**: Optimization strategies to meet Lighthouse targets
+5. **Cost**: Open-source solutions preferred, Vercel free tier suitable for MVP
+
+**No NEEDS CLARIFICATION items remaining** - ready to proceed to Phase 1 (Data Model & Contracts).

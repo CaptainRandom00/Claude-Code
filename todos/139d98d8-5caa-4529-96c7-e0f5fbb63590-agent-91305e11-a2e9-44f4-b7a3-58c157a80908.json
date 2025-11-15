@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Analyze current header CSS classes and background colors",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Examine page-specific header implementations",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Investigate template-parts/page-header.php reusable component",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check page templates for background class usage",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Identify root cause of color inconsistency",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Create standardization plan for blue header color",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "6"
+  }
+]

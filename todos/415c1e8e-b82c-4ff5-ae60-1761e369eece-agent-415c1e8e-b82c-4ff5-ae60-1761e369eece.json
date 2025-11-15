@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Phase 3.1: Setup and Project Initialization (T001-T005)",
+    "status": "completed",
+    "activeForm": "Setting up project structure and dependencies"
+  },
+  {
+    "content": "Phase 3.2: Tests First - Contract and Model Tests (T006-T024)",
+    "status": "completed",
+    "activeForm": "Implementing TDD test suite"
+  },
+  {
+    "content": "Phase 3.3: Core Implementation - Models and Services (T025-T041)",
+    "status": "in_progress",
+    "activeForm": "Building core functionality"
+  },
+  {
+    "content": "Phase 3.4: CLI and Orchestration (T042-T049)",
+    "status": "pending",
+    "activeForm": "Implementing command line interface"
+  },
+  {
+    "content": "Phase 3.5: Advanced Features and Optimization (T050-T057)",
+    "status": "pending",
+    "activeForm": "Adding performance and advanced features"
+  },
+  {
+    "content": "Implement Data Models (T025-T029) - parallel execution",
+    "status": "in_progress",
+    "activeForm": "Creating core data models"
+  }
+]

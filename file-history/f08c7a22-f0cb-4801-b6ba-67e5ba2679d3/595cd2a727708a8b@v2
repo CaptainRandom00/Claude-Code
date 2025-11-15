@@ -1,0 +1,730 @@
+# Remediation Plan: Widget-Based Dashboard Framework
+
+**Feature**: 028-build-a-widget
+**Created**: 2025-10-12
+**Analysis Report**: Based on `/speckit.analyze` cross-artifact consistency check
+**Total Findings**: 27 issues (4 CRITICAL, 9 HIGH, 14 MEDIUM/LOW)
+**Estimated Total Effort**: 4-6 hours
+
+---
+
+## Phase 1: CRITICAL Fixes (MUST complete before implementation)
+
+**Estimated Time**: 45-60 minutes
+**Blocker**: YES - Implementation cannot proceed without these
+
+### A1: Resolve Calculation Location Conflict
+
+**Issue**: spec.md FR-010 says "client-side calculations" but tasks.md T024 implements in `server/services/widget-service.ts`
+
+**Root Cause**: Architectural ambiguity between client and server responsibility
+
+**Decision Required**: Choose ONE approach:
+- **Option A**: Pure client-side (calculations in browser using fetched data)
+- **Option B**: Server-side with client orchestration (calculations on server, client requests results)
+
+**Recommended Solution**: **Option B** - Server-side calculations with client orchestration
+
+**Rationale**:
+- Large datasets (10K+ records per FR) should not be transferred to browser
+- Server has more compute resources for complex aggregations
+- Client handles orchestration (trigger calculations, display results)
+- "Client-side calculation engine" means client-controlled, not client-executed
+
+**Files to Modify**:
+
+1. **spec.md** - Line ~129 (FR-010)
+```markdown
+BEFORE:
+- **FR-010**: Widget MUST apply calculations client-side using calculation pipeline
+
+AFTER:
+- **FR-010**: Widget MUST apply calculations using a calculation engine (server-executed, client-orchestrated) that processes data through the pipeline without requiring page reloads
+```
+
+2. **spec.md** - Add clarification note after FR-011
+```markdown
+**Calculation Execution Model**: Calculations execute server-side for performance and security. The calculation engine is "client-side" in that it's controlled by client actions (widget configuration, parameter changes) and updates without page reloads, but the actual data processing occurs on the server to handle large datasets efficiently.
+```
+
+**Validation**: Check tasks.md T024 aligns with clarified model ✓ (already implements server-side in widget-service.ts)
+
+**Time Estimate**: 10 minutes
+
+---
+
+### A7: Detail api_endpoints_metadata Population Algorithm
+
+**Issue**: tasks.md T057 says "populate api_endpoints_metadata by scanning routes.registry.json" but no algorithm specified
+
+**Required Information**:
+- Parsing strategy for routes.registry.json
+- Schema mapping (registry format → database columns)
+- Field extraction rules
+- Error handling for malformed routes
+
+**Solution**: Add detailed algorithm to research.md
+
+**Files to Modify**:
+
+1. **research.md** - Add new section after §7
+
+```markdown
+### 8. API Metadata Discovery Implementation
+
+**Challenge**: Populate `api_endpoints_metadata` table by introspecting existing route registry.
+
+**Solution**: Parse `server/routes.registry.json` with schema transformation.
+
+#### 8.1 Algorithm
+
+```typescript
+// Pseudocode for T057 implementation
+async function populateApiMetadata() {
+  const registry = JSON.parse(fs.readFileSync('server/routes.registry.json'));
+
+  for (const route of registry.routes) {
+    // Extract HTTP method and path
+    const [method, path] = route.endpoint.split(' '); // "GET /api/products" → ["GET", "/api/products"]
+
+    // Determine if endpoint returns list or single item
+    const returnsList = path.includes('/:id') === false && method === 'GET';
+
+    // Parse description from route manifest comment block
+    const description = route.description || extractFromRouteFile(route.file, path);
+
+    // Infer data shape from response schema (if available)
+    const responseSchema = route.responseSchema || null;
+
+    // Insert into database
+    await db.insert(apiEndpointsMetadata).values({
+      endpoint: path,
+      method: method,
+      description: description,
+      returnsList: returnsList,
+      requiresAuth: route.auth !== false, // default true
+      responseSchema: responseSchema ? JSON.stringify(responseSchema) : null,
+      isActive: true,
+      lastValidated: new Date(),
+    });
+  }
+}
+```
+
+#### 8.2 Schema Mapping
+
+| routes.registry.json Field | api_endpoints_metadata Column | Transformation |
+|----------------------------|-------------------------------|----------------|
+| `route.endpoint` | `endpoint` (path only) | Split on space, take second part |
+| `route.endpoint` | `method` | Split on space, take first part |
+| `route.description` | `description` | Direct copy or extract from route file |
+| `route.responseSchema` | `responseSchema` | JSON.stringify() if present |
+| Inferred from path | `returnsList` | true if no `:id` param and GET method |
+| `route.auth` | `requiresAuth` | Default true unless explicitly false |
+
+#### 8.3 Error Handling
+
+- **Missing registry file**: Skip population, log warning (endpoints can be manually added)
+- **Malformed JSON**: Parse errors should fail gracefully with detailed error message
+- **Duplicate endpoints**: ON CONFLICT DO UPDATE (upsert pattern)
+- **Invalid endpoint format**: Skip route, log warning with route file reference
+
+#### 8.4 Implementation Notes
+
+- Run as database seed task (T057) during initial setup
+- Idempotent: Can re-run to update metadata after new routes added
+- Future enhancement: Auto-refresh on route file changes (watch mode)
+```
+
+2. **tasks.md** - Update T057 description
+
+```markdown
+BEFORE:
+- [ ] T057: Populate api_endpoints_metadata table by scanning routes.registry.json
+
+AFTER:
+- [ ] T057: Populate api_endpoints_metadata table by parsing routes.registry.json per algorithm in research.md §8 (see: endpoint extraction, schema mapping, error handling for malformed routes)
+```
+
+**Time Estimate**: 20 minutes
+
+---
+
+### A8: Add Dashboard Version Pruning Background Job
+
+**Issue**: FR-048 requires "minimum 5 versions retained, 24-hour retention" but no task implements pruning
+
+**Solution**: Add new task for scheduled version cleanup
+
+**Files to Modify**:
+
+1. **tasks.md** - Insert new task after T076 (auto-save implementation)
+
+```markdown
+### Phase 9: Error Recovery & Resilience (6 tasks) [Depends: Phase 3, Phase 7]
+
+**Timeline**: 2-3 days
+**Test Coverage**: Failure scenarios, auto-save, version restore
+
+- [ ] T076: Implement auto-save with 500ms debounce using useLayoutPersistence hook [P] (test: FR-046)
+- [ ] **T077: Implement dashboard version auto-pruning background job [P]**
+  - **Purpose**: Enforce FR-048 retention policy (keep 5 most recent versions per dashboard, minimum 24-hour retention)
+  - **Implementation**:
+    - Create `server/services/version-pruning-service.ts`
+    - Scheduled job runs hourly (or use database triggers)
+    - Query: For each dashboard, find versions beyond 5 most recent AND older than 24 hours
+    - Delete qualifying versions with CASCADE to cleanup
+  - **Query Logic**:
+    ```sql
+    DELETE FROM dashboard_versions
+    WHERE dashboard_id = ?
+      AND version_number NOT IN (
+        SELECT version_number FROM dashboard_versions
+        WHERE dashboard_id = ?
+        ORDER BY created_at DESC
+        LIMIT 5
+      )
+      AND created_at < NOW() - INTERVAL 24 HOUR
+    ```
+  - **Test**: Create 10 versions, wait 24h (mock), verify only 5 newest retained
+  - **Files**: `server/services/version-pruning-service.ts`, `server/index.ts` (cron registration)
+- [ ] T078: Add version comparison UI to show differences between dashboard versions [P] (test: FR-048)
+```
+
+2. **spec.md** - Clarify FR-048 with implementation note
+
+```markdown
+BEFORE:
+- **FR-048**: System MUST maintain version history with minimum 5 versions retained for 24 hours
+
+AFTER:
+- **FR-048**: System MUST maintain version history with minimum 5 versions retained for 24 hours minimum (versions older than 24h may be pruned if more than 5 exist; automated cleanup runs hourly)
+```
+
+3. **Update task numbering**: Increment T077-T126 by 1 (T077 → T078, etc.)
+
+**Time Estimate**: 15 minutes
+
+---
+
+### I1: Update plan.md Library Version
+
+**Issue**: plan.md line 16 shows "NEEDS CLARIFICATION" but research.md decided on react-grid-layout v1.5.2
+
+**Solution**: Update Technical Context with finalized decision
+
+**Files to Modify**:
+
+1. **plan.md** - Line 16
+
+```markdown
+BEFORE:
+- Frontend: React 18+, TanStack Query v5, shadcn/ui, Recharts, react-grid-layout (NEEDS CLARIFICATION: drag-drop library selection)
+
+AFTER:
+- Frontend: React 18+, TanStack Query v5, shadcn/ui, Recharts, react-grid-layout v1.5.2 (decision rationale: research.md §1)
+```
+
+**Time Estimate**: 2 minutes
+
+---
+
+## Phase 2: HIGH Priority Fixes (Address before task execution begins)
+
+**Estimated Time**: 2-3 hours
+**Blocker**: NO - Can proceed with implementation, but should fix to avoid rework
+
+### A2: Define Preview Timeout Behavior
+
+**Issue**: FR-031 "preview updates within 500ms" lacks failure behavior specification
+
+**Solution**: Add timeout handling specification
+
+**Files to Modify**:
+
+1. **spec.md** - Extend FR-031
+
+```markdown
+BEFORE:
+- **FR-031**: Preview panel MUST update within 500ms of configuration changes
+
+AFTER:
+- **FR-031**: Preview panel MUST update within 500ms of configuration changes; if preview generation exceeds 500ms, display the last successful preview with a "Preview delayed - data may be stale" indicator and continue attempting to generate fresh preview in background
+```
+
+2. **tasks.md** - Update T067 to include timeout handling
+
+```markdown
+BEFORE:
+- [ ] T067: Implement preview panel with <500ms update latency using debouncing
+
+AFTER:
+- [ ] T067: Implement preview panel with <500ms update latency using debouncing; add timeout fallback per FR-031 (show stale preview + warning if >500ms)
+```
+
+**Time Estimate**: 5 minutes
+
+---
+
+### A3: Define Graceful Rate Limiting Behavior
+
+**Issue**: FR-027 "handle API rate limiting gracefully" undefined; contracts specify limits but not client behavior
+
+**Solution**: Define retry strategy and user feedback
+
+**Files to Modify**:
+
+1. **spec.md** - Extend FR-027
+
+```markdown
+BEFORE:
+- **FR-027**: System MUST handle API endpoint rate limiting and errors gracefully
+
+AFTER:
+- **FR-027**: System MUST handle API endpoint rate limiting and errors gracefully using exponential backoff (initial: 1s, max: 32s, factor: 2×); after 3 consecutive failures, display user-friendly error message with "Retry" action; rate limit headers (X-RateLimit-Remaining, X-RateLimit-Reset) should inform retry timing
+```
+
+2. **tasks.md** - Update T056 to include retry strategy
+
+```markdown
+BEFORE:
+- [ ] T056: Implement error handling for API failures with user-friendly messages
+
+AFTER:
+- [ ] T056: Implement error handling for API failures with exponential backoff retry (per FR-027: 1s→2s→4s→8s→16s→32s max) and user-friendly messages after 3 failures
+```
+
+**Time Estimate**: 8 minutes
+
+---
+
+### A9-A12: Add Missing Implementation Tasks
+
+**Issue**: FR-049 (crash recovery), FR-050 (delete recovery UI), FR-051-053 (offline), FR-054-056 (UI states) lack task coverage
+
+**Solution**: Add 8 new tasks to appropriate phases
+
+**Files to Modify**:
+
+1. **tasks.md** - Insert new tasks in Phase 9 (Error Recovery)
+
+```markdown
+### Phase 9: Error Recovery & Resilience (10 tasks) [Depends: Phase 3, Phase 7]
+
+**Timeline**: 3-4 days
+**Test Coverage**: Failure scenarios, auto-save, version restore, crash recovery, offline mode
+
+[... existing T076-T078 ...]
+
+- [ ] **T079: Implement browser crash recovery using IndexedDB persistence [P]**
+  - **Purpose**: FR-049 - Recover unsaved dashboard changes after browser crash
+  - **Implementation**:
+    - Store dashboard state in IndexedDB on every change (debounced 500ms)
+    - On page load, check for unsaved changes (compare IndexedDB timestamp > last server save)
+    - If found, show modal: "Unsaved changes detected. Restore? [Yes] [Discard]"
+    - Restore: Apply IndexedDB state, mark as draft, prompt save
+  - **Storage Key**: `dashboard_draft_{dashboardId}`
+  - **Files**: `client/src/hooks/use-crash-recovery.ts`, `client/src/components/dashboard-builder/RecoveryDialog.tsx`
+
+- [ ] **T080: Implement "Undo Delete" UI and recovery endpoint [P]**
+  - **Purpose**: FR-050 - 30-day retention for deleted dashboards with recovery option
+  - **Implementation**:
+    - Soft delete: Set `deleted_at` timestamp instead of DELETE
+    - Show toast notification after delete: "Dashboard deleted. [Undo]"
+    - Undo action calls `POST /api/dashboards/{id}/restore` within 30 days
+    - Add "Deleted Dashboards" view (admin page) showing recoverable items
+  - **Files**: `client/src/components/dashboard-builder/DeleteConfirmDialog.tsx`, `server/routes-widget-dashboard.ts` (add restore endpoint)
+
+- [ ] **T081: Implement offline detection and status indicator [P]**
+  - **Purpose**: FR-051 - Detect offline state and notify user
+  - **Implementation**:
+    - Listen to `window.addEventListener('online'/'offline')`
+    - Show persistent banner: "You're offline. Changes will sync when reconnected."
+    - Disable server-dependent actions (save, template load, API endpoint picker)
+  - **Files**: `client/src/hooks/use-offline-detection.ts`, `client/src/components/ui/OfflineBanner.tsx`
+
+- [ ] **T082: Implement request queuing for offline mode [P]**
+  - **Purpose**: FR-052 - Queue failed requests and retry when online
+  - **Implementation**:
+    - Intercept failed fetch() calls in TanStack Query
+    - Store in IndexedDB queue: `{url, method, body, timestamp, retryCount}`
+    - On 'online' event, replay queued requests (max 50 queue size per FR-052)
+    - Show sync progress: "Syncing 3 pending changes..."
+  - **Files**: `client/src/lib/offline-queue.ts`, integrate with TanStack Query retry logic
+
+- [ ] **T083: Implement degraded experience indicator for slow connections [P]**
+  - **Purpose**: FR-053 - Show warning when latency >5 seconds
+  - **Implementation**:
+    - Track average request latency in TanStack Query
+    - If 3 consecutive requests >5s, show warning: "Slow connection detected. Some features may be delayed."
+    - Suggest: Reduce widget refresh intervals, disable auto-refresh
+  - **Files**: `client/src/hooks/use-connection-quality.ts`, `client/src/components/ui/ConnectionWarning.tsx`
+```
+
+2. **tasks.md** - Insert new tasks in Phase 3 (User Story 1) for UI states
+
+```markdown
+### Phase 3: User Story 1 - Create Widget-Based Dashboard (P1 - MVP) (22 tasks)
+
+[... after T028 ...]
+
+- [ ] **T029: Implement empty state component for widgets with no data [P]**
+  - **Purpose**: FR-054 - Consistent empty state messaging
+  - **Implementation**:
+    - Component shows when API returns empty array or null
+    - Display: Icon + "No data available" message + suggested action
+    - Per widget type: Metric (no value), Chart (no series), Table (no rows)
+  - **Files**: `client/src/components/widgets/base/WidgetEmptyState.tsx`
+
+- [ ] **T030: Implement skeleton loading placeholders for widgets [P]**
+  - **Purpose**: FR-055 - Match final content layout during loading
+  - **Implementation**:
+    - Shimmer animation placeholders
+    - Per widget type: Metric (single value box), Chart (axis + bars), Table (header + 5 rows)
+    - Use shadcn/ui Skeleton component
+  - **Files**: `client/src/components/widgets/base/WidgetSkeleton.tsx`
+
+- [ ] **T031: Implement onboarding tooltips for first-time users [P]**
+  - **Purpose**: FR-056 - Guide users through builder workflow
+  - **Implementation**:
+    - Detect first visit (localStorage flag)
+    - Sequential tooltips: "Add your first widget" → "Configure data source" → "Arrange layout"
+    - Skip button + "Don't show again" checkbox
+    - Library: Use Radix UI Tooltip or build custom
+  - **Files**: `client/src/components/dashboard-builder/OnboardingTooltips.tsx`, `client/src/hooks/use-onboarding.ts`
+
+[... renumber subsequent tasks: old T029 → T032, etc. ...]
+```
+
+3. **Update task numbering**: Renumber all tasks after insertions (old T079 → T084, old T080 → T085, etc.)
+
+**Time Estimate**: 45 minutes
+
+---
+
+### C1: Add Permission Enforcement Tasks
+
+**Issue**: FR-033 requires authorization checks but tasks.md has ZERO permission enforcement
+
+**Solution**: Add 3 security tasks for permission middleware and authorization
+
+**Files to Modify**:
+
+1. **tasks.md** - Insert in Phase 10 (Security & Performance)
+
+```markdown
+### Phase 10: Security & Performance (11 tasks) [Depends: All phases]
+
+[... after T101 ...]
+
+- [ ] **T102: Implement permission middleware for widget data endpoints [BLOCKS: all widget data fetching]**
+  - **Purpose**: FR-033 - Users MUST only see data they are authorized to access
+  - **Implementation**:
+    - Create `server/middleware/permission-check.ts`
+    - Before proxying widget data requests (POST /api/widgets/data/fetch), verify:
+      1. User session exists (authentication)
+      2. User has permission to access target endpoint (authorization)
+      3. Apply user-specific data filters (e.g., org_id, role-based visibility)
+    - Use existing auth system's permission model
+  - **Query**: `SELECT permissions FROM user_roles WHERE user_id = ? AND endpoint = ?`
+  - **Error**: Return 403 Forbidden if unauthorized
+  - **Files**: `server/middleware/permission-check.ts`, integrate into routes-widget-dashboard.ts
+
+- [ ] **T103: Implement data-level authorization filters for widget queries [P]**
+  - **Purpose**: FR-033 enforcement at query level
+  - **Implementation**:
+    - Widget data proxy automatically injects WHERE clauses based on user permissions
+    - Example: User with role "Sales Manager" sees only their region's data
+    - Permission rules stored in database or config file
+  - **Files**: `server/services/permission-service.ts`, integrate with widget-service.ts
+
+- [ ] **T104: Add authorization audit logging for sensitive data access [P]**
+  - **Purpose**: Track who accessed what data through widgets
+  - **Implementation**:
+    - Log every widget data fetch: `{userId, dashboardId, widgetId, endpoint, timestamp, responseCode}`
+    - Store in `widget_access_logs` table (or Winston logs)
+    - Retention: 90 days
+  - **Files**: `server/middleware/audit-logger.ts`, new migration for audit table
+
+[... renumber subsequent tasks ...]
+```
+
+**Time Estimate**: 20 minutes
+
+---
+
+### I2: Resolve Database Table Count Mismatch
+
+**Issue**: data-model.md lists 10 tables, tasks.md T004 only creates 8
+
+**Solution**: Clarify which tables are required vs optional
+
+**Files to Modify**:
+
+1. **data-model.md** - Line 340, update table list
+
+```markdown
+### Core Tables (8 required)
+
+1. widget_definitions
+2. dashboards
+3. dashboard_widgets
+4. widget_layouts
+5. dashboard_templates
+6. template_widgets
+7. api_endpoints_metadata
+8. dashboard_versions
+
+### Optional Tables (future enhancements - NOT in MVP)
+
+9. dashboard_sharing (FR-034 marked as future scope)
+10. widget_calculation_cache (optimization - add if performance issues arise)
+```
+
+2. **tasks.md** - Update T004 to reference 8 core tables
+
+```markdown
+BEFORE:
+- [ ] T004: Create database migration for 8 widget framework tables per data-model.md
+
+AFTER:
+- [ ] T004: Create database migration for 8 core widget framework tables per data-model.md (excludes optional dashboard_sharing and widget_calculation_cache - see data-model §Optional Tables)
+```
+
+**Time Estimate**: 5 minutes
+
+---
+
+### I3: Clarify Dashboard Template Seed Data Structure
+
+**Issue**: T019 says "3 widget definitions" but should be "1 template with 3 widgets"
+
+**Solution**: Clarify seed data structure
+
+**Files to Modify**:
+
+1. **tasks.md** - Update T019 description
+
+```markdown
+BEFORE:
+- [ ] T019: Seed database with 3 initial widget definitions for common use cases
+
+AFTER:
+- [ ] T019: Seed database with 1 dashboard template ("Sales Overview") containing 3 pre-configured widget definitions (total sales metric, monthly trend chart, top products table) per FR-016 requirement
+```
+
+2. **spec.md** - Add seed data specification after FR-016
+
+```markdown
+**Seed Data Requirement**: System MUST ship with at least 1 pre-built template:
+- **Sales Overview Dashboard** (3 widgets):
+  1. Total Sales Metric (sum of sales_amount from /api/sales endpoint)
+  2. Monthly Trend Chart (line chart, sales by month)
+  3. Top 10 Products Table (grouped by product, sorted by revenue DESC)
+```
+
+**Time Estimate**: 8 minutes
+
+---
+
+### Additional HIGH Fixes (A10-A12 grouped)
+
+**Issue**: FR-051-056 missing tasks (covered in A9-A12 above)
+
+**Time Estimate**: Included in A9-A12 (45 minutes)
+
+---
+
+## Phase 3: MEDIUM/LOW Fixes (Clean up during implementation)
+
+**Estimated Time**: 1-2 hours
+**Blocker**: NO - Can defer or address incrementally
+
+### A4: Add Default Refresh Interval to Spec
+
+**Files**: spec.md (add to FR-004)
+
+```markdown
+- **FR-004**: Users MUST be able to set auto-refresh intervals between 30 seconds and 60 minutes (default: 60 seconds per data-model.md)
+```
+
+**Time**: 2 minutes
+
+---
+
+### A5: Resolve Auto-Save Timing Conflict
+
+**Recommendation**: Interpret as complementary constraints
+- 500ms debounce (UX smoothness - don't save on every keystroke)
+- 30 seconds max staleness (safety net - force save if no changes in 30s)
+
+**Files**: spec.md (clarify FR-046)
+
+```markdown
+- **FR-046**: System MUST auto-save dashboard layout and widget configurations every 30 seconds maximum (implementation uses 500ms debounce after changes, with 30-second maximum interval if no changes detected)
+```
+
+**Time**: 3 minutes
+
+---
+
+### A6: Clarify Grid Dimensions
+
+**Files**: spec.md (add note to FR-020)
+
+```markdown
+**Grid Cell Sizing**: Responsive breakpoints (FR-022) define columns per width (320px: 1 col, 768px: 2 cols, 1200px: 4 cols, 3840px: 8 cols). Cell height: 200px fixed. Thus "2x2 widget" occupies different pixel dimensions at different breakpoints (e.g., 768px width: each cell ≈384px wide).
+```
+
+**Time**: 5 minutes
+
+---
+
+### A13: Add Async Calculation Task
+
+**Files**: tasks.md (insert after T087)
+
+```markdown
+- [ ] **T088: Implement async calculation mode for long-running operations [P]**
+  - **Purpose**: FR-058 edge case - calculations >30 seconds should run async with notification
+  - **Implementation**:
+    - If calculation exceeds 5 seconds (proactive threshold), switch to async mode
+    - Return `{status: "processing", calculationId: "uuid"}` immediately
+    - Client polls GET /api/calculations/{id}/status every 2 seconds
+    - Show notification when complete: "Calculation finished - click to view results"
+  - **Files**: `server/services/async-calculation-service.ts`, `client/src/hooks/use-async-calculation.ts`
+```
+
+**Time**: 10 minutes
+
+---
+
+### A14: Add Cache Management Task
+
+**Files**: tasks.md (insert after T111)
+
+```markdown
+- [ ] **T112: Implement browser cache size monitoring and LRU pruning [P]**
+  - **Purpose**: Edge case - prevent cache exceeding 50MB per FR spec
+  - **Implementation**:
+    - Track cached data size in IndexedDB (store metadata: {key, size, lastAccess})
+    - On cache write, check total size
+    - If >50MB, evict least-recently-used (LRU) entries until <45MB
+  - **Files**: `client/src/lib/cache-manager.ts`
+```
+
+**Time**: 8 minutes
+
+---
+
+### A15/D1-D3: Consolidate Duplications
+
+**Action Items**:
+
+1. **A15**: Remove inline schema from tasks.md, reference data-model.md only
+2. **D1**: Delete constitution check from quickstart.md lines 21-22
+3. **D2**: Clarify T063 vs T090 - T063 creates base component, T090 adds comparison mode toggle
+4. **D3**: Extract widget type enum to shared/types/widget-types.ts
+
+**Time**: 20 minutes
+
+---
+
+### I4-I6: Resolve Minor Inconsistencies
+
+**I4**: Make /api/widgets/system/limits return environment-configured values (not hardcoded)
+**I5**: Align quickstart.md and tasks.md - use TWO separate services (widget-service.ts, dashboard-service.ts)
+**I6**: Mark dashboard_sharing as "Phase 2 feature" in both spec and data-model
+
+**Time**: 15 minutes
+
+---
+
+### C2-C3: Add Testing and Monitoring Tasks
+
+**C2**: Add WCAG audit task using axe-core automated testing
+**C3**: Add resource monitoring infrastructure tasks (memory tracking, CPU throttling detection)
+
+**Time**: 25 minutes
+
+---
+
+## Execution Summary
+
+### Critical Path (Must complete before implementation)
+
+```
+Phase 1: CRITICAL (45-60 min)
+├─ A1: Calculation location conflict → 10 min
+├─ A7: API metadata algorithm → 20 min
+├─ A8: Version pruning task → 15 min
+└─ I1: Update plan.md version → 2 min
+```
+
+### Recommended Path (Address before task execution)
+
+```
+Phase 2: HIGH Priority (2-3 hours)
+├─ A2: Preview timeout behavior → 5 min
+├─ A3: Rate limiting strategy → 8 min
+├─ A9-A12: Missing tasks (offline, UI states, recovery) → 45 min
+├─ C1: Permission enforcement tasks → 20 min
+├─ I2: Database table count → 5 min
+└─ I3: Template seed structure → 8 min
+```
+
+### Optional Path (Can defer)
+
+```
+Phase 3: MEDIUM/LOW (1-2 hours)
+├─ A4-A6: Specification clarifications → 10 min
+├─ A13-A14: Edge case tasks → 18 min
+├─ A15/D1-D3: Consolidate duplications → 20 min
+├─ I4-I6: Minor inconsistencies → 15 min
+└─ C2-C3: Testing/monitoring enhancement → 25 min
+```
+
+---
+
+## Remediation Timeline
+
+### Immediate (Today - 60 min)
+✅ Phase 1: CRITICAL fixes (A1, A7, A8, I1)
+
+### Before Implementation (Tomorrow - 2-3 hours)
+✅ Phase 2: HIGH priority fixes (A2, A3, A9-A12, C1, I2, I3)
+
+### During Implementation (Ad-hoc - 1-2 hours)
+⚪ Phase 3: MEDIUM/LOW fixes as encountered
+
+---
+
+## Validation Checklist
+
+After completing remediation:
+
+- [ ] All CRITICAL ambiguities resolved (A1, A7, A8, I1)
+- [ ] Missing tasks added for FR-033, FR-048-056 (8 new tasks)
+- [ ] Database schema clarified (8 core + 2 optional tables)
+- [ ] Authorization enforcement explicitly covered in tasks
+- [ ] Preview/rate-limit failure behavior specified
+- [ ] Template seed data structure documented
+- [ ] All findings tracked with specific file changes
+- [ ] Task numbering updated after insertions
+- [ ] Constitution compliance maintained (no new violations)
+
+---
+
+## Next Steps
+
+1. **Review this remediation plan** with stakeholders
+2. **Execute Phase 1 (CRITICAL)** - 60 minutes
+3. **Execute Phase 2 (HIGH)** - 2-3 hours
+4. **Re-run `/speckit.analyze`** to verify all fixes applied correctly
+5. **Proceed to `/speckit.implement`** with clean artifacts
+
+---
+
+**Estimated Total Effort**: 4-6 hours (60 min + 2-3 hours + 1-2 hours optional)
+
+**Recommended Approach**: Complete Phase 1+2 (3-4 hours) then proceed to implementation. Address Phase 3 issues incrementally during development as they arise.

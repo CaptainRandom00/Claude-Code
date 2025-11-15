@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+
+/**
+ * Quick Template Gallery Test
+ * Verifies template gallery page loads and templates are displayed
+ */
+
+import { chromium } from 'playwright';
+
+async function testTemplateGallery() {
+  console.log('🧪 Testing Template Gallery...\n');
+
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  try {
+    // Navigate to template gallery
+    console.log('📍 Navigating to http://localhost:3000/dashboards/templates...');
+    await page.goto('http://localhost:3000/dashboards/templates', {
+      waitUntil: 'networkidle',
+      timeout: 30000
+    });
+
+    // Wait for template gallery to load
+    await page.waitForSelector('[data-testid="template-gallery"]', { timeout: 10000 });
+    console.log('✅ Template gallery loaded');
+
+    // Check for templates
+    const templateCards = await page.locator('[data-testid^="template-card-"]').count();
+    console.log(`✅ Found ${templateCards} template cards`);
+
+    if (templateCards < 3) {
+      throw new Error(`❌ Expected at least 3 templates, found ${templateCards}`);
+    }
+
+    // Check first template has required elements
+    const firstTemplate = page.locator('[data-testid^="template-card-"]').first();
+    const hasName = await firstTemplate.locator('[data-testid="template-name"]').isVisible();
+    const hasDescription = await firstTemplate.locator('[data-testid="template-description"]').isVisible();
+    const hasPreview = await firstTemplate.locator('[data-testid="template-preview"]').isVisible();
+
+    if (!hasName || !hasDescription || !hasPreview) {
+      throw new Error('Template card missing required elements');
+    }
+    console.log('✅ Template cards have required elements');
+
+    // Test clicking on a template
+    await firstTemplate.click();
+    await page.waitForSelector('[data-testid="save-dashboard-dialog"]', { timeout: 5000 });
+    console.log('✅ Template selection dialog opened');
+
+    // Check dialog elements
+    const nameInput = page.locator('[data-testid="dashboard-name-input"]');
+    const nameInputVisible = await nameInput.isVisible();
+    const createButton = page.locator('[data-testid="confirm-save-button"]');
+    const createButtonVisible = await createButton.isVisible();
+
+    if (!nameInputVisible || !createButtonVisible) {
+      throw new Error('Dialog missing required elements');
+    }
+    console.log('✅ Dialog has name input and create button');
+
+    // Take screenshot
+    await page.screenshot({ path: 'template-gallery-test.png', fullPage: true });
+    console.log('\n📸 Screenshot saved to template-gallery-test.png');
+
+    console.log('\n✅ All template gallery tests passed!');
+
+  } catch (error) {
+    console.error(`\n❌ Test failed:`, error.message);
+    await page.screenshot({ path: 'template-gallery-error.png', fullPage: true });
+    console.log('📸 Error screenshot saved to template-gallery-error.png');
+    process.exit(1);
+  } finally {
+    await browser.close();
+  }
+}
+
+testTemplateGallery();

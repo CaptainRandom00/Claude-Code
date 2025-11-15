@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__music-analysis__load",
+      "mcp__music-analysis__tempo",
+      "mcp__music-analysis__chroma_cqt",
+      "mcp__music-analysis__mfcc"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

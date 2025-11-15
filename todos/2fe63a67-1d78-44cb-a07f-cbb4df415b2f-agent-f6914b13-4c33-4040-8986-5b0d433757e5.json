@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Create semantic wrapper system with HTML5 landmarks and content components",
+    "status": "completed",
+    "activeForm": "Creating semantic wrapper system with HTML5 landmarks and content components"
+  },
+  {
+    "content": "Implement BEM CSS framework with component, element, and modifier styles",
+    "status": "completed",
+    "activeForm": "Implementing BEM CSS framework with component, element, and modifier styles"
+  },
+  {
+    "content": "Create data attribute schema for content scanning and classification",
+    "status": "completed",
+    "activeForm": "Creating data attribute schema for content scanning and classification"
+  },
+  {
+    "content": "Build WordPress integration with PHP template functions and The7 theme compatibility",
+    "status": "in_progress",
+    "activeForm": "Building WordPress integration with PHP template functions and The7 theme compatibility"
+  },
+  {
+    "content": "Generate JavaScript content scanning functionality",
+    "status": "pending",
+    "activeForm": "Generating JavaScript content scanning functionality"
+  },
+  {
+    "content": "Create documentation with implementation examples",
+    "status": "pending",
+    "activeForm": "Creating documentation with implementation examples"
+  }
+]

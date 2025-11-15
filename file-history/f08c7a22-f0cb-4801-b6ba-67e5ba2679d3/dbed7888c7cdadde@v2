@@ -1,0 +1,614 @@
+/**
+ * Dashboard Service Unit Tests
+ * Feature: 028-build-a-widget
+ *
+ * Tests for dashboard CRUD operations, widget management,
+ * layout persistence, and version control.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { DashboardService } from '../../server/services/dashboard-service';
+import type { InsertDashboard, InsertDashboardWidget } from '@shared/schema';
+
+describe('Dashboard Service', () => {
+  let dashboardService: DashboardService;
+
+  beforeEach(() => {
+    dashboardService = new DashboardService();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('create', () => {
+    it('should create a new dashboard with valid data', async () => {
+      const dashboardData: InsertDashboard = {
+        userId: 1,
+        name: 'Test Dashboard',
+        description: 'A test dashboard',
+        isActive: true
+      };
+
+      const result = await dashboardService.create(dashboardData);
+
+      expect(result).toBeDefined();
+      expect(result.name).toBe('Test Dashboard');
+      expect(result.userId).toBe(1);
+    });
+
+    it('should validate dashboard name length (min 3 characters)', async () => {
+      const invalidData: InsertDashboard = {
+        userId: 1,
+        name: 'AB', // Too short
+        isActive: true
+      };
+
+      await expect(dashboardService.create(invalidData)).rejects.toThrow(
+        'Dashboard name must be between 3 and 255 characters'
+      );
+    });
+
+    it('should validate dashboard name length (max 255 characters)', async () => {
+      const invalidData: InsertDashboard = {
+        userId: 1,
+        name: 'A'.repeat(256), // Too long
+        isActive: true
+      };
+
+      await expect(dashboardService.create(invalidData)).rejects.toThrow(
+        'Dashboard name must be between 3 and 255 characters'
+      );
+    });
+
+    it('should create initial version on dashboard creation', async () => {
+      const dashboardData: InsertDashboard = {
+        userId: 1,
+        name: 'Versioned Dashboard',
+        isActive: true
+      };
+
+      const dashboard = await dashboardService.create(dashboardData);
+      const versions = await dashboardService.getVersionHistory(dashboard.id);
+
+      expect(versions).toHaveLength(1);
+      expect(versions[0].version).toBe(1);
+      expect(versions[0].description).toBe('Initial dashboard creation');
+    });
+
+    it('should create dashboard with global filters', async () => {
+      const dashboardData: InsertDashboard = {
+        userId: 1,
+        name: 'Filtered Dashboard',
+        globalFilters: {
+          dateRange: {
+            start: '2025-01-01',
+            end: '2025-12-31'
+          },
+          status: 'active'
+        },
+        isActive: true
+      };
+
+      const result = await dashboardService.create(dashboardData);
+
+      expect(result.globalFilters).toBeDefined();
+      expect(result.globalFilters.dateRange).toBeDefined();
+    });
+  });
+
+  describe('getById', () => {
+    it('should retrieve dashboard by ID', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const retrieved = await dashboardService.getById(created.id);
+
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(created.id);
+      expect(retrieved?.name).toBe('Test Dashboard');
+    });
+
+    it('should return null for non-existent dashboard ID', async () => {
+      const result = await dashboardService.getById(999999);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getByUser', () => {
+    it('should retrieve all active dashboards for a user', async () => {
+      const userId = 1;
+
+      await dashboardService.create({
+        userId,
+        name: 'Dashboard 1',
+        isActive: true
+      });
+
+      await dashboardService.create({
+        userId,
+        name: 'Dashboard 2',
+        isActive: true
+      });
+
+      const dashboards = await dashboardService.getByUser(userId);
+
+      expect(dashboards.length).toBeGreaterThanOrEqual(2);
+      expect(dashboards.every(d => d.userId === userId)).toBe(true);
+      expect(dashboards.every(d => d.isActive === true)).toBe(true);
+    });
+
+    it('should exclude inactive dashboards by default', async () => {
+      const userId = 1;
+
+      // Create active dashboard
+      await dashboardService.create({
+        userId,
+        name: 'Active Dashboard',
+        isActive: true
+      });
+
+      // Create inactive dashboard
+      const inactive = await dashboardService.create({
+        userId,
+        name: 'Inactive Dashboard',
+        isActive: true
+      });
+
+      await dashboardService.delete(inactive.id, userId);
+
+      const dashboards = await dashboardService.getByUser(userId, false);
+
+      expect(dashboards.every(d => d.isActive === true)).toBe(true);
+      expect(dashboards.some(d => d.id === inactive.id)).toBe(false);
+    });
+
+    it('should include inactive dashboards when includeInactive is true', async () => {
+      const userId = 1;
+
+      const inactive = await dashboardService.create({
+        userId,
+        name: 'To Delete',
+        isActive: true
+      });
+
+      await dashboardService.delete(inactive.id, userId);
+
+      const allDashboards = await dashboardService.getByUser(userId, true);
+
+      expect(allDashboards.some(d => d.id === inactive.id && d.isActive === false)).toBe(true);
+    });
+
+    it('should return dashboards ordered by updatedAt descending', async () => {
+      const userId = 1;
+
+      const first = await dashboardService.create({
+        userId,
+        name: 'First Dashboard',
+        isActive: true
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const second = await dashboardService.create({
+        userId,
+        name: 'Second Dashboard',
+        isActive: true
+      });
+
+      const dashboards = await dashboardService.getByUser(userId);
+
+      const firstIndex = dashboards.findIndex(d => d.id === first.id);
+      const secondIndex = dashboards.findIndex(d => d.id === second.id);
+
+      expect(secondIndex).toBeLessThan(firstIndex);
+    });
+  });
+
+  describe('update', () => {
+    it('should update dashboard name', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Original Name',
+        isActive: true
+      });
+
+      const updated = await dashboardService.update(created.id, {
+        name: 'Updated Name'
+      }, 1);
+
+      expect(updated.name).toBe('Updated Name');
+    });
+
+    it('should update dashboard description', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const updated = await dashboardService.update(created.id, {
+        description: 'New description'
+      }, 1);
+
+      expect(updated.description).toBe('New description');
+    });
+
+    it('should update global filters', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Filtered Dashboard',
+        globalFilters: { status: 'active' },
+        isActive: true
+      });
+
+      const updated = await dashboardService.update(created.id, {
+        globalFilters: { status: 'inactive', dateRange: '2025' }
+      }, 1);
+
+      expect(updated.globalFilters.status).toBe('inactive');
+      expect(updated.globalFilters.dateRange).toBe('2025');
+    });
+
+    it('should validate name length on update', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      await expect(
+        dashboardService.update(created.id, { name: 'AB' }, 1)
+      ).rejects.toThrow('Dashboard name must be between 3 and 255 characters');
+    });
+
+    it('should prevent unauthorized updates', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'User 1 Dashboard',
+        isActive: true
+      });
+
+      await expect(
+        dashboardService.update(created.id, { name: 'Hacked' }, 2)
+      ).rejects.toThrow('Unauthorized: Cannot update dashboard owned by another user');
+    });
+
+    it('should update updatedAt timestamp', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const originalUpdatedAt = created.updatedAt;
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const updated = await dashboardService.update(created.id, {
+        name: 'Updated Dashboard'
+      }, 1);
+
+      expect(updated.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+    });
+
+    it('should throw error for non-existent dashboard', async () => {
+      await expect(
+        dashboardService.update(999999, { name: 'Updated' }, 1)
+      ).rejects.toThrow('Dashboard with ID 999999 not found');
+    });
+  });
+
+  describe('delete', () => {
+    it('should soft delete dashboard', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'To Delete',
+        isActive: true
+      });
+
+      const result = await dashboardService.delete(created.id, 1);
+
+      expect(result).toBe(true);
+
+      const retrieved = await dashboardService.getById(created.id);
+      expect(retrieved?.isActive).toBe(false);
+    });
+
+    it('should prevent unauthorized deletion', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'User 1 Dashboard',
+        isActive: true
+      });
+
+      await expect(
+        dashboardService.delete(created.id, 2)
+      ).rejects.toThrow('Unauthorized: Cannot delete dashboard owned by another user');
+    });
+
+    it('should throw error for non-existent dashboard', async () => {
+      await expect(
+        dashboardService.delete(999999, 1)
+      ).rejects.toThrow('Dashboard with ID 999999 not found');
+    });
+
+    it('should update updatedAt on delete', async () => {
+      const created = await dashboardService.create({
+        userId: 1,
+        name: 'To Delete',
+        isActive: true
+      });
+
+      const originalUpdatedAt = created.updatedAt;
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      await dashboardService.delete(created.id, 1);
+
+      const deleted = await dashboardService.getById(created.id);
+      expect(deleted?.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+    });
+  });
+
+  describe('addWidget', () => {
+    it('should add widget to dashboard', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const widgetData: InsertDashboardWidget = {
+        dashboardId: dashboard.id,
+        widgetDefinitionId: 1,
+        position: { x: 0, y: 0, w: 4, h: 4 }
+      };
+
+      const result = await dashboardService.addWidget(widgetData);
+
+      expect(result).toBeDefined();
+      expect(result.dashboardId).toBe(dashboard.id);
+      expect(result.widgetDefinitionId).toBe(1);
+    });
+
+    it('should validate widget position has required fields', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const invalidData: InsertDashboardWidget = {
+        dashboardId: dashboard.id,
+        widgetDefinitionId: 1,
+        position: { x: 0, y: 0 } as any // Missing w and h
+      };
+
+      await expect(dashboardService.addWidget(invalidData)).rejects.toThrow();
+    });
+  });
+
+  describe('getWidgets', () => {
+    it('should retrieve all widgets for a dashboard', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      await dashboardService.addWidget({
+        dashboardId: dashboard.id,
+        widgetDefinitionId: 1,
+        position: { x: 0, y: 0, w: 4, h: 4 }
+      });
+
+      await dashboardService.addWidget({
+        dashboardId: dashboard.id,
+        widgetDefinitionId: 2,
+        position: { x: 4, y: 0, w: 4, h: 4 }
+      });
+
+      const widgets = await dashboardService.getWidgets(dashboard.id);
+
+      expect(widgets.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should include widget definitions in response', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      await dashboardService.addWidget({
+        dashboardId: dashboard.id,
+        widgetDefinitionId: 1,
+        position: { x: 0, y: 0, w: 4, h: 4 }
+      });
+
+      const widgets = await dashboardService.getWidgets(dashboard.id);
+
+      expect(widgets[0].widgetDefinition).toBeDefined();
+    });
+  });
+
+  describe('Template System', () => {
+    it('should create dashboard from template', async () => {
+      const userId = 1;
+      const templateId = 1; // Sales Performance template
+
+      const dashboard = await dashboardService.createFromTemplate(
+        templateId,
+        userId,
+        'My Sales Dashboard'
+      );
+
+      expect(dashboard).toBeDefined();
+      expect(dashboard.name).toBe('My Sales Dashboard');
+      expect(dashboard.userId).toBe(userId);
+    });
+
+    it('should use default template name if custom name not provided', async () => {
+      const userId = 1;
+      const templateId = 1;
+
+      const dashboard = await dashboardService.createFromTemplate(
+        templateId,
+        userId
+      );
+
+      expect(dashboard.name).toBeTruthy();
+    });
+
+    it('should copy all widgets from template to new dashboard', async () => {
+      const userId = 1;
+      const templateId = 1;
+
+      const dashboard = await dashboardService.createFromTemplate(
+        templateId,
+        userId
+      );
+
+      const widgets = await dashboardService.getWidgets(dashboard.id);
+
+      expect(widgets.length).toBeGreaterThan(0);
+    });
+
+    it('should get all available templates', async () => {
+      const templates = await dashboardService.getTemplates();
+
+      expect(Array.isArray(templates)).toBe(true);
+      expect(templates.length).toBeGreaterThanOrEqual(3); // Sales, Expiry, Stock
+    });
+
+    it('should get template by ID', async () => {
+      const template = await dashboardService.getTemplateById(1);
+
+      expect(template).toBeDefined();
+      expect(template?.id).toBe(1);
+    });
+  });
+
+  describe('Version Control', () => {
+    it('should create new version when dashboard is updated', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Versioned Dashboard',
+        isActive: true
+      });
+
+      await dashboardService.update(dashboard.id, {
+        name: 'Updated Dashboard'
+      }, 1);
+
+      const versions = await dashboardService.getVersionHistory(dashboard.id);
+
+      expect(versions.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should limit version history to 5 versions (24h retention)', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      // Create multiple versions
+      for (let i = 0; i < 7; i++) {
+        await dashboardService.update(dashboard.id, {
+          name: `Version ${i + 2}`
+        }, 1);
+      }
+
+      const versions = await dashboardService.getVersionHistory(dashboard.id);
+
+      expect(versions.length).toBeLessThanOrEqual(5);
+    });
+
+    it('should restore dashboard from previous version', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Original Name',
+        isActive: true
+      });
+
+      const versions = await dashboardService.getVersionHistory(dashboard.id);
+      const originalVersion = versions[0];
+
+      await dashboardService.update(dashboard.id, {
+        name: 'Changed Name'
+      }, 1);
+
+      await dashboardService.restoreVersion(dashboard.id, originalVersion.id, 1);
+
+      const restored = await dashboardService.getById(dashboard.id);
+      expect(restored?.name).toBe('Original Name');
+    });
+
+    it('should prevent unauthorized version restore', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const versions = await dashboardService.getVersionHistory(dashboard.id);
+
+      await expect(
+        dashboardService.restoreVersion(dashboard.id, versions[0].id, 2)
+      ).rejects.toThrow('Unauthorized');
+    });
+  });
+
+  describe('Layout Management', () => {
+    it('should save layout configuration for dashboard', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Test Dashboard',
+        isActive: true
+      });
+
+      const layout = {
+        lg: [{ i: '1', x: 0, y: 0, w: 6, h: 4 }],
+        md: [{ i: '1', x: 0, y: 0, w: 4, h: 4 }]
+      };
+
+      await dashboardService.saveLayout(dashboard.id, layout);
+
+      const savedLayout = await dashboardService.getLayout(dashboard.id);
+
+      expect(savedLayout).toBeDefined();
+      expect(savedLayout?.lg).toHaveLength(1);
+    });
+
+    it('should support all breakpoints (lg, md, sm, xs, xxs)', async () => {
+      const dashboard = await dashboardService.create({
+        userId: 1,
+        name: 'Responsive Dashboard',
+        isActive: true
+      });
+
+      const layout = {
+        lg: [{ i: '1', x: 0, y: 0, w: 6, h: 4 }],
+        md: [{ i: '1', x: 0, y: 0, w: 4, h: 4 }],
+        sm: [{ i: '1', x: 0, y: 0, w: 2, h: 4 }],
+        xs: [{ i: '1', x: 0, y: 0, w: 1, h: 4 }],
+        xxs: [{ i: '1', x: 0, y: 0, w: 1, h: 4 }]
+      };
+
+      await dashboardService.saveLayout(dashboard.id, layout);
+
+      const savedLayout = await dashboardService.getLayout(dashboard.id);
+
+      expect(savedLayout?.lg).toBeDefined();
+      expect(savedLayout?.md).toBeDefined();
+      expect(savedLayout?.sm).toBeDefined();
+      expect(savedLayout?.xs).toBeDefined();
+      expect(savedLayout?.xxs).toBeDefined();
+    });
+  });
+});

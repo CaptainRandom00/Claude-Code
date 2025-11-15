@@ -1,0 +1,1067 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  BarChart3, 
+  AlertTriangle, 
+  CheckCircle, 
+  Package,
+  Calendar,
+  Target,
+  Zap,
+  CalendarDays,
+  Search,
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
+} from "lucide-react";
+
+interface AggregationResult {
+  processedDates: string[];
+  totalItemsProcessed: number;
+  totalSalesValue: number;
+  totalDataQualityIssues: number;
+  summary: {
+    newDatesProcessed: number;
+    skippedDates: number;
+    errorDates: number;
+  };
+  validationErrors?: ValidationError[];
+}
+
+interface ValidationError {
+  type: string;
+  itemCode: string;
+  salesValue: number;
+  message: string;
+}
+
+interface AggregatedData {
+  salesDate: string;
+  baseItemCode: string;
+  variantSales: {
+    case: number;
+    single: number;
+    pack1: number;
+    pack2: number;
+  };
+  variantQuantities: {
+    case: number;
+    single: number;
+    pack1: number;
+    pack2: number;
+  };
+  totalSales: number;
+  totalQuantity: number;
+}
+
+interface ItemDetails {
+  description: string;
+  brand: string;
+  category: string;
+  supplier: string;
+}
+
+interface VariantAnalysis {
+  baseItemCode: string;
+  period: {
+    startDate: string;
+    endDate: string;
+    days: number;
+  };
+  variantContribution: {
+    case: number;
+    single: number;
+    pack1: number;
+    pack2: number;
+  };
+  recommendations: {
+    primaryVariant: string;
+    inventoryFocus: string;
+  };
+}
+
+export default function SalesAggregation() {
+  const [loading, setLoading] = useState(false);
+  const [aggregationResult, setAggregationResult] = useState<AggregationResult | null>(null);
+  const [aggregatedData, setAggregatedData] = useState<AggregatedData[]>([]);
+  const [filteredData, setFilteredData] = useState<AggregatedData[]>([]);
+  const [variantAnalysis, setVariantAnalysis] = useState<VariantAnalysis | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [aggregatedDates, setAggregatedDates] = useState<Date[]>([]);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
+  const [selectedItemCode, setSelectedItemCode] = useState('');
+  const [periodDays, setPeriodDays] = useState(30);
+  const [itemDetails, setItemDetails] = useState<Record<string, ItemDetails>>({});
+  const [brnDateWarning, setBrnDateWarning] = useState<{show: boolean; salesDate: string; brnDate: string} | null>(null);
+  
+  // Filters for Aggregated Data tab
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [searchItemCode, setSearchItemCode] = useState('');
+  const [searchSupplier, setSearchSupplier] = useState('');
+  const [searchCategory, setSearchCategory] = useState('');
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Load aggregated dates for calendar
+  const loadAggregatedDates = async () => {
+    try {
+      const response = await fetch('/api/sales-aggregation/aggregated-dates');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const dates = result.data.map((dateStr: string) => new Date(dateStr));
+        setAggregatedDates(dates);
+        setAvailableDates(result.data);
+        
+        // Auto-select the most recent date if available
+        if (result.data.length > 0 && !selectedDate) {
+          setSelectedDate(result.data[0]); // Dates are returned in descending order
+        }
+      } else {
+        setAggregatedDates([]);
+        setAvailableDates([]);
+      }
+    } catch (err) {
+      console.error('Failed to load aggregated dates:', err);
+      setAggregatedDates([]);
+      setAvailableDates([]);
+    }
+  };
+
+  // Trigger auto-aggregation for unaggregated data
+  const handleAutoAggregation = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/sales-aggregation/auto-aggregate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAggregationResult(result.data);
+        // Reload aggregated dates and data after successful aggregation
+        await loadAggregatedDates();
+        await loadAggregatedData();
+      } else {
+        setError(result.error || 'Auto-aggregation failed');
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
+      console.error('Auto-aggregation error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load aggregated data on component mount and when calendar date changes
+  useEffect(() => {
+    setError(null); // Clear any previous errors
+    loadAggregatedDates();
+    loadAggregatedData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCalendarDate) {
+      setError(null); // Clear any previous errors
+      loadAggregatedData();
+    }
+  }, [selectedCalendarDate]);
+
+  // Load data when selected date changes
+  useEffect(() => {
+    if (selectedDate) {
+      loadAggregatedData(selectedDate);
+    }
+  }, [selectedDate]);
+
+  // Apply filters when filter values change
+  useEffect(() => {
+    applyFilters(aggregatedData);
+  }, [searchItemCode, searchSupplier, searchCategory, aggregatedData]);
+
+  // Load aggregated sales data
+  const loadAggregatedData = async (dateToLoad?: string) => {
+    try {
+      const params = new URLSearchParams();
+      const targetDate = dateToLoad || selectedDate;
+      
+      if (targetDate) {
+        params.append('startDate', targetDate);
+        params.append('endDate', targetDate);
+      } else if (selectedCalendarDate) {
+        const dateStr = selectedCalendarDate.toISOString().split('T')[0];
+        params.append('startDate', dateStr);
+        params.append('endDate', dateStr);
+      }
+      // Limit to a reasonable number, but ensure user can search for specific items
+      params.append('limit', '5000');
+
+      const response = await fetch(`/api/sales-aggregation/data?${params}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setAggregatedData(result.data);
+        
+        // Extract unique suppliers and categories for filters
+        const uniqueSuppliers = new Set<string>();
+        const uniqueCategories = new Set<string>();
+        
+        // Load item details for all items
+        const itemCodes = [...new Set(result.data.map((item: AggregatedData) => item.baseItemCode))] as string[];
+        // Use the sales date from the data to match BRN snapshot
+        const salesDate = result.data[0]?.salesDate || targetDate;
+        await loadItemDetails(itemCodes, salesDate);
+        
+        applyFilters(result.data);
+      } else {
+        setAggregatedData([]);
+        setFilteredData([]);
+        if (!result.success) {
+          setError(result.error || 'Failed to load aggregated data');
+        }
+      }
+    } catch (err) {
+      setError('Failed to load aggregated data');
+      console.error('Load data error:', err);
+    }
+  };
+
+  // Apply filters to the aggregated data
+  const applyFilters = (data: AggregatedData[]) => {
+    let filtered = [...data];
+    
+    if (searchItemCode) {
+      filtered = filtered.filter(item => 
+        item.baseItemCode.toLowerCase().includes(searchItemCode.toLowerCase())
+      );
+    }
+    
+    if (searchSupplier && itemDetails) {
+      filtered = filtered.filter(item => {
+        const details = itemDetails[item.baseItemCode];
+        return details && details.supplier.toLowerCase().includes(searchSupplier.toLowerCase());
+      });
+    }
+    
+    if (searchCategory && itemDetails) {
+      filtered = filtered.filter(item => {
+        const details = itemDetails[item.baseItemCode];
+        return details && details.category.toLowerCase().includes(searchCategory.toLowerCase());
+      });
+    }
+    
+    setFilteredData(filtered);
+  };
+
+  // Load item details from BRN master data
+  const loadItemDetails = async (itemCodes: string[], snapshotDate: string) => {
+    if (itemCodes.length === 0) return;
+    
+    try {
+      const response = await fetch('/api/sales-aggregation/item-details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemCodes, snapshotDate }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setItemDetails(result.data);
+        
+        // Check if BRN date matches sales date
+        if (result.metadata && !result.metadata.isExactMatch) {
+          setBrnDateWarning({
+            show: true,
+            salesDate: new Date(result.metadata.requestedDate).toLocaleDateString('en-GB'),
+            brnDate: result.metadata.brnDateUsed ? new Date(result.metadata.brnDateUsed).toLocaleDateString('en-GB') : 'latest available'
+          });
+        } else {
+          setBrnDateWarning(null);
+        }
+        
+        // Extract unique suppliers and categories
+        const uniqueSuppliers = new Set<string>();
+        const uniqueCategories = new Set<string>();
+        
+        Object.values(result.data).forEach((details: any) => {
+          if (details.supplier) uniqueSuppliers.add(details.supplier);
+          if (details.category) uniqueCategories.add(details.category);
+        });
+        
+        setSuppliers(Array.from(uniqueSuppliers).sort());
+        setCategories(Array.from(uniqueCategories).sort());
+      }
+    } catch (err) {
+      console.error('Failed to load item details:', err);
+    }
+  };
+
+  // Load variant analysis
+  const loadVariantAnalysis = async () => {
+    if (!selectedItemCode) {
+      setError('Please enter an item code for analysis');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/sales-aggregation/variant-analysis/${selectedItemCode}?periodDays=${periodDays}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setVariantAnalysis(result.data);
+      } else {
+        setError(result.error || 'Variant analysis failed');
+      }
+    } catch (err) {
+      setError('Failed to load variant analysis');
+      console.error('Variant analysis error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Parse item code to show variant breakdown
+  const parseItemCode = async (itemCode: string) => {
+    try {
+      const response = await fetch('/api/sales-aggregation/parse-item-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemCode }),
+      });
+
+      const result = await response.json();
+      return result.success ? result.data : null;
+    } catch (err) {
+      console.error('Parse item code error:', err);
+      return null;
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP'
+    }).format(value);
+  };
+
+  // Handle column sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort the filtered data
+  const sortedData = [...filteredData].sort((a, b) => {
+    if (!sortColumn) return 0;
+
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortColumn) {
+      case 'baseItemCode':
+        aValue = a.baseItemCode;
+        bValue = b.baseItemCode;
+        break;
+      case 'description':
+        aValue = itemDetails[a.baseItemCode]?.description || '';
+        bValue = itemDetails[b.baseItemCode]?.description || '';
+        break;
+      case 'supplier':
+        aValue = itemDetails[a.baseItemCode]?.supplier || '';
+        bValue = itemDetails[b.baseItemCode]?.supplier || '';
+        break;
+      case 'category':
+        aValue = itemDetails[a.baseItemCode]?.category || '';
+        bValue = itemDetails[b.baseItemCode]?.category || '';
+        break;
+      case 'caseQty':
+        aValue = a.variantQuantities?.case || 0;
+        bValue = b.variantQuantities?.case || 0;
+        break;
+      case 'singleQty':
+        aValue = a.variantQuantities?.single || 0;
+        bValue = b.variantQuantities?.single || 0;
+        break;
+      case 'pack1Qty':
+        aValue = a.variantQuantities?.pack1 || 0;
+        bValue = b.variantQuantities?.pack1 || 0;
+        break;
+      case 'pack2Qty':
+        aValue = a.variantQuantities?.pack2 || 0;
+        bValue = b.variantQuantities?.pack2 || 0;
+        break;
+      case 'totalQty':
+        aValue = a.totalQuantity || 0;
+        bValue = b.totalQuantity || 0;
+        break;
+      default:
+        return 0;
+    }
+
+    // Handle numeric vs string comparison
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+
+    // String comparison
+    const aString = String(aValue).toLowerCase();
+    const bString = String(bValue).toLowerCase();
+    
+    if (sortDirection === 'asc') {
+      return aString < bString ? -1 : aString > bString ? 1 : 0;
+    } else {
+      return aString > bString ? -1 : aString < bString ? 1 : 0;
+    }
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-muted-foreground">Consolidate sales data across item variants</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Badge variant="outline" className="flex items-center space-x-1">
+            <Package className="w-3 h-3" />
+            <span>Variant Consolidation</span>
+          </Badge>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Tabs defaultValue="aggregate" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="aggregate">Daily Aggregation</TabsTrigger>
+          <TabsTrigger value="data">Aggregated Data</TabsTrigger>
+          <TabsTrigger value="analysis">Variant Analysis</TabsTrigger>
+        </TabsList>
+
+        {/* Daily Aggregation Tab */}
+        <TabsContent value="aggregate" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5" />
+                <span>Trigger Daily Aggregation</span>
+              </CardTitle>
+              <CardDescription>
+                Process EPOS sales data to consolidate variant sales (65, 65s, 65c, 65p1, 65p2) into unified totals
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex justify-center">
+                <Button 
+                  onClick={handleAutoAggregation}
+                  disabled={loading}
+                  size="lg"
+                  className="w-64"
+                >
+                  {loading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Zap className="w-4 h-4" />
+                      <span>Process New Sales Data</span>
+                    </div>
+                  )}
+                </Button>
+              </div>
+              
+              <div className="text-center text-sm text-muted-foreground">
+                <p>Processes any new EPOS sales data uploads and consolidates</p>
+                <p>variant sales (001s, 001c, 001p1, etc.) into unified totals</p>
+              </div>
+
+              {/* Aggregation Results */}
+              {aggregationResult && (
+                <div className="mt-6 space-y-4">
+                  {/* Status Message */}
+                  <Card className={`${aggregationResult.summary.newDatesProcessed > 0 ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        {aggregationResult.summary.newDatesProcessed > 0 ? (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-blue-600" />
+                        )}
+                        <div>
+                          <p className={`font-semibold ${aggregationResult.summary.newDatesProcessed > 0 ? 'text-green-800' : 'text-blue-800'}`}>
+                            {aggregationResult.summary.newDatesProcessed > 0 
+                              ? `✅ Successfully processed ${aggregationResult.summary.newDatesProcessed} new date${aggregationResult.summary.newDatesProcessed > 1 ? 's' : ''}`
+                              : '✅ System is up-to-date - All available data has been aggregated'
+                            }
+                          </p>
+                          <p className={`text-sm ${aggregationResult.summary.newDatesProcessed > 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                            {aggregationResult.summary.skippedDates > 0 && `${aggregationResult.summary.skippedDates} existing date${aggregationResult.summary.skippedDates > 1 ? 's' : ''} already processed`}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Package className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Items Processed</p>
+                            <p className="text-2xl font-bold">{aggregationResult.totalItemsProcessed}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <TrendingUp className="w-4 h-4 text-green-500" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Total Sales</p>
+                            <p className="text-2xl font-bold">{formatCurrency(aggregationResult.totalSalesValue)}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <CalendarDays className="w-4 h-4 text-purple-500" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Dates Processed</p>
+                            <p className="text-2xl font-bold">{aggregationResult.summary.newDatesProcessed}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          {aggregationResult.totalDataQualityIssues > 0 ? (
+                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          )}
+                          <div>
+                            <p className="text-sm text-muted-foreground">Data Quality</p>
+                            <p className="text-2xl font-bold">
+                              {aggregationResult.totalDataQualityIssues === 0 ? 'Clean' : `${aggregationResult.totalDataQualityIssues} Issues`}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {aggregationResult.processedDates.length > 0 && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold mb-2">Processed Dates</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {aggregationResult.processedDates.map((date, index) => (
+                            <Badge key={index} variant="outline">{date}</Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+              
+              {/* Calendar View */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <CalendarDays className="w-5 h-5" />
+                    <span>Aggregated Data Calendar</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Dates highlighted in blue have aggregated sales data. Click a date to view details.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedCalendarDate}
+                    onSelect={setSelectedCalendarDate}
+                    modifiers={{
+                      aggregated: aggregatedDates
+                    }}
+                    modifiersClassNames={{
+                      aggregated: 'bg-blue-500 text-white font-bold hover:bg-blue-600'
+                    }}
+                    captionLayout="dropdown"
+                    fromYear={2020}
+                    toYear={2030}
+                    fixedWeeks={true}
+                    showOutsideDays={true}
+                    className="rounded-md border"
+                  />
+                  {selectedCalendarDate && (
+                    <div className="mt-4 text-center">
+                      <Badge variant="outline">
+                        Viewing data for {selectedCalendarDate.toLocaleDateString()}
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Aggregated Data Tab */}
+        <TabsContent value="data" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5" />
+                <span>Aggregated Sales Data</span>
+              </CardTitle>
+              <CardDescription>
+                View consolidated sales data by base item code and variants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* BRN Date Warning */}
+                {brnDateWarning?.show && (
+                  <Alert className="border-yellow-500 bg-yellow-50">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800">
+                      <strong>Note:</strong> BRN master data for {brnDateWarning.salesDate} is not available. 
+                      Using BRN data from {brnDateWarning.brnDate}. Product descriptions and details may not reflect 
+                      the exact information as of the sales date.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Filters Section */}
+                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Filter className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Filters</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Date Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="date-select">Select Date</Label>
+                      <Select value={selectedDate} onValueChange={setSelectedDate}>
+                        <SelectTrigger id="date-select">
+                          <SelectValue placeholder="Select a date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableDates.length > 0 ? (
+                            availableDates.map(date => (
+                              <SelectItem key={date} value={date}>
+                                {new Date(date).toLocaleDateString('en-GB', {
+                                  weekday: 'short',
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-dates" disabled>
+                              No dates available
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Item Code Search */}
+                    <div className="space-y-2">
+                      <Label htmlFor="item-search">Item Code</Label>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="item-search"
+                          placeholder="Search item code..."
+                          value={searchItemCode}
+                          onChange={(e) => setSearchItemCode(e.target.value)}
+                          className="pl-8"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Supplier Search */}
+                    <div className="space-y-2">
+                      <Label htmlFor="supplier-search">Supplier</Label>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="supplier-search"
+                          placeholder="Search supplier..."
+                          value={searchSupplier}
+                          onChange={(e) => setSearchSupplier(e.target.value)}
+                          className="pl-8"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Category Search */}
+                    <div className="space-y-2">
+                      <Label htmlFor="category-search">Category</Label>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="category-search"
+                          placeholder="Search category..."
+                          value={searchCategory}
+                          onChange={(e) => setSearchCategory(e.target.value)}
+                          className="pl-8"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedDate 
+                        ? `Showing data for ${new Date(selectedDate).toLocaleDateString()}`
+                        : 'Please select a date to view data'
+                      }
+                      {searchItemCode && ` • Filtered by: "${searchItemCode}"`}
+                    </p>
+                    <Button 
+                      onClick={() => loadAggregatedData()} 
+                      variant="outline"
+                      size="sm"
+                    >
+                      Refresh Data
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Data Table */}
+                {filteredData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredData.length} of {aggregatedData.length} items
+                        {aggregatedData.length >= 5000 && (
+                          <span className="text-yellow-600 ml-2">
+                            (Limited to 5000 - use search to find specific items)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary"
+                              onClick={() => handleSort('baseItemCode')}
+                            >
+                              <span>Base Item</span>
+                              {sortColumn === 'baseItemCode' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-left p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary"
+                              onClick={() => handleSort('description')}
+                            >
+                              <span>Description</span>
+                              {sortColumn === 'description' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-right p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary ml-auto"
+                              onClick={() => handleSort('caseQty')}
+                            >
+                              <span>Case Qty</span>
+                              {sortColumn === 'caseQty' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-right p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary ml-auto"
+                              onClick={() => handleSort('singleQty')}
+                            >
+                              <span>Single Qty</span>
+                              {sortColumn === 'singleQty' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-right p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary ml-auto"
+                              onClick={() => handleSort('pack1Qty')}
+                            >
+                              <span>Pack1 Qty</span>
+                              {sortColumn === 'pack1Qty' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-right p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary ml-auto"
+                              onClick={() => handleSort('pack2Qty')}
+                            >
+                              <span>Pack2 Qty</span>
+                              {sortColumn === 'pack2Qty' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-right p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary ml-auto"
+                              onClick={() => handleSort('totalQty')}
+                            >
+                              <span>Total Qty</span>
+                              {sortColumn === 'totalQty' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-left p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary"
+                              onClick={() => handleSort('supplier')}
+                            >
+                              <span>Supplier</span>
+                              {sortColumn === 'supplier' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </th>
+                          <th className="text-left p-2">
+                            <button
+                              className="flex items-center space-x-1 hover:text-primary"
+                              onClick={() => handleSort('category')}
+                            >
+                              <span>Category</span>
+                              {sortColumn === 'category' ? (
+                                sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                              ) : null}
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedData.map((item, index) => {
+                          const details = itemDetails[item.baseItemCode];
+                          return (
+                            <tr key={index} className="border-b hover:bg-muted/50">
+                              <td className="p-2 font-medium">{item.baseItemCode}</td>
+                              <td className="p-2">
+                                {details ? (
+                                  <div>
+                                    <div className="font-medium">{details.description}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {details.brand !== 'Unknown' ? `${details.brand} • ${details.category}` : details.category}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Item not in BRN data</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-right">{(item.variantQuantities?.case || 0).toFixed(2)}</td>
+                              <td className="p-2 text-right">{(item.variantQuantities?.single || 0).toFixed(2)}</td>
+                              <td className="p-2 text-right">{(item.variantQuantities?.pack1 || 0).toFixed(2)}</td>
+                              <td className="p-2 text-right">{(item.variantQuantities?.pack2 || 0).toFixed(2)}</td>
+                              <td className="p-2 text-right font-semibold">{(item.totalQuantity || 0).toFixed(2)}</td>
+                              <td className="p-2">{details?.supplier || <span className="text-muted-foreground">-</span>}</td>
+                              <td className="p-2">{details?.category || <span className="text-muted-foreground">-</span>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : aggregatedData.length > 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No items match your search criteria</p>
+                    <p className="text-sm">Try adjusting your filters</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No aggregated data available</p>
+                    <p className="text-sm">Select a date or run aggregation</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Variant Analysis Tab */}
+        <TabsContent value="analysis" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Target className="w-5 h-5" />
+                <span>Variant Performance Analysis</span>
+              </CardTitle>
+              <CardDescription>
+                Analyze which variants (case, single, pack1, pack2) perform best for specific items
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="item-code">Base Item Code</Label>
+                  <Input
+                    id="item-code"
+                    placeholder="Enter item code (e.g., 65)"
+                    value={selectedItemCode}
+                    onChange={(e) => setSelectedItemCode(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="period-days">Analysis Period (days)</Label>
+                  <Input
+                    id="period-days"
+                    type="number"
+                    value={periodDays}
+                    onChange={(e) => setPeriodDays(parseInt(e.target.value) || 30)}
+                    min="1"
+                    max="365"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    onClick={loadVariantAnalysis}
+                    disabled={loading || !selectedItemCode}
+                    className="w-full"
+                  >
+                    <span>Analyze Variants</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Variant Analysis Results */}
+              {variantAnalysis && (
+                <div className="mt-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Case Sales</p>
+                          <p className="text-2xl font-bold text-blue-600">
+                            {variantAnalysis.variantContribution.case.toFixed(1)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Single Sales</p>
+                          <p className="text-2xl font-bold text-green-600">
+                            {variantAnalysis.variantContribution.single.toFixed(1)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Pack1 Sales</p>
+                          <p className="text-2xl font-bold text-purple-600">
+                            {variantAnalysis.variantContribution.pack1.toFixed(1)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Pack2 Sales</p>
+                          <p className="text-2xl font-bold text-orange-600">
+                            {variantAnalysis.variantContribution.pack2.toFixed(1)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2">Recommendations</h4>
+                      <div className="space-y-2">
+                        <p className="text-sm">
+                          <strong>Primary Variant:</strong> {variantAnalysis.recommendations.primaryVariant}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {variantAnalysis.recommendations.inventoryFocus}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

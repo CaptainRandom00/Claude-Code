@@ -1,0 +1,230 @@
+/**
+ * Product Image Service
+ * Feature: 025-product-image-management
+ *
+ * Handles image compression, thumbnail generation, validation, and file management
+ * for product profile images using Sharp library.
+ */
+
+import sharp from 'sharp';
+import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import type { ProductImage, CompressionStats, ValidationResult, ImageProcessingResult } from '../../shared/types/product-images';
+
+/**
+ * Compress image to WebP format with thumbnail generation
+ *
+ * @param buffer - Original image buffer from upload
+ * @returns Processed image buffers and compression statistics
+ */
+export async function compressImage(buffer: Buffer): Promise<ImageProcessingResult> {
+  const startTime = Date.now();
+
+  // Get original image metadata
+  const originalMetadata = await sharp(buffer).metadata();
+  const originalSize = buffer.length;
+
+  // Compress original to WebP at 85% quality
+  // Resize to max 1200x1200 maintaining aspect ratio
+  const originalProcessed = await sharp(buffer)
+    .resize(1200, 1200, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 85 })
+    .withMetadata({ orientation: undefined }) // Strip EXIF but preserve orientation
+    .toBuffer();
+
+  // Get processed image metadata
+  const processedMetadata = await sharp(originalProcessed).metadata();
+
+  // Generate 300x300 center-cropped thumbnail
+  const thumbnail = await sharp(buffer)
+    .resize(300, 300, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .webp({ quality: 85 })
+    .toBuffer();
+
+  const compressionTime = Date.now() - startTime;
+
+  // Calculate compression statistics
+  const compressedSize = originalProcessed.length;
+  const reductionPercent = ((originalSize - compressedSize) / originalSize) * 100;
+
+  const stats: CompressionStats = {
+    originalSize,
+    compressedSize,
+    reductionPercent: Math.round(reductionPercent * 10) / 10, // Round to 1 decimal
+  };
+
+  console.log(`Image compressed in ${compressionTime}ms: ${Math.round(originalSize / 1024)}KB → ${Math.round(compressedSize / 1024)}KB (${stats.reductionPercent}% reduction)`);
+
+  return {
+    original: originalProcessed,
+    thumbnail,
+    stats,
+    metadata: {
+      width: processedMetadata.width || 0,
+      height: processedMetadata.height || 0,
+      format: 'webp',
+    },
+  };
+}
+
+/**
+ * Generate unique filename using MD5 hash
+ *
+ * @param itemCode - Product item code
+ * @param description - Product description
+ * @returns Hashed filename with .webp extension
+ */
+export function generateFilename(itemCode: string, description: string): string {
+  const timestamp = Date.now();
+  const hash = crypto
+    .createHash('md5')
+    .update(`${itemCode}-${description}-${timestamp}`)
+    .digest('hex');
+
+  return `${hash}.webp`;
+}
+
+/**
+ * Validate uploaded image file
+ *
+ * @param file - Multer file object
+ * @returns Validation result with error message if invalid
+ */
+export async function validateImage(file: Express.Multer.File): Promise<ValidationResult> {
+  // Check file size (max 10MB)
+  const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+  if (file.size > maxSize) {
+    return {
+      valid: false,
+      error: 'File size exceeds 10MB limit',
+    };
+  }
+
+  // Validate magic number (not just MIME type)
+  const buffer = file.buffer;
+  const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+  const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  const isWebP = buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46;
+
+  if (!isJPEG && !isPNG && !isWebP) {
+    return {
+      valid: false,
+      error: 'Only JPG, JPEG, PNG, WEBP formats accepted',
+    };
+  }
+
+  // Validate dimensions using Sharp
+  try {
+    const metadata = await sharp(buffer).metadata();
+
+    if (!metadata.width || !metadata.height) {
+      return {
+        valid: false,
+        error: 'Could not determine image dimensions',
+      };
+    }
+
+    const minDimension = 100;
+    if (metadata.width < minDimension || metadata.height < minDimension) {
+      return {
+        valid: false,
+        error: `Image too small. Minimum ${minDimension}x${minDimension} pixels required`,
+      };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return {
+      valid: false,
+      error: 'Invalid image file',
+    };
+  }
+}
+
+/**
+ * Save processed image and thumbnail to filesystem
+ *
+ * @param itemCode - Product item code
+ * @param filename - Generated filename (without path)
+ * @param original - Compressed original image buffer
+ * @param thumbnail - Thumbnail image buffer
+ * @returns Relative paths to saved files
+ */
+export async function saveImage(
+  itemCode: string,
+  filename: string,
+  original: Buffer,
+  thumbnail: Buffer
+): Promise<{ path: string; thumbnailPath: string }> {
+  // Create product-specific directory
+  const baseDir = path.join(process.cwd(), 'public', 'uploads', 'product-images', itemCode);
+
+  try {
+    await fs.mkdir(baseDir, { recursive: true });
+  } catch (error) {
+    console.error(`Failed to create directory ${baseDir}:`, error);
+    throw new Error('Failed to create image directory');
+  }
+
+  // Save original compressed image
+  const originalPath = path.join(baseDir, filename);
+  await fs.writeFile(originalPath, original);
+
+  // Save thumbnail
+  const thumbnailFilename = filename.replace('.webp', '_thumb.webp');
+  const thumbnailPath = path.join(baseDir, thumbnailFilename);
+  await fs.writeFile(thumbnailPath, thumbnail);
+
+  // Return relative paths (for database storage)
+  const relativePath = `/uploads/product-images/${itemCode}/${filename}`;
+  const relativeThumbnailPath = `/uploads/product-images/${itemCode}/${thumbnailFilename}`;
+
+  console.log(`Saved image: ${relativePath}`);
+
+  return {
+    path: relativePath,
+    thumbnailPath: relativeThumbnailPath,
+  };
+}
+
+/**
+ * Delete image and thumbnail from filesystem
+ *
+ * @param imagePath - Relative path to image
+ * @param thumbnailPath - Relative path to thumbnail
+ */
+export async function deleteImage(imagePath: string, thumbnailPath: string): Promise<void> {
+  const fullImagePath = path.join(process.cwd(), 'public', imagePath);
+  const fullThumbnailPath = path.join(process.cwd(), 'public', thumbnailPath);
+
+  try {
+    // Delete original image
+    await fs.unlink(fullImagePath).catch((err) => {
+      if (err.code !== 'ENOENT') throw err; // Ignore if file doesn't exist
+    });
+
+    // Delete thumbnail
+    await fs.unlink(fullThumbnailPath).catch((err) => {
+      if (err.code !== 'ENOENT') throw err; // Ignore if file doesn't exist
+    });
+
+    console.log(`Deleted image: ${imagePath}`);
+  } catch (error) {
+    console.error(`Failed to delete image files:`, error);
+    throw new Error('Failed to delete image files');
+  }
+}
+
+/**
+ * Generate UUID v4 for image ID
+ */
+export function generateImageId(): string {
+  return crypto.randomUUID();
+}

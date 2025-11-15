@@ -1,0 +1,156 @@
+/**
+ * Preview Panel Component
+ * Feature: 028-build-a-widget (User Story 3 - T064)
+ *
+ * Shows real-time preview of widget data with applied calculations
+ */
+
+import { useMutation } from '@tanstack/react-query';
+import { Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import type { CalculationConfig } from './CalculationBuilder';
+
+interface PreviewPanelProps {
+  apiEndpoint: string | null;
+  calculationConfig: CalculationConfig | null;
+  autoPreview?: boolean;
+}
+
+interface PreviewResponse {
+  success: boolean;
+  preview: any;
+  recordCount: number;
+  limitedTo: number;
+  timestamp: string;
+}
+
+export function PreviewPanel({ apiEndpoint, calculationConfig, autoPreview = true }: PreviewPanelProps) {
+  // Preview mutation
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      if (!apiEndpoint || !calculationConfig) {
+        throw new Error('Endpoint and calculation required');
+      }
+
+      const response = await fetch('/api/widgets/data/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiEndpoint,
+          calculationConfig,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Preview failed');
+      }
+
+      return response.json() as Promise<PreviewResponse>;
+    },
+  });
+
+  // Auto-trigger preview when config changes
+  const handlePreview = () => {
+    if (apiEndpoint && calculationConfig) {
+      previewMutation.mutate();
+    }
+  };
+
+  // Trigger preview automatically if enabled
+  if (autoPreview && apiEndpoint && calculationConfig && !previewMutation.data && !previewMutation.isPending) {
+    handlePreview();
+  }
+
+  return (
+    <div data-testid="preview-panel" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Preview
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Real-time preview of widget data
+          </p>
+        </div>
+
+        {!autoPreview && (
+          <Button
+            onClick={handlePreview}
+            disabled={!apiEndpoint || !calculationConfig || previewMutation.isPending}
+            size="sm"
+          >
+            Refresh Preview
+          </Button>
+        )}
+      </div>
+
+      {/* Preview Content */}
+      <div className="border rounded-lg p-4 min-h-[200px]">
+        {previewMutation.isPending && (
+          <div className="flex items-center justify-center h-40" data-testid="preview-loading">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {previewMutation.isError && (
+          <div className="flex items-center gap-2 text-destructive" data-testid="preview-error">
+            <AlertCircle className="h-5 w-5" />
+            <p>
+              {previewMutation.error instanceof Error
+                ? previewMutation.error.message
+                : 'Failed to generate preview'}
+            </p>
+          </div>
+        )}
+
+        {previewMutation.data && (
+          <div data-testid="preview-data">
+            {/* Preview Metadata */}
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <span className="text-sm text-muted-foreground">
+                {previewMutation.data.recordCount} records
+                {previewMutation.data.limitedTo && ` (showing first ${previewMutation.data.limitedTo})`}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {new Date(previewMutation.data.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+
+            {/* Preview Value */}
+            <div className="text-center py-8" data-testid="preview-value">
+              {Array.isArray(previewMutation.data.preview) ? (
+                // Show first value from array for metric widgets
+                <div className="text-4xl font-bold">
+                  {JSON.stringify(previewMutation.data.preview[0] || 'No data')}
+                </div>
+              ) : (
+                // Show object value
+                <div className="text-4xl font-bold">
+                  {JSON.stringify(previewMutation.data.preview)}
+                </div>
+              )}
+            </div>
+
+            {/* Raw Data (collapsed) */}
+            <details className="mt-4">
+              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                View raw data
+              </summary>
+              <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-40">
+                {JSON.stringify(previewMutation.data.preview, null, 2)}
+              </pre>
+            </details>
+          </div>
+        )}
+
+        {!apiEndpoint && !calculationConfig && !previewMutation.data && (
+          <div className="flex items-center justify-center h-40 text-muted-foreground">
+            <p>Select an API endpoint and calculation to preview data</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

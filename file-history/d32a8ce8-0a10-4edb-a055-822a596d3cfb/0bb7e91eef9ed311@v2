@@ -1,0 +1,60 @@
+-- Migration: Create case_studies table
+-- Created: 2025-11-08
+
+CREATE TABLE IF NOT EXISTS case_studies (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  industry VARCHAR(100) NOT NULL,
+  services_used TEXT[], -- Array of service names
+  challenge TEXT NOT NULL,
+  solution TEXT NOT NULL,
+  results TEXT NOT NULL,
+  technologies TEXT[], -- Array of technology names
+  featured_image VARCHAR(500),
+  metrics JSONB, -- Store metrics as JSON (e.g., {"roi": "150%", "timeframe": "6 months"})
+  published BOOLEAN DEFAULT false,
+  published_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  -- Full-text search vector
+  search_vector tsvector GENERATED ALWAYS AS (
+    to_tsvector('english',
+      coalesce(title, '') || ' ' ||
+      coalesce(client_name, '') || ' ' ||
+      coalesce(industry, '') || ' ' ||
+      coalesce(challenge, '') || ' ' ||
+      coalesce(solution, '') || ' ' ||
+      coalesce(results, '')
+    )
+  ) STORED
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_case_studies_slug ON case_studies(slug);
+CREATE INDEX IF NOT EXISTS idx_case_studies_published ON case_studies(published, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_case_studies_industry ON case_studies(industry);
+CREATE INDEX IF NOT EXISTS idx_case_studies_search ON case_studies USING GIN(search_vector);
+CREATE INDEX IF NOT EXISTS idx_case_studies_services ON case_studies USING GIN(services_used);
+CREATE INDEX IF NOT EXISTS idx_case_studies_technologies ON case_studies USING GIN(technologies);
+CREATE INDEX IF NOT EXISTS idx_case_studies_metrics ON case_studies USING GIN(metrics);
+
+-- Create trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_case_studies_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_case_studies_updated_at
+  BEFORE UPDATE ON case_studies
+  FOR EACH ROW
+  EXECUTE FUNCTION update_case_studies_updated_at();
+
+-- Add comment for documentation
+COMMENT ON TABLE case_studies IS 'Stores client case studies and project success stories';
+COMMENT ON COLUMN case_studies.search_vector IS 'Full-text search vector generated from title, client, industry, challenge, solution, and results';
+COMMENT ON COLUMN case_studies.metrics IS 'JSON object storing measurable results (e.g., ROI, time savings, performance improvements)';

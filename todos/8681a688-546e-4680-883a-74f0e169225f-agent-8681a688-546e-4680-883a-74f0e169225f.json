@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Implement Google Calendar OAuth2 authentication flow",
+    "status": "completed",
+    "priority": "high",
+    "id": "google-oauth"
+  },
+  {
+    "content": "Create Google Calendar API service for event management",
+    "status": "completed",
+    "priority": "high",
+    "id": "google-calendar-api"
+  },
+  {
+    "content": "Update calendar integration UI for Google Calendar",
+    "status": "completed",
+    "priority": "high",
+    "id": "google-calendar-ui"
+  },
+  {
+    "content": "Test Google Calendar sync with real credentials",
+    "status": "completed",
+    "priority": "high",
+    "id": "test-google-sync"
+  },
+  {
+    "content": "Add EventKit iCloud integration to iOS app roadmap",
+    "status": "pending",
+    "priority": "medium",
+    "id": "ios-eventkit-roadmap"
+  }
+]

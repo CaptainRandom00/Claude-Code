@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Analyze site structure and initial WordPress configuration",
+    "status": "in_progress",
+    "activeForm": "Analyzing site structure and initial WordPress configuration"
+  },
+  {
+    "content": "Perform version audit and compatibility analysis",
+    "status": "pending",
+    "activeForm": "Performing version audit and compatibility analysis"
+  },
+  {
+    "content": "Assess technical debt and infrastructure issues",
+    "status": "pending",
+    "activeForm": "Assessing technical debt and infrastructure issues"
+  },
+  {
+    "content": "Analyze site performance and SEO impact",
+    "status": "pending",
+    "activeForm": "Analyzing site performance and SEO impact"
+  },
+  {
+    "content": "Investigate breaking point timeline and root causes",
+    "status": "pending",
+    "activeForm": "Investigating breaking point timeline and root causes"
+  },
+  {
+    "content": "Generate comprehensive audit report with modernization roadmap",
+    "status": "pending",
+    "activeForm": "Generating comprehensive audit report with modernization roadmap"
+  }
+]

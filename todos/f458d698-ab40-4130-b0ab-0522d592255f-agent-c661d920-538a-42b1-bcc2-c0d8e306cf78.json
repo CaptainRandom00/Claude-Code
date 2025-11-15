@@ -1,0 +1,62 @@
+[
+  {
+    "content": "Start development server and verify it's running",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Test API endpoints systematically - GET /api/skill-trees",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test API endpoints - GET /api/skill-trees/:id",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Test critical endpoint - GET /api/skill-trees/:id/nodes (previously failing)",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Test API endpoints - GET /api/skill-nodes/:id and POST /api/skill-trees/:id/nodes",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Test frontend navigation to skill trees page",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Test skill tree detail page rendering and console for errors",
+    "status": "completed",
+    "priority": "high",
+    "id": "7"
+  },
+  {
+    "content": "Test integration flow - frontend service to backend API",
+    "status": "completed",
+    "priority": "high",
+    "id": "8"
+  },
+  {
+    "content": "Test authentication with provided credentials",
+    "status": "completed",
+    "priority": "medium",
+    "id": "9"
+  },
+  {
+    "content": "Generate comprehensive test report with pass/fail status",
+    "status": "completed",
+    "priority": "high",
+    "id": "10"
+  }
+]

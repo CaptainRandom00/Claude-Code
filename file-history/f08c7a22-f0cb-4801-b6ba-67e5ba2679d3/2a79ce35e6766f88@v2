@@ -1,0 +1,96 @@
+/**
+ * Alert Widget Component
+ * Feature: 028-build-a-widget
+ *
+ * Displays list of alerts with severity levels (per spec.md FR-017)
+ * Supports info, warning, and error severity levels
+ */
+
+import React from 'react';
+import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { VisualizationConfig } from '@/types/widget-types';
+
+interface AlertWidgetProps {
+  data: any[];
+  visualizationConfig: VisualizationConfig;
+}
+
+interface AlertItem {
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  timestamp?: string;
+  title?: string;
+}
+
+export function AlertWidget({ data, visualizationConfig }: AlertWidgetProps) {
+  // Extract alerts from data
+  const alerts: AlertItem[] = data.map((item) => ({
+    message: item.message || '',
+    severity: item.severity || 'info',
+    timestamp: item.timestamp,
+    title: item.title,
+  }));
+
+  // Get severity icon
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'error':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'warning':
+        return <AlertTriangle className="h-4 w-4" />;
+      case 'info':
+      default:
+        return <Info className="h-4 w-4" />;
+    }
+  };
+
+  // Get severity variant for Alert component
+  const getSeverityVariant = (severity: string): 'default' | 'destructive' => {
+    return severity === 'error' ? 'destructive' : 'default';
+  };
+
+  // Format timestamp
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+  };
+
+  return (
+    <div
+      data-testid="alert-widget"
+      className="space-y-3 overflow-auto max-h-[500px]"
+    >
+      {alerts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
+          <Info className="h-12 w-12 text-muted-foreground mb-3" />
+          <p className="text-sm text-muted-foreground">No alerts to display</p>
+        </div>
+      ) : (
+        alerts.map((alert, index) => (
+          <Alert
+            key={index}
+            variant={getSeverityVariant(alert.severity)}
+            className="relative"
+          >
+            {getSeverityIcon(alert.severity)}
+            <div className="ml-2 flex-1">
+              {alert.title && (
+                <AlertTitle className="mb-1">{alert.title}</AlertTitle>
+              )}
+              <AlertDescription>
+                {alert.message}
+                {alert.timestamp && (
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    {formatTimestamp(alert.timestamp)}
+                  </span>
+                )}
+              </AlertDescription>
+            </div>
+          </Alert>
+        ))
+      )}
+    </div>
+  );
+}

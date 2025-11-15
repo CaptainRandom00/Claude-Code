@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Research and choose TA library (TA-Lib vs TA vs others)",
+    "status": "completed",
+    "priority": "high",
+    "id": "tech1"
+  },
+  {
+    "content": "Design TA database schema with composite keys",
+    "status": "completed",
+    "priority": "high",
+    "id": "tech2"
+  },
+  {
+    "content": "Create TA calculation service with auto-fetch capability",
+    "status": "completed",
+    "priority": "high",
+    "id": "tech3"
+  },
+  {
+    "content": "Create REST API endpoints for TA operations",
+    "status": "completed",
+    "priority": "high",
+    "id": "tech7"
+  },
+  {
+    "content": "Build indicator selection UI in Analytics section",
+    "status": "completed",
+    "priority": "medium",
+    "id": "tech4"
+  },
+  {
+    "content": "Integrate with existing Analytics page",
+    "status": "completed",
+    "priority": "medium",
+    "id": "tech8"
+  },
+  {
+    "content": "Implement all available indicators from chosen library",
+    "status": "completed",
+    "priority": "medium",
+    "id": "tech5"
+  },
+  {
+    "content": "Add intelligent data fetching for missing periods",
+    "status": "completed",
+    "priority": "high",
+    "id": "tech6"
+  }
+]

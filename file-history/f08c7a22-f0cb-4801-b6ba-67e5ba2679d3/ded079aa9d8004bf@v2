@@ -1,0 +1,231 @@
+# Data Model: Fix Sales Aggregation Calendar Navigation and Date Alignment
+
+**Feature**: 026-fix-sales-aggregation
+**Date**: 2025-10-10
+**Phase**: Phase 1 - Design & Contracts
+
+## Overview
+
+**No data model changes required** for this feature.
+
+This is a pure UI component enhancement affecting only the Calendar component's visual presentation and interaction model. No database schema, API contracts, or data structures are modified.
+
+## Existing Data Model (Unchanged)
+
+### Aggregated Sales Data
+
+The calendar component displays dates that have aggregated sales data, but this data structure remains completely unchanged:
+
+```typescript
+// Existing data structure (no modifications)
+interface AggregatedSalesDate {
+  date: Date;           // Date with aggregated data
+  totalSales: number;   // Total sales for the date
+  itemCount: number;    // Number of items sold
+  // ... other aggregated metrics
+}
+```
+
+**Source**: Fetched via existing sales aggregation API
+**Display**: Blue highlighting via react-day-picker `modifiers` prop
+**No changes**: Data structure, fetching logic, or API contracts
+
+### Calendar Component State
+
+The calendar component manages local UI state for date selection, which also remains unchanged:
+
+```typescript
+// Existing state (no modifications)
+const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>();
+const [aggregatedDates, setAggregatedDates] = useState<Date[]>([]);
+```
+
+**Component**: `client/src/components/dashboard/sales-aggregation.tsx`
+**Changes**: None - state management unchanged
+**Impact**: Zero - existing functionality preserved
+
+## Component Prop Changes Only
+
+The only changes are **additive props** to the Calendar component:
+
+```typescript
+// Before (current implementation)
+<CalendarComponent
+  mode="single"
+  selected={selectedCalendarDate}
+  onSelect={setSelectedCalendarDate}
+  modifiers={{ aggregated: aggregatedDates }}
+  modifiersClassNames={{ aggregated: 'bg-blue-500 text-white font-bold hover:bg-blue-600' }}
+  className="rounded-md border"
+/>
+
+// After (with new props)
+<CalendarComponent
+  mode="single"
+  selected={selectedCalendarDate}
+  onSelect={setSelectedCalendarDate}
+  modifiers={{ aggregated: aggregatedDates }}
+  modifiersClassNames={{ aggregated: 'bg-blue-500 text-white font-bold hover:bg-blue-600' }}
+  captionLayout="dropdown-buttons"  // NEW: Navigation controls
+  fixedWeeks={true}                 // NEW: Consistent 6-week grid
+  showOutsideDays={true}            // ALREADY DEFAULT
+  className="rounded-md border"
+/>
+```
+
+**Type**: React component props (UI configuration only)
+**Storage**: None - no persistence
+**Validation**: None - props validated by TypeScript + react-day-picker
+
+## Database Impact Analysis
+
+### Database Schema
+**Status**: ✅ No changes
+**Reason**: Frontend UI fix only
+
+### Database Queries
+**Status**: ✅ No changes
+**Reason**: Existing aggregated data queries unchanged
+
+### Migrations
+**Status**: ✅ Not applicable
+**Reason**: No schema modifications
+
+### Indexes
+**Status**: ✅ No changes
+**Reason**: No new query patterns
+
+## API Contract Impact Analysis
+
+### API Endpoints
+**Status**: ✅ No changes
+**Reason**: Calendar uses existing sales aggregation API
+
+### Request/Response Schemas
+**Status**: ✅ No changes
+**Reason**: No new data requested or returned
+
+### API Versioning
+**Status**: ✅ Not applicable
+**Reason**: No API modifications
+
+## Type Definitions
+
+### Existing Types (Unchanged)
+
+```typescript
+// client/src/components/ui/calendar.tsx
+export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+// No changes - react-day-picker props already include captionLayout and fixedWeeks
+```
+
+```typescript
+// client/src/components/dashboard/sales-aggregation.tsx
+// No new type definitions needed - using existing Date and state types
+```
+
+### New Types
+**Status**: ✅ None required
+**Reason**: Using existing TypeScript types from react-day-picker
+
+## Validation Rules
+
+### Client-Side Validation
+**Status**: ✅ No new validation
+**Reason**: Props validated by TypeScript compiler
+
+### Server-Side Validation
+**Status**: ✅ Not applicable
+**Reason**: No server-side changes
+
+## State Transitions
+
+### UI State Transitions (Unchanged)
+
+1. **Calendar loads** → Display current month with aggregated dates highlighted
+2. **User navigates** → Update displayed month, re-highlight aggregated dates
+3. **User selects date** → Update selected date state, trigger data fetch
+
+**Changes**: None - state machine unchanged, only visual presentation enhanced
+
+## Data Flow Diagram
+
+```
+┌──────────────────────────────────────────────────┐
+│  Sales Aggregation API (Existing, Unchanged)     │
+│  Returns: { aggregatedDates: Date[], ... }      │
+└────────────────┬─────────────────────────────────┘
+                 │
+                 │ (No changes)
+                 ▼
+┌──────────────────────────────────────────────────┐
+│  Sales Aggregation Component State (Unchanged)   │
+│  aggregatedDates: Date[]                         │
+│  selectedCalendarDate: Date | undefined          │
+└────────────────┬─────────────────────────────────┘
+                 │
+                 │ (Pass as props)
+                 ▼
+┌──────────────────────────────────────────────────┐
+│  Calendar Component (ENHANCED)                   │
+│  Props:                                          │
+│    - modifiers (existing)                        │
+│    - selected (existing)                         │
+│    - onSelect (existing)                         │
+│    + captionLayout (NEW)  ← UI enhancement       │
+│    + fixedWeeks (NEW)     ← UI enhancement       │
+└──────────────────────────────────────────────────┘
+                 │
+                 │ (Render with enhanced UI)
+                 ▼
+┌──────────────────────────────────────────────────┐
+│  User sees:                                      │
+│  ✓ Month/year dropdown navigation (NEW)         │
+│  ✓ Aligned dates with day-of-week headers (FIX) │
+│  ✓ Blue highlighted aggregated dates (SAME)     │
+│  ✓ Date selection functionality (SAME)          │
+└──────────────────────────────────────────────────┘
+```
+
+## Dependency Analysis
+
+### Upstream Dependencies (Unchanged)
+- Sales aggregation API: ✅ No changes
+- Aggregated data calculation: ✅ No changes
+- Date filtering logic: ✅ No changes
+
+### Downstream Dependencies (Unchanged)
+- Date selection handlers: ✅ No changes
+- Sales detail view triggers: ✅ No changes
+- Data export functionality: ✅ No changes
+
+## Migration Strategy
+
+**Status**: ✅ Not applicable
+**Reason**: No data migrations needed for UI-only changes
+
+## Rollback Plan
+
+**Status**: Simple prop removal
+**Method**: Remove `captionLayout` and `fixedWeeks` props from Calendar component
+**Impact**: Calendar returns to previous state
+**Data Risk**: None - no data persistence
+
+## Summary
+
+This feature requires **zero data model changes**. All enhancements are purely presentational:
+
+- ✅ No database schema modifications
+- ✅ No API contract changes
+- ✅ No new data entities
+- ✅ No validation rule changes
+- ✅ No state transitions modified
+- ✅ No migrations needed
+
+The only changes are additive React component props for UI configuration.
+
+---
+
+**Phase Complete**: Phase 1 - Data Model Analysis
+**Result**: No data model changes required
+**Next**: Quickstart manual testing guide

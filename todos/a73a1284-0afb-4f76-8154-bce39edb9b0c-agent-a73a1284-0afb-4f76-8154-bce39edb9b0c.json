@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Restart Docker Desktop and verify daemon is running",
+    "status": "completed",
+    "priority": "high",
+    "id": "12"
+  },
+  {
+    "content": "Start PostgreSQL and Redis services using startup script",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "13"
+  },
+  {
+    "content": "Seed test users to ensure they exist in database",
+    "status": "pending",
+    "priority": "high",
+    "id": "14"
+  },
+  {
+    "content": "Start full application stack (frontend + backend)",
+    "status": "pending",
+    "priority": "high",
+    "id": "15"
+  },
+  {
+    "content": "Test login authentication with test user credentials",
+    "status": "pending",
+    "priority": "high",
+    "id": "16"
+  },
+  {
+    "content": "Verify dashboard and skill trees load correctly after login",
+    "status": "pending",
+    "priority": "medium",
+    "id": "17"
+  }
+]

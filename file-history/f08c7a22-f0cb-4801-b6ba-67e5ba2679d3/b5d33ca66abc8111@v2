@@ -1,0 +1,71 @@
+/**
+ * Widget Header Component
+ * Feature: 028-build-a-widget
+ *
+ * Widget header with title and manual refresh button (per spec.md FR-005)
+ */
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+
+interface WidgetHeaderProps {
+  title: string;
+  lastFetched?: Date | null;
+  onRefresh?: () => void;
+  loading?: boolean;
+}
+
+export function WidgetHeader({
+  title,
+  lastFetched,
+  onRefresh,
+  loading = false,
+}: WidgetHeaderProps) {
+  const formatLastFetched = (date: Date | null | undefined) => {
+    if (!date) return '';
+
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+
+    if (seconds < 60) return `${seconds}s ago`;
+    if (minutes < 60) return `${minutes}m ago`;
+    return new Date(date).toLocaleTimeString();
+  };
+
+  return (
+    <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center justify-between">
+      <div className="flex-1">
+        <h3
+          data-testid="widget-title"
+          className="text-sm font-semibold text-foreground"
+        >
+          {title}
+        </h3>
+        {lastFetched && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Updated {formatLastFetched(lastFetched)}
+          </p>
+        )}
+      </div>
+
+      {onRefresh && (
+        <Button
+          data-testid="widget-refresh-button"
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading}
+          className="h-8 w-8 p-0"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+          />
+          <span className="sr-only">Refresh widget</span>
+        </Button>
+      )}
+    </div>
+  );
+}

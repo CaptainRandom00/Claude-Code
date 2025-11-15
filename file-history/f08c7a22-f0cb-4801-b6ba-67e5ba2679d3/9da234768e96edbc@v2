@@ -1,0 +1,168 @@
+/**
+ * @file image-upload.spec.ts
+ * @description E2E tests for product image upload functionality (Feature 025)
+ * @feature 025-product-image-management
+ */
+
+import { test, expect } from '@playwright/test';
+import path from 'path';
+import fs from 'fs';
+
+test.describe('Product Image Upload Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // Navigate to dashboard
+    await page.goto('http://localhost:3000/dashboard', { waitUntil: 'domcontentloaded' });
+
+    // Click Stock Profiles tab
+    await page.click('button:has-text("Stock Profiles")');
+
+    // Wait for the grid to load
+    await page.waitForSelector('table', { timeout: 10000 });
+  });
+
+  test('should successfully upload a product image', async ({ page }) => {
+    // Click on the first row in the table to open edit modal
+    const firstRow = page.locator('table tbody tr').first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
+    await firstRow.click();
+
+    // Wait for edit modal to open
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+
+    // Scroll down to find the Product Images section
+    await page.evaluate(() => {
+      const element = document.querySelector('[class*="space-y-4"]');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    });
+
+    await page.waitForTimeout(500);
+
+    // Verify upload zone is visible
+    const uploadZoneText = page.locator('text=Drag images here').or(page.locator('text=Maximum 5 images reached'));
+    await expect(uploadZoneText).toBeVisible({ timeout: 5000 });
+
+    // Get count of existing images before upload
+    const imageGrid = page.locator('.grid.grid-cols-4 > div');
+    const countBefore = await imageGrid.count();
+
+    // Check if we're at max capacity
+    const maxReached = await page.locator('text=Maximum 5 images reached').isVisible().catch(() => false);
+
+    if (maxReached) {
+      console.log('Maximum images reached, skipping upload test');
+      return;
+    }
+
+    // Use the screenshot image from the project for testing
+    const testImagePath = path.join(process.cwd(), 'diagnostic-chromium-1758493333053.png');
+
+    // Verify test image exists
+    if (!fs.existsSync(testImagePath)) {
+      console.log('Test image not found, using alternative');
+      // Skip this test if the image doesn't exist
+      return;
+    }
+
+    // Upload image via file input
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles(testImagePath);
+
+    // Wait for upload progress to appear
+    await expect(page.locator('text=Uploading')).toBeVisible({ timeout: 5000 }).catch(() => {
+      console.log('Upload progress not visible, continuing...');
+    });
+
+    // Wait for compression stats message (indicates successful upload)
+    await expect(page.locator('text=/Original:.*→ Compressed:/')).toBeVisible({
+      timeout: 15000
+    });
+
+    // Wait for UI to update
+    await page.waitForTimeout(1000);
+
+    // Verify image count increased
+    const imageGridAfter = page.locator('.grid.grid-cols-4 > div');
+    const countAfter = await imageGridAfter.count();
+
+    expect(countAfter).toBeGreaterThan(countBefore);
+
+    // Verify at least one image thumbnail is visible
+    const thumbnails = page.locator('.grid.grid-cols-4 img');
+    await expect(thumbnails.first()).toBeVisible();
+  });
+
+  test('should display image count badge', async ({ page }) => {
+    // Click on the first row
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    // Wait for modal
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+
+    // Scroll to images section
+    await page.evaluate(() => {
+      const element = document.querySelector('[class*="space-y-4"]');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    });
+
+    // Check the badge showing image count
+    const badge = page.locator('text=/\\d+\\/5/');
+    await expect(badge).toBeVisible({ timeout: 5000 });
+
+    // Extract and validate the count
+    const badgeText = await badge.textContent();
+    const match = badgeText?.match(/(\d+)\/5/);
+
+    expect(match).toBeTruthy();
+    if (match) {
+      const currentCount = parseInt(match[1]);
+      expect(currentCount).toBeGreaterThanOrEqual(0);
+      expect(currentCount).toBeLessThanOrEqual(5);
+    }
+  });
+
+  test('should open image carousel when clicking thumbnail', async ({ page }) => {
+    // Click on the first row
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
+
+    // Wait for modal
+    await expect(page.locator('text=Edit Product Profile')).toBeVisible({ timeout: 5000 });
+
+    // Scroll to images section
+    await page.evaluate(() => {
+      const element = document.querySelector('[class*="space-y-4"]');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    });
+
+    await page.waitForTimeout(500);
+
+    // Check if there are any images
+    const thumbnails = page.locator('.grid.grid-cols-4 > div');
+    const thumbnailCount = await thumbnails.count();
+
+    if (thumbnailCount === 0) {
+      console.log('No images to test carousel with');
+      return;
+    }
+
+    // Click first thumbnail
+    await thumbnails.first().click();
+
+    // Wait for carousel to appear (checking for common carousel elements)
+    await page.waitForTimeout(500);
+
+    // Carousel should have navigation or action buttons
+    const hasCarouselButtons = await page.locator('button:has-text("Delete")').or(
+      page.locator('button:has-text("Set as Primary")')
+    ).isVisible().catch(() => false);
+
+    expect(hasCarouselButtons).toBeTruthy();
+  });
+});

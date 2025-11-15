@@ -1,0 +1,85 @@
+/**
+ * useWidgetData Hook
+ * Feature: 028-build-a-widget
+ *
+ * Custom hook for fetching and managing widget data with TanStack Query
+ * Handles auto-refresh, manual refresh, error states, and loading states
+ */
+
+import { useQuery } from '@tanstack/react-query';
+import type { WidgetDefinition } from '@/types/widget-types';
+
+interface WidgetDataResponse {
+  widgetId: number;
+  widgetType: string;
+  data: any[];
+  lastFetched: string;
+}
+
+interface UseWidgetDataOptions {
+  widgetDefinition: WidgetDefinition;
+  enabled?: boolean;
+  overrideParams?: Record<string, any>;
+}
+
+/**
+ * Fetch widget data from the server
+ */
+async function fetchWidgetData(
+  widgetDefinitionId: number,
+  overrideParams?: Record<string, any>
+): Promise<WidgetDataResponse> {
+  const response = await fetch('/api/widgets/data/fetch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      widgetDefinitionId,
+      overrideParams,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch widget data');
+  }
+
+  return response.json();
+}
+
+/**
+ * Custom hook for fetching widget data with automatic refresh
+ *
+ * @param options - Configuration options
+ * @returns Query result with data, loading, error states and refetch function
+ */
+export function useWidgetData({
+  widgetDefinition,
+  enabled = true,
+  overrideParams,
+}: UseWidgetDataOptions) {
+  const queryResult = useQuery({
+    queryKey: ['widget-data', widgetDefinition.id, overrideParams],
+    queryFn: () => fetchWidgetData(widgetDefinition.id, overrideParams),
+    enabled,
+    refetchInterval: widgetDefinition.refreshInterval || 60000, // Default 60s per FR-004
+    refetchOnWindowFocus: false, // Only auto-refresh on interval
+    staleTime: 0, // Data is always considered stale to ensure fresh fetches
+    retry: 2, // Retry failed requests twice
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+  });
+
+  return {
+    data: queryResult.data?.data || [],
+    lastFetched: queryResult.data?.lastFetched
+      ? new Date(queryResult.data.lastFetched)
+      : null,
+    isLoading: queryResult.isLoading,
+    isError: queryResult.isError,
+    error: queryResult.error
+      ? (queryResult.error as Error).message
+      : null,
+    refetch: queryResult.refetch,
+  };
+}

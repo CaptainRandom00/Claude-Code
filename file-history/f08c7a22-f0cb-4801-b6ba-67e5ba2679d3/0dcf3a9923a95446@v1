@@ -1,0 +1,157 @@
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./index.css";
+
+// Enhanced Safari and WebKit compatibility for React 18
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+// Error boundary component for Safari compatibility
+function SafariErrorBoundary({ children }: { children: React.ReactNode }) {
+  try {
+    return <>{children}</>;
+  } catch (error) {
+    console.error("Safari Error Boundary caught:", error);
+    return (
+      <div style={{
+        padding: '20px',
+        fontFamily: 'monospace',
+        background: '#000',
+        color: '#ff0000',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <h1>Application Error</h1>
+        <p>Error: {error instanceof Error ? error.message : 'Unknown error'}</p>
+        <p>Browser: {navigator.userAgent.includes('Safari') ? 'Safari/WebKit' : 'Other'}</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '10px 20px',
+            marginTop: '20px',
+            background: '#ff0000',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          Reload Page
+        </button>
+      </div>
+    );
+  }
+}
+
+// Safari-specific initialization with multiple fallback strategies
+const initializeApp = () => {
+  try {
+    // Strategy 1: Standard React 18 createRoot
+    console.log("Initializing React app with createRoot...");
+    const root = createRoot(rootElement);
+
+    // Detect Safari/WebKit and add additional safety measures
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isWebKit = /webkit/i.test(navigator.userAgent);
+
+    if (isSafari || isWebKit) {
+      console.log("Safari/WebKit detected - applying compatibility mode");
+
+      // Add extra DOM ready check for Safari
+      setTimeout(() => {
+        try {
+          root.render(
+            <SafariErrorBoundary>
+              <App />
+            </SafariErrorBoundary>
+          );
+        } catch (safariError) {
+          console.error("Safari render error:", safariError);
+          fallbackRender();
+        }
+      }, 100);
+    } else {
+      // Standard render for other browsers
+      root.render(<App />);
+    }
+
+  } catch (error) {
+    console.error("Failed to initialize React app:", error);
+    fallbackRender();
+  }
+};
+
+// Fallback rendering for critical failures
+const fallbackRender = () => {
+  console.log("Using fallback render method");
+
+  rootElement.innerHTML = `
+    <div style="
+      padding: 20px;
+      font-family: monospace;
+      background: #000;
+      color: #00ff00;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    ">
+      <h1 style="color: #00ff00; margin-bottom: 20px;">BB Management System</h1>
+      <p style="color: #ffff00; margin-bottom: 10px;">🔧 Initializing application...</p>
+      <p style="color: #666; font-size: 12px;">If this message persists, there may be a browser compatibility issue.</p>
+      <p style="color: #666; font-size: 12px;">Browser: ${navigator.userAgent}</p>
+      <button
+        onclick="window.location.reload()"
+        style="
+          padding: 10px 20px;
+          margin-top: 20px;
+          background: #00ff00;
+          color: #000;
+          border: none;
+          cursor: pointer;
+          font-family: monospace;
+          font-weight: bold;
+        "
+      >
+        RELOAD
+      </button>
+    </div>
+  `;
+
+  // Attempt to retry initialization after a delay
+  setTimeout(() => {
+    try {
+      console.log("Retrying React initialization...");
+      const root = createRoot(rootElement);
+      root.render(<App />);
+    } catch (retryError) {
+      console.error("Retry failed:", retryError);
+    }
+  }, 2000);
+};
+
+// Multi-stage initialization with DOM readiness detection
+const startInitialization = () => {
+  console.log(`DOM readyState: ${document.readyState}`);
+  console.log(`User Agent: ${navigator.userAgent}`);
+
+  if (document.readyState === 'loading') {
+    console.log("DOM still loading, waiting for DOMContentLoaded...");
+    document.addEventListener('DOMContentLoaded', initializeApp);
+  } else if (document.readyState === 'interactive') {
+    console.log("DOM interactive, waiting for full load...");
+    setTimeout(initializeApp, 100);
+  } else {
+    console.log("DOM complete, initializing immediately...");
+    initializeApp();
+  }
+};
+
+// Start the initialization process
+startInitialization();

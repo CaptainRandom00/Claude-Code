@@ -1,0 +1,50 @@
+[
+  {
+    "content": "Research WordPress 6.8.1 for tutoring platform with custom post types, Gutenberg blocks, security, and GDPR compliance",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "research-wordpress"
+  },
+  {
+    "content": "Research PHP 8.0+ for WordPress integration, security patterns, and input validation",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-php"
+  },
+  {
+    "content": "Research MySQL 8.0 for WordPress optimization, query performance, and GDPR compliance",
+    "status": "pending",
+    "priority": "high",
+    "id": "research-mysql"
+  },
+  {
+    "content": "Research Puppeteer 24.12.0 for WordPress testing automation and screenshot generation",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-puppeteer"
+  },
+  {
+    "content": "Research Playwright for MCP server integration, cross-browser testing, and E2E testing",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-playwright"
+  },
+  {
+    "content": "Research Docker for WordPress containerization and development environment setup",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-docker"
+  },
+  {
+    "content": "Research JavaScript ES6+ for WordPress REST API integration and Gutenberg blocks",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-javascript"
+  },
+  {
+    "content": "Research CSS3 for WordPress theming, responsive design, and accessibility",
+    "status": "pending",
+    "priority": "medium",
+    "id": "research-css"
+  }
+]

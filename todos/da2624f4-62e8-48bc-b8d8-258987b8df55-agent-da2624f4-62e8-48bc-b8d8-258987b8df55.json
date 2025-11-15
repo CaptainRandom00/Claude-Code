@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Add metadata explanation to skill node display",
+    "status": "pending",
+    "priority": "high",
+    "id": "enhance_1"
+  },
+  {
+    "content": "Enhance Docker Architecture node with comprehensive content",
+    "status": "completed",
+    "priority": "high",
+    "id": "enhance_2"
+  },
+  {
+    "content": "Update docker run command node with detailed sections",
+    "status": "completed",
+    "priority": "medium",
+    "id": "enhance_3"
+  },
+  {
+    "content": "Enhance Dockerfile Reference with structured content",
+    "status": "completed",
+    "priority": "medium",
+    "id": "enhance_4"
+  },
+  {
+    "content": "Test enhanced knowledge display and cross-references",
+    "status": "completed",
+    "priority": "low",
+    "id": "enhance_5"
+  }
+]

@@ -1,0 +1,366 @@
+/**
+ * Calculation Engine
+ * Feature: 028-build-a-widget
+ *
+ * Client-side calculation utilities using Lodash
+ * Based on research.md §4 (Lodash calculation engine decision)
+ *
+ * Note: Calculations are server-executed per spec.md FR-009,
+ * but client may need to apply calculations to cached/preview data
+ */
+
+import _ from 'lodash';
+import type {
+  CalculationConfig,
+  CalculationFilter,
+  Aggregation,
+  Comparison,
+} from '../types/widget-types';
+
+// ============================================================================
+// Filter Functions
+// ============================================================================
+
+/**
+ * Apply filters to data array (WHERE clauses)
+ * @param data - Array of data objects
+ * @param filters - Array of filter conditions
+ * @returns Filtered data array
+ */
+export function applyFilters<T = any>(data: T[], filters: CalculationFilter[]): T[] {
+  if (!filters || filters.length === 0) {
+    return data;
+  }
+
+  return data.filter((item) => {
+    return filters.every((filter) => {
+      const value = _.get(item, filter.field);
+
+      switch (filter.operator) {
+        case 'eq':
+          return value === filter.value;
+        case 'ne':
+          return value !== filter.value;
+        case 'gt':
+          return value > filter.value;
+        case 'lt':
+          return value < filter.value;
+        case 'gte':
+          return value >= filter.value;
+        case 'lte':
+          return value <= filter.value;
+        case 'in':
+          return Array.isArray(filter.value) && filter.value.includes(value);
+        case 'contains':
+          return String(value).toLowerCase().includes(String(filter.value).toLowerCase());
+        default:
+          return true;
+      }
+    });
+  });
+}
+
+// ============================================================================
+// Group By Functions
+// ============================================================================
+
+/**
+ * Group data by specified fields
+ * @param data - Array of data objects
+ * @param groupBy - Array of field names to group by
+ * @returns Grouped data object
+ */
+export function applyGroupBy<T = any>(
+  data: T[],
+  groupBy: string[]
+): Record<string, T[]> {
+  if (!groupBy || groupBy.length === 0) {
+    return { all: data };
+  }
+
+  return _.groupBy(data, (item) => {
+    return groupBy.map((field) => _.get(item, field)).join('|');
+  });
+}
+
+// ============================================================================
+// Aggregation Functions
+// ============================================================================
+
+/**
+ * Apply aggregations to data
+ * @param data - Data array or grouped data object
+ * @param aggregations - Array of aggregation configs
+ * @param groupBy - Group by fields (if any)
+ * @returns Aggregated results array
+ */
+export function applyAggregations<T = any>(
+  data: T[] | Record<string, T[]>,
+  aggregations: Aggregation[],
+  groupBy?: string[]
+): any[] {
+  const isGrouped = typeof data === 'object' && !Array.isArray(data);
+
+  if (!isGrouped) {
+    // No grouping - return single aggregated result
+    const result: any = {};
+
+    aggregations.forEach((agg) => {
+      const fieldName = agg.alias || agg.field;
+      const values = (data as T[])
+        .map((item) => _.get(item, agg.field))
+        .filter((v) => v !== undefined && v !== null);
+
+      result[fieldName] = aggregateValues(values, agg.type);
+    });
+
+    return [result];
+  } else {
+    // Grouped data - aggregate each group
+    const results: any[] = [];
+
+    Object.entries(data).forEach(([groupKey, groupData]) => {
+      const result: any = {};
+
+      // Add group by fields to result
+      if (groupBy && groupBy.length > 0) {
+        const groupValues = groupKey.split('|');
+        groupBy.forEach((field, index) => {
+          result[field] = groupValues[index];
+        });
+      }
+
+      // Apply aggregations
+      aggregations.forEach((agg) => {
+        const fieldName = agg.alias || agg.field;
+        const values = groupData
+          .map((item) => _.get(item, agg.field))
+          .filter((v) => v !== undefined && v !== null);
+
+        result[fieldName] = aggregateValues(values, agg.type);
+      });
+
+      results.push(result);
+    });
+
+    return results;
+  }
+}
+
+/**
+ * Aggregate values based on aggregation type
+ * @param values - Array of numeric values
+ * @param type - Aggregation type
+ * @returns Aggregated value
+ */
+function aggregateValues(values: any[], type: string): number {
+  switch (type) {
+    case 'sum':
+      return _.sum(values);
+    case 'average':
+      return _.mean(values);
+    case 'count':
+      return values.length;
+    case 'min':
+      return _.min(values) || 0;
+    case 'max':
+      return _.max(values) || 0;
+    default:
+      return 0;
+  }
+}
+
+// ============================================================================
+// Comparison Functions
+// ============================================================================
+
+/**
+ * Apply comparison calculations (Percent Change, Difference, Ratio)
+ * @param data - Aggregated data array
+ * @param comparisons - Array of comparison configs
+ * @returns Data with comparison fields added
+ */
+export function applyComparisons(data: any[], comparisons: Comparison[]): any[] {
+  if (!comparisons || comparisons.length === 0) {
+    return data;
+  }
+
+  return data.map((item) => {
+    const result = { ...item };
+
+    comparisons.forEach((comp) => {
+      const current = _.get(item, comp.currentField);
+      const comparison = _.get(item, comp.comparisonField);
+
+      if (current !== undefined && comparison !== undefined) {
+        const fieldName = `${comp.currentField}_${comp.type}`;
+
+        switch (comp.type) {
+          case 'percent_change':
+            result[fieldName] =
+              comparison !== 0 ? ((current - comparison) / comparison) * 100 : 0;
+            break;
+          case 'difference':
+            result[fieldName] = current - comparison;
+            break;
+          case 'ratio':
+            result[fieldName] = comparison !== 0 ? current / comparison : 0;
+            break;
+        }
+      }
+    });
+
+    return result;
+  });
+}
+
+// ============================================================================
+// Sort Functions
+// ============================================================================
+
+/**
+ * Sort data by specified fields
+ * @param data - Data array
+ * @param sortConfig - Array of sort configurations
+ * @returns Sorted data array
+ */
+export function applySort<T = any>(
+  data: T[],
+  sortConfig: Array<{ field: string; order: 'asc' | 'desc' }>
+): T[] {
+  if (!sortConfig || sortConfig.length === 0) {
+    return data;
+  }
+
+  return _.orderBy(
+    data,
+    sortConfig.map((s) => s.field),
+    sortConfig.map((s) => s.order)
+  );
+}
+
+// ============================================================================
+// Complete Pipeline
+// ============================================================================
+
+/**
+ * Apply complete calculation pipeline
+ * Pipeline: Fetch → Filter → Group → Aggregate → Compare → Sort → Limit
+ *
+ * @param data - Raw data array
+ * @param config - Complete calculation configuration
+ * @returns Processed data
+ */
+export function applyCalculationPipeline<T = any>(
+  data: T[],
+  config: CalculationConfig
+): any[] {
+  let result = [...data];
+
+  // Step 1: Filter (WHERE clauses)
+  if (config.filters && config.filters.length > 0) {
+    result = applyFilters(result, config.filters);
+  }
+
+  // Step 2 & 3: Group + Aggregate
+  if (config.groupBy && config.groupBy.length > 0) {
+    const grouped = applyGroupBy(result, config.groupBy);
+    result = applyAggregations(grouped, config.aggregations, config.groupBy);
+  } else {
+    result = applyAggregations(result, config.aggregations);
+  }
+
+  // Step 4: Compare (Percent Change, Difference, Ratio)
+  if (config.comparisons && config.comparisons.length > 0) {
+    result = applyComparisons(result, config.comparisons);
+  }
+
+  // Step 5: Sort
+  if (config.sort && config.sort.length > 0) {
+    result = applySort(result, config.sort);
+  }
+
+  // Step 6: Limit
+  if (config.limit && config.limit > 0) {
+    result = result.slice(0, config.limit);
+  }
+
+  return result;
+}
+
+// ============================================================================
+// Formatting Utilities
+// ============================================================================
+
+/**
+ * Format value based on visualization config
+ * @param value - Numeric value
+ * @param format - Format type
+ * @param decimalPlaces - Number of decimal places
+ * @returns Formatted string
+ */
+export function formatValue(
+  value: number | null | undefined,
+  format?: string,
+  decimalPlaces: number = 2
+): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '-';
+  }
+
+  switch (format) {
+    case 'currency':
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: decimalPlaces,
+        maximumFractionDigits: decimalPlaces,
+      }).format(value);
+
+    case 'percentage':
+      return `${value.toFixed(decimalPlaces)}%`;
+
+    case 'number':
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: decimalPlaces,
+        maximumFractionDigits: decimalPlaces,
+      }).format(value);
+
+    case 'date':
+      return new Date(value).toLocaleDateString();
+
+    default:
+      return value.toFixed(decimalPlaces);
+  }
+}
+
+/**
+ * Get trend indicator for comparison values
+ * @param value - Comparison value (percent change, difference, etc.)
+ * @returns Trend object with direction and color
+ */
+export function getTrendIndicator(value: number): {
+  direction: 'up' | 'down' | 'neutral';
+  color: string;
+  icon: string;
+} {
+  if (value > 0) {
+    return {
+      direction: 'up',
+      color: 'text-green-500',
+      icon: '↑',
+    };
+  } else if (value < 0) {
+    return {
+      direction: 'down',
+      color: 'text-red-500',
+      icon: '↓',
+    };
+  } else {
+    return {
+      direction: 'neutral',
+      color: 'text-gray-500',
+      icon: '→',
+    };
+  }
+}

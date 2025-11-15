@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Find and examine homepage template files (front-page.php, page.php, index.php)",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Analyze hero sections and special header content on homepage",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Examine style.css for header variations and hero section styling",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Check custom fields and template parts related to headers",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Look for Gutenberg block patterns or custom blocks",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Examine functions.php for theme customization capabilities",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  }
+]

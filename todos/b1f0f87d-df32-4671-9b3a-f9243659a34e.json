@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Create new branch for YouTube integration feature",
+    "status": "completed",
+    "priority": "high",
+    "id": "youtube_1"
+  },
+  {
+    "content": "Design YouTube integration architecture",
+    "status": "completed",
+    "priority": "high",
+    "id": "youtube_2"
+  },
+  {
+    "content": "Implement YouTube video embedding system",
+    "status": "completed",
+    "priority": "high",
+    "id": "youtube_3"
+  },
+  {
+    "content": "Add YouTube video custom fields to services/resources",
+    "status": "completed",
+    "priority": "medium",
+    "id": "youtube_4"
+  },
+  {
+    "content": "Create YouTube video gallery/playlist functionality",
+    "status": "completed",
+    "priority": "medium",
+    "id": "youtube_5"
+  },
+  {
+    "content": "Test YouTube integration functionality",
+    "status": "completed",
+    "priority": "medium",
+    "id": "youtube_6"
+  },
+  {
+    "content": "Optimize YouTube embeds for performance",
+    "status": "completed",
+    "priority": "medium",
+    "id": "youtube_7"
+  }
+]

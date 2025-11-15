@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Analyze codebase for redundant files",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Remove old export files (XAU_USD Excel files)",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Remove backup and version files",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Clean up redundant test and demo files",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Remove duplicate components and temporary files",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  }
+]

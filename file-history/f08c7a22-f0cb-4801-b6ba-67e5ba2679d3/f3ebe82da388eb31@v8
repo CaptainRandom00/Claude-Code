@@ -1,0 +1,659 @@
+/**
+ * Widget Service
+ * Feature: 028-build-a-widget
+ *
+ * Handles CRUD operations and business logic for widget definitions,
+ * including calculation pipeline execution and data fetching.
+ */
+
+import { db } from '../db';
+import {
+  widgetDefinitions,
+  apiEndpointsMetadata,
+  type WidgetDefinition,
+  type InsertWidgetDefinition
+} from '@shared/schema';
+import { eq, and, desc, isNull } from 'drizzle-orm';
+
+// Simple helper functions to replace lodash
+function get(obj: any, path: string): any {
+  return path.split('.').reduce((acc, part) => acc?.[part], obj);
+}
+
+function groupBy<T>(array: T[], iteratee: (item: T) => string): Record<string, T[]> {
+  return array.reduce((result: Record<string, T[]>, item: T) => {
+    const key = iteratee(item);
+    (result[key] = result[key] || []).push(item);
+    return result;
+  }, {});
+}
+
+function sum(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0);
+}
+
+function mean(values: number[]): number {
+  return values.length > 0 ? sum(values) / values.length : 0;
+}
+
+function min(values: number[]): number {
+  return Math.min(...values);
+}
+
+function max(values: number[]): number {
+  return Math.max(...values);
+}
+
+function orderBy(array: any[], fields: string[], orders: string[]): any[] {
+  return [...array].sort((a, b) => {
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
+      const order = orders[i] === 'desc' ? -1 : 1;
+      const aVal = get(a, field);
+      const bVal = get(b, field);
+      if (aVal < bVal) return -1 * order;
+      if (aVal > bVal) return 1 * order;
+    }
+    return 0;
+  });
+}
+
+export class WidgetService {
+  /**
+   * Create a new widget definition
+   * @param data - Widget definition data
+   * @returns Created widget definition
+   */
+  async create(data: InsertWidgetDefinition): Promise<WidgetDefinition> {
+    // Validate refresh interval (30s to 60min per FR-004)
+    if (data.refreshInterval !== undefined) {
+      if (data.refreshInterval < 30000 || data.refreshInterval > 3600000) {
+        throw new Error('Refresh interval must be between 30000ms (30s) and 3600000ms (60min)');
+      }
+    }
+
+    const [widget] = await db.insert(widgetDefinitions).values(data).$returningId();
+
+    // Fetch the complete widget with all fields
+    const created = await this.getById(widget.id);
+    if (!created) {
+      throw new Error('Failed to create widget definition');
+    }
+
+    return created;
+  }
+
+  /**
+   * Get widget definition by ID
+   * @param id - Widget definition ID
+   * @returns Widget definition or null
+   */
+  async getById(id: number): Promise<WidgetDefinition | null> {
+    const [widget] = await db
+      .select()
+      .from(widgetDefinitions)
+      .where(eq(widgetDefinitions.id, id))
+      .limit(1);
+
+    return widget || null;
+  }
+
+  /**
+   * Get all widgets for a specific user
+   * @param userId - User ID
+   * @param includeSystem - Include system widgets (default: true)
+   * @returns Array of widget definitions
+   */
+  async getByUser(userId: number, includeSystem: boolean = true): Promise<WidgetDefinition[]> {
+    if (includeSystem) {
+      // Return user widgets + system widgets
+      const widgets = await db
+        .select()
+        .from(widgetDefinitions)
+        .where(
+          and(
+            eq(widgetDefinitions.isActive, true)
+          )
+        )
+        .orderBy(desc(widgetDefinitions.createdAt));
+
+      // Filter to include only user's widgets and system widgets
+      return widgets.filter(w => w.userId === userId || w.isSystem === true);
+    } else {
+      // Return only user's widgets
+      return await db
+        .select()
+        .from(widgetDefinitions)
+        .where(
+          and(
+            eq(widgetDefinitions.userId, userId),
+            eq(widgetDefinitions.isActive, true)
+          )
+        )
+        .orderBy(desc(widgetDefinitions.createdAt));
+    }
+  }
+
+  /**
+   * Get all system widgets (pre-built widgets)
+   * @returns Array of system widget definitions
+   */
+  async getSystemWidgets(): Promise<WidgetDefinition[]> {
+    return await db
+      .select()
+      .from(widgetDefinitions)
+      .where(
+        and(
+          eq(widgetDefinitions.isSystem, true),
+          eq(widgetDefinitions.isActive, true)
+        )
+      )
+      .orderBy(desc(widgetDefinitions.createdAt));
+  }
+
+  /**
+   * Update widget definition
+   * @param id - Widget definition ID
+   * @param data - Partial widget data to update
+   * @returns Updated widget definition
+   */
+  async update(id: number, data: Partial<InsertWidgetDefinition>): Promise<WidgetDefinition> {
+    // Validate refresh interval if provided
+    if (data.refreshInterval !== undefined) {
+      if (data.refreshInterval < 30000 || data.refreshInterval > 3600000) {
+        throw new Error('Refresh interval must be between 30000ms (30s) and 3600000ms (60min)');
+      }
+    }
+
+    // Update the widget
+    await db
+      .update(widgetDefinitions)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(widgetDefinitions.id, id));
+
+    // Fetch updated widget
+    const updated = await this.getById(id);
+    if (!updated) {
+      throw new Error(`Widget definition with ID ${id} not found`);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Soft delete widget definition (set isActive = false)
+   * @param id - Widget definition ID
+   * @param userId - User ID (for authorization check)
+   * @returns Success boolean
+   */
+  async delete(id: number, userId: number): Promise<boolean> {
+    const widget = await this.getById(id);
+
+    if (!widget) {
+      throw new Error(`Widget definition with ID ${id} not found`);
+    }
+
+    // Prevent deletion of system widgets
+    if (widget.isSystem) {
+      throw new Error('Cannot delete system widgets');
+    }
+
+    // Verify ownership
+    if (widget.userId !== userId) {
+      throw new Error('Unauthorized: Cannot delete widget owned by another user');
+    }
+
+    // Soft delete
+    await db
+      .update(widgetDefinitions)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(widgetDefinitions.id, id));
+
+    return true;
+  }
+
+  /**
+   * Apply calculation pipeline to fetched data
+   * Server-executed, client-orchestrated (per spec.md FR-009)
+   * Pipeline: Fetch → Filter → Group → Aggregate → Compare
+   *
+   * @param data - Raw data array from API endpoint
+   * @param calculationConfig - Calculation configuration from widget definition
+   * @returns Processed data with calculations applied
+   */
+  async applyCalculations(data: any[], calculationConfig: any): Promise<any> {
+    let result = [...data];
+
+    // Step 1: Filter (WHERE clauses)
+    if (calculationConfig.filters && calculationConfig.filters.length > 0) {
+      result = this.applyFilters(result, calculationConfig.filters);
+    }
+
+    // Step 2: Group (GROUP BY)
+    let grouped: any = result;
+    if (calculationConfig.groupBy && calculationConfig.groupBy.length > 0) {
+      grouped = groupBy(result, (item) => {
+        return calculationConfig.groupBy.map((field: string) => item[field] || 'null').join('|');
+      });
+    }
+
+    // Step 3: Aggregate (SUM, AVG, COUNT, MIN, MAX)
+    if (calculationConfig.aggregations && calculationConfig.aggregations.length > 0) {
+      result = this.applyAggregations(grouped, calculationConfig.aggregations, calculationConfig.groupBy);
+    }
+
+    // Step 4: Compare (Percent Change, Difference, Ratio)
+    if (calculationConfig.comparisons && calculationConfig.comparisons.length > 0) {
+      result = this.applyComparisons(result, calculationConfig.comparisons);
+    }
+
+    // Step 5: Apply Conditional Formatting (User Story 5 - T089)
+    if (calculationConfig.conditionalFormatting) {
+      result = this.applyConditionalFormatting(result, calculationConfig.conditionalFormatting);
+    }
+
+    // Step 6: Sort
+    if (calculationConfig.sort && calculationConfig.sort.length > 0) {
+      result = orderBy(
+        result,
+        calculationConfig.sort.map((s: any) => s.field),
+        calculationConfig.sort.map((s: any) => s.order)
+      );
+    }
+
+    // Step 7: Limit
+    if (calculationConfig.limit) {
+      result = result.slice(0, calculationConfig.limit);
+    }
+
+    return result;
+  }
+
+  /**
+   * Apply filters to data (WHERE clauses)
+   * @param data - Data array
+   * @param filters - Array of filter conditions
+   * @returns Filtered data
+   */
+  private applyFilters(data: any[], filters: any[]): any[] {
+    return data.filter((item) => {
+      return filters.every((filter) => {
+        const value = get(item, filter.field);
+
+        switch (filter.operator) {
+          case 'eq':
+            return value === filter.value;
+          case 'ne':
+            return value !== filter.value;
+          case 'gt':
+            return value > filter.value;
+          case 'lt':
+            return value < filter.value;
+          case 'gte':
+            return value >= filter.value;
+          case 'lte':
+            return value <= filter.value;
+          case 'in':
+            return Array.isArray(filter.value) && filter.value.includes(value);
+          case 'contains':
+            return String(value).includes(String(filter.value));
+          default:
+            return true;
+        }
+      });
+    });
+  }
+
+  /**
+   * Apply aggregations to data (SUM, AVG, COUNT, MIN, MAX)
+   * @param data - Data (can be array or grouped object)
+   * @param aggregations - Array of aggregation configs
+   * @param groupBy - Group by fields (if any)
+   * @returns Aggregated results
+   */
+  private applyAggregations(data: any, aggregations: any[], groupBy?: string[]): any[] {
+    const isGrouped = typeof data === 'object' && !Array.isArray(data);
+
+    if (!isGrouped) {
+      // No grouping - return single aggregated result
+      const result: any = {};
+
+      aggregations.forEach((agg) => {
+        const fieldName = agg.alias || agg.field || 'count';
+
+        // For COUNT, we don't need a field
+        if (agg.type === 'count') {
+          result[fieldName] = data.length;
+        } else {
+          // For other aggregations, field is required
+          if (!agg.field) {
+            result[fieldName] = 0;
+            return;
+          }
+          const values = data.map((item: any) => get(item, agg.field)).filter((v: any) => v !== undefined && v !== null);
+
+          switch (agg.type) {
+            case 'sum':
+              result[fieldName] = sum(values);
+              break;
+            case 'average':
+              result[fieldName] = mean(values);
+              break;
+            case 'min':
+              result[fieldName] = min(values);
+              break;
+            case 'max':
+              result[fieldName] = max(values);
+              break;
+          }
+        }
+      });
+
+      return [result];
+    } else {
+      // Grouped data - aggregate each group
+      const results: any[] = [];
+
+      Object.entries(data).forEach(([groupKey, groupData]: [string, any]) => {
+        const result: any = {};
+
+        // Add group by fields to result
+        if (groupBy && groupBy.length > 0 && groupKey) {
+          const groupValues = groupKey.split('|');
+          groupBy.forEach((field, index) => {
+            const value = groupValues[index];
+            result[field] = value === 'null' ? null : value;
+          });
+        }
+
+        // Apply aggregations
+        aggregations.forEach((agg) => {
+          const fieldName = agg.alias || agg.field || 'count';
+
+          // For COUNT, we don't need a field
+          if (agg.type === 'count') {
+            result[fieldName] = groupData.length;
+          } else {
+            // For other aggregations, field is required
+            if (!agg.field) {
+              result[fieldName] = 0;
+              return;
+            }
+            const values = groupData.map((item: any) => get(item, agg.field)).filter((v: any) => v !== undefined && v !== null);
+
+            switch (agg.type) {
+              case 'sum':
+                result[fieldName] = sum(values);
+                break;
+              case 'average':
+                result[fieldName] = mean(values);
+                break;
+              case 'min':
+                result[fieldName] = min(values);
+                break;
+              case 'max':
+                result[fieldName] = max(values);
+                break;
+            }
+          }
+        });
+
+        results.push(result);
+      });
+
+      return results;
+    }
+  }
+
+  /**
+   * Apply comparison calculations (Percent Change, Difference, Ratio)
+   * Used for comparing current vs previous period (User Story 5)
+   *
+   * @param data - Aggregated data array
+   * @param comparisons - Array of comparison configs
+   * @returns Data with comparison fields added
+   */
+  private applyComparisons(data: any[], comparisons: any[]): any[] {
+    return data.map((item) => {
+      const result = { ...item };
+
+      comparisons.forEach((comp) => {
+        const current = get(item, comp.currentField);
+        const comparison = get(item, comp.comparisonField);
+
+        if (current !== undefined && comparison !== undefined) {
+          const fieldName = `${comp.currentField}_${comp.type}`;
+
+          switch (comp.type) {
+            case 'percent_change':
+              result[fieldName] = comparison !== 0
+                ? ((current - comparison) / comparison) * 100
+                : 0;
+              break;
+            case 'difference':
+              result[fieldName] = current - comparison;
+              break;
+            case 'ratio':
+              result[fieldName] = comparison !== 0
+                ? current / comparison
+                : 0;
+              break;
+          }
+        }
+      });
+
+      return result;
+    });
+  }
+
+  /**
+   * Apply conditional formatting rules (User Story 5 - T089)
+   * Evaluates rules and adds formatting metadata to each record
+   * @param data - Data array
+   * @param rules - Formatting rules
+   * @returns Data with _formatting metadata
+   */
+  private applyConditionalFormatting(data: any[], rules: any[]): any[] {
+    return data.map((item) => {
+      const formatting: any = {};
+
+      rules.forEach((rule) => {
+        const value = get(item, rule.field);
+        let matched = false;
+
+        switch (rule.operator) {
+          case 'gt':
+            matched = value > rule.value;
+            break;
+          case 'gte':
+            matched = value >= rule.value;
+            break;
+          case 'lt':
+            matched = value < rule.value;
+            break;
+          case 'lte':
+            matched = value <= rule.value;
+            break;
+          case 'eq':
+            matched = value === rule.value;
+            break;
+          case 'ne':
+            matched = value !== rule.value;
+            break;
+          case 'between':
+            matched = value >= rule.min && value <= rule.max;
+            break;
+        }
+
+        if (matched) {
+          formatting[rule.field] = {
+            color: rule.color,
+            backgroundColor: rule.backgroundColor,
+            icon: rule.icon,
+            style: rule.style,
+          };
+        }
+      });
+
+      return {
+        ...item,
+        _formatting: formatting,
+      };
+    });
+  }
+
+  /**
+   * Validate widget configuration before saving
+   * @param config - Widget configuration to validate
+   * @returns Validation result with errors if any
+   */
+  validateConfiguration(config: Partial<InsertWidgetDefinition>): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Validate widget type
+    const validTypes = ['metric', 'chart', 'table', 'alert', 'progress'];
+    if (config.widgetType && !validTypes.includes(config.widgetType)) {
+      errors.push(`Invalid widget type. Must be one of: ${validTypes.join(', ')}`);
+    }
+
+    // Validate refresh interval
+    if (config.refreshInterval !== undefined) {
+      if (config.refreshInterval < 30000 || config.refreshInterval > 3600000) {
+        errors.push('Refresh interval must be between 30000ms (30s) and 3600000ms (60min)');
+      }
+    }
+
+    // Validate calculation config structure
+    if (config.calculationConfig) {
+      const calc = config.calculationConfig as any;
+
+      if (calc.aggregations && !Array.isArray(calc.aggregations)) {
+        errors.push('calculationConfig.aggregations must be an array');
+      }
+
+      if (calc.filters && !Array.isArray(calc.filters)) {
+        errors.push('calculationConfig.filters must be an array');
+      }
+    }
+
+    // Validate visualization config structure
+    if (config.visualizationConfig) {
+      const viz = config.visualizationConfig as any;
+
+      const validFormats = ['currency', 'percentage', 'number', 'date'];
+      if (viz.format && !validFormats.includes(viz.format)) {
+        errors.push(`Invalid format. Must be one of: ${validFormats.join(', ')}`);
+      }
+
+      const validChartTypes = ['line', 'bar', 'area', 'pie', 'candlestick'];
+      if (viz.chartType && !validChartTypes.includes(viz.chartType)) {
+        errors.push(`Invalid chart type. Must be one of: ${validChartTypes.join(', ')}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Validate widget configuration with endpoint whitelist (T058 - US3)
+   * Ensures widget uses approved API endpoints only
+   * @param apiEndpoint - API endpoint path
+   * @param calculationConfig - Calculation configuration
+   * @returns Validation result
+   */
+  async validateConfiguration(
+    apiEndpoint: string,
+    calculationConfig: any
+  ): Promise<{ valid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+
+    // 1. Check if endpoint is in whitelist (api_endpoints_metadata)
+    const [endpoint] = await db
+      .select()
+      .from(apiEndpointsMetadata)
+      .where(
+        and(
+          eq(apiEndpointsMetadata.endpointPath, apiEndpoint),
+          eq(apiEndpointsMetadata.isDeprecated, false)
+        )
+      )
+      .limit(1);
+
+    if (!endpoint) {
+      errors.push(`API endpoint "${apiEndpoint}" is not approved for widgets`);
+      return { valid: false, errors };
+    }
+
+    // 2. Validate calculation config structure (basic check)
+    if (calculationConfig && typeof calculationConfig !== 'object') {
+      errors.push('calculationConfig must be an object');
+    }
+
+    // 3. Validate aggregation fields exist in endpoint schema
+    if (calculationConfig.aggregations) {
+      const availableFields = endpoint.availableFields as string[] || [];
+
+      for (const agg of calculationConfig.aggregations) {
+        if (agg.field && !availableFields.includes(agg.field)) {
+          errors.push(
+            `Field "${agg.field}" not available in endpoint. Available fields: ${availableFields.join(', ')}`
+          );
+        }
+      }
+    }
+
+    // 4. Validate filter fields
+    if (calculationConfig.filters) {
+      const availableFields = endpoint.availableFields as string[] || [];
+
+      for (const filter of calculationConfig.filters) {
+        if (filter.field && !availableFields.includes(filter.field)) {
+          errors.push(
+            `Filter field "${filter.field}" not available in endpoint`
+          );
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Optimize preview data fetching (T059 - US3)
+   * Limits data to 100 records for fast preview < 500ms
+   * @param data - Raw data array
+   * @param calculationConfig - Calculation configuration
+   * @returns Limited preview data
+   */
+  async previewData(data: any[], calculationConfig: any): Promise<any> {
+    // Limit input data to 1000 records before processing
+    const limitedInput = data.slice(0, 1000);
+
+    // Apply calculations
+    const processed = await this.applyCalculations(limitedInput, calculationConfig);
+
+    // Limit output to 100 records
+    const limitedOutput = Array.isArray(processed)
+      ? processed.slice(0, 100)
+      : processed;
+
+    return {
+      preview: limitedOutput,
+      recordCount: Array.isArray(processed) ? processed.length : 1,
+      limitedTo: 100,
+      inputRecords: limitedInput.length,
+    };
+  }
+}
+
+// Export singleton instance
+export const widgetService = new WidgetService();

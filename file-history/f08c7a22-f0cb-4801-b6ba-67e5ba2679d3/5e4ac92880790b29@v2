@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+
+/**
+ * Quick Dashboard Test
+ * Verifies dashboard page loads and widgets render
+ */
+
+import { chromium } from 'playwright';
+
+async function testDashboard() {
+  console.log('🧪 Testing Dashboard Viewer...\n');
+
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  try {
+    // Navigate to dashboard
+    console.log('📍 Navigating to http://localhost:3000/dashboards/1...');
+    await page.goto('http://localhost:3000/dashboards/1', {
+      waitUntil: 'networkidle',
+      timeout: 30000
+    });
+
+    // Wait for dashboard to load
+    await page.waitForSelector('[data-testid="dashboard-viewer"]', { timeout: 10000 });
+    console.log('✅ Dashboard viewer loaded');
+
+    // Check for dashboard title
+    const title = await page.textContent('h1');
+    console.log(`✅ Dashboard title: "${title}"`);
+
+    // Check for widgets
+    const widgets = await page.locator('[data-testid^="widget-"]').count();
+    console.log(`✅ Found ${widgets} widgets`);
+
+    if (widgets === 0) {
+      throw new Error('❌ No widgets found on dashboard!');
+    }
+
+    // Check first widget loads
+    await page.waitForSelector('[data-testid="widget-1"]', { timeout: 5000 });
+    console.log('✅ First widget rendered');
+
+    // Check for widget content or loading state
+    const hasContent = await page.locator('[data-testid="widget-content"]').count() > 0;
+    const hasLoading = await page.locator('[data-testid="widget-loading"]').count() > 0;
+    const hasError = await page.locator('[data-testid="widget-error"]').count() > 0;
+
+    console.log(`\nWidget States:`);
+    console.log(`  Content: ${hasContent ? '✅' : '❌'}`);
+    console.log(`  Loading: ${hasLoading ? '⏳' : '❌'}`);
+    console.log(`  Error: ${hasError ? '⚠️' : '✅'}`);
+
+    // Take screenshot
+    await page.screenshot({ path: 'dashboard-test.png', fullPage: true });
+    console.log('\n📸 Screenshot saved to dashboard-test.png');
+
+    console.log('\n✅ All tests passed!');
+
+  } catch (error) {
+    console.error(`\n❌ Test failed:`, error.message);
+    await page.screenshot({ path: 'dashboard-error.png', fullPage: true });
+    console.log('📸 Error screenshot saved to dashboard-error.png');
+    process.exit(1);
+  } finally {
+    await browser.close();
+  }
+}
+
+testDashboard();

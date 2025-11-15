@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Execute Phase 3.4: Backend Services",
+    "status": "completed",
+    "activeForm": "Executing Phase 3.4: Backend Services"
+  },
+  {
+    "content": "Create basic Express app to make tests pass",
+    "status": "completed",
+    "activeForm": "Creating basic Express app to make tests pass"
+  },
+  {
+    "content": "Execute Phase 3.5: API Routes",
+    "status": "in_progress",
+    "activeForm": "Executing Phase 3.5: API Routes"
+  },
+  {
+    "content": "Implement proper route handlers to make tests pass",
+    "status": "pending",
+    "activeForm": "Implementing proper route handlers to make tests pass"
+  },
+  {
+    "content": "Complete remaining implementation phases",
+    "status": "pending",
+    "activeForm": "Completing remaining implementation phases"
+  }
+]

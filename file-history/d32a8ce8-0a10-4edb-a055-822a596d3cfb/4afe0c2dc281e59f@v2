@@ -1,0 +1,81 @@
+import { test } from '@playwright/test';
+
+test.describe('Simple Visual Check - Public Pages', () => {
+  test('Homepage screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000); // Wait for animations
+
+    await page.screenshot({
+      path: 'screenshots/1-homepage.png',
+      fullPage: true
+    });
+
+    console.log('✅ Homepage screenshot saved');
+  });
+
+  test('Services page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/services');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/2-services.png',
+      fullPage: true
+    });
+
+    console.log('✅ Services page screenshot saved');
+  });
+
+  test('Industries page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/industries');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/3-industries.png',
+      fullPage: true
+    });
+
+    console.log('✅ Industries page screenshot saved');
+  });
+
+  test('Case Studies page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/case-studies');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/4-case-studies.png',
+      fullPage: true
+    });
+
+    console.log('✅ Case Studies page screenshot saved');
+  });
+
+  test('Blog page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/blog');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/5-blog.png',
+      fullPage: true
+    });
+
+    console.log('✅ Blog page screenshot saved');
+  });
+
+  test('Contact page screenshot', async ({ page }) => {
+    await page.goto('http://localhost:3000/contact');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({
+      path: 'screenshots/6-contact.png',
+      fullPage: true
+    });
+
+    console.log('✅ Contact page screenshot saved');
+  });
+});

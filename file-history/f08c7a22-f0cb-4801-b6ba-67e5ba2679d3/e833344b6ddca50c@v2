@@ -1,0 +1,327 @@
+/**
+ * @file useProductImages.ts
+ * @description TanStack Query hook for product image management with optimistic updates
+ * Feature: 025-product-image-management
+ */
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ProductImage } from '../../../shared/types/product-images';
+import { useToast } from '@/components/ui/use-toast';
+
+/**
+ * API Response for GET /:itemCode/images
+ */
+interface GetImagesResponse {
+  success: boolean;
+  data: {
+    itemCode: string;
+    images: ProductImage[];
+    imageCount: number;
+  };
+}
+
+/**
+ * API Response for upload, delete, setPrimary operations
+ */
+interface ImageOperationResponse {
+  success: boolean;
+  data: {
+    itemCode: string;
+    images: ProductImage[];
+    imageCount: number;
+  };
+  message?: string;
+}
+
+/**
+ * Hook return interface
+ */
+export interface UseProductImagesReturn {
+  // Data
+  images: ProductImage[];
+  imageCount: number;
+
+  // Loading states
+  isLoading: boolean;
+  isFetching: boolean;
+
+  // Error
+  error: Error | null;
+
+  // Mutations
+  upload: {
+    mutate: (files: File[]) => void;
+    mutateAsync: (files: File[]) => Promise<ImageOperationResponse>;
+    isLoading: boolean;
+    isSuccess: boolean;
+    error: Error | null;
+  };
+  deleteImage: {
+    mutate: (imageId: string) => void;
+    mutateAsync: (imageId: string) => Promise<ImageOperationResponse>;
+    isLoading: boolean;
+  };
+  setPrimary: {
+    mutate: (imageId: string) => void;
+    mutateAsync: (imageId: string) => Promise<ImageOperationResponse>;
+    isLoading: boolean;
+  };
+
+  // Refetch
+  refetch: () => Promise<any>;
+}
+
+/**
+ * Hook for product image management
+ *
+ * @param itemCode - Product item code
+ * @returns Image data and mutation functions
+ */
+export function useProductImages(itemCode: string): UseProductImagesReturn {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const queryKey = ['product-images', itemCode];
+
+  // Query for fetching images
+  const {
+    data: queryData,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery<GetImagesResponse>({
+    queryKey,
+    queryFn: async () => {
+      const response = await fetch(`/api/product-profiles/${itemCode}/images`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch images: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes (NFR-025.69)
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: true,
+    retry: 3,
+  });
+
+  // Upload mutation
+  const uploadMutation = useMutation<ImageOperationResponse, Error, File[]>({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      const response = await fetch(`/api/product-profiles/${itemCode}/images`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${response.status}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Update cache
+      queryClient.setQueryData<GetImagesResponse>(queryKey, {
+        success: true,
+        data: {
+          itemCode,
+          images: data.data.images,
+          imageCount: data.data.imageCount,
+        },
+      });
+
+      // Invalidate to refetch from server
+      queryClient.invalidateQueries({ queryKey });
+
+      toast({
+        title: 'Upload successful',
+        description: data.message || `${data.data.imageCount} image(s) uploaded`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete mutation with optimistic update
+  const deleteMutation = useMutation<ImageOperationResponse, Error, string>({
+    mutationFn: async (imageId: string) => {
+      const response = await fetch(`/api/product-profiles/${itemCode}/images/${imageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Delete failed: ${response.status}`);
+      }
+
+      return response.json();
+    },
+    onMutate: async (imageId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData<GetImagesResponse>(queryKey);
+
+      // Optimistically update
+      if (previousData) {
+        const updatedImages = previousData.data.images.filter(img => img.id !== imageId);
+        queryClient.setQueryData<GetImagesResponse>(queryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            images: updatedImages,
+            imageCount: updatedImages.length,
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (error, _imageId, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+
+      toast({
+        title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+    onSuccess: (data) => {
+      // Update with server response
+      queryClient.setQueryData<GetImagesResponse>(queryKey, {
+        success: true,
+        data: {
+          itemCode,
+          images: data.data.images,
+          imageCount: data.data.imageCount,
+        },
+      });
+
+      toast({
+        title: 'Image deleted',
+        description: data.message || 'Image removed successfully',
+      });
+    },
+  });
+
+  // Set primary mutation with optimistic update
+  const setPrimaryMutation = useMutation<ImageOperationResponse, Error, string>({
+    mutationFn: async (imageId: string) => {
+      const response = await fetch(`/api/product-profiles/${itemCode}/images/${imageId}/primary`, {
+        method: 'PUT',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Set primary failed: ${response.status}`);
+      }
+
+      return response.json();
+    },
+    onMutate: async (imageId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData<GetImagesResponse>(queryKey);
+
+      // Optimistically update
+      if (previousData) {
+        const updatedImages = previousData.data.images.map(img => ({
+          ...img,
+          isPrimary: img.id === imageId,
+        }));
+
+        queryClient.setQueryData<GetImagesResponse>(queryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            images: updatedImages,
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (error, _imageId, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+
+      toast({
+        title: 'Failed to set primary',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+    onSuccess: (data) => {
+      // Update with server response
+      queryClient.setQueryData<GetImagesResponse>(queryKey, {
+        success: true,
+        data: {
+          itemCode,
+          images: data.data.images,
+          imageCount: data.data.imageCount,
+        },
+      });
+
+      toast({
+        title: 'Primary image updated',
+        description: data.message || 'Primary image set successfully',
+      });
+    },
+  });
+
+  return {
+    images: queryData?.data?.images || [],
+    imageCount: queryData?.data?.imageCount || 0,
+    isLoading,
+    isFetching,
+    error,
+    upload: {
+      mutate: uploadMutation.mutate,
+      mutateAsync: uploadMutation.mutateAsync,
+      isLoading: uploadMutation.isPending,
+      isSuccess: uploadMutation.isSuccess,
+      error: uploadMutation.error,
+    },
+    deleteImage: {
+      mutate: deleteMutation.mutate,
+      mutateAsync: deleteMutation.mutateAsync,
+      isLoading: deleteMutation.isPending,
+    },
+    setPrimary: {
+      mutate: setPrimaryMutation.mutate,
+      mutateAsync: setPrimaryMutation.mutateAsync,
+      isLoading: setPrimaryMutation.isPending,
+    },
+    refetch,
+  };
+}

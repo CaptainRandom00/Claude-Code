@@ -1,0 +1,239 @@
+/**
+ * Widget Validation Schemas
+ * Feature: 028-build-a-widget
+ *
+ * Zod validation schemas for widget dashboard framework API endpoints
+ * Based on contracts/widget-api.md request bodies
+ */
+
+import { z } from 'zod';
+
+// ============================================================================
+// Widget Type Enums
+// ============================================================================
+
+export const widgetTypeEnum = z.enum(['metric', 'chart', 'table', 'alert', 'progress']);
+export const httpMethodEnum = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
+export const breakpointEnum = z.enum(['xxs', 'xs', 'sm', 'md', 'lg']);
+export const formatEnum = z.enum(['currency', 'percentage', 'number', 'date']);
+export const chartTypeEnum = z.enum(['line', 'bar', 'area', 'pie', 'candlestick']);
+export const aggregationTypeEnum = z.enum(['sum', 'average', 'count', 'min', 'max']);
+export const comparisonTypeEnum = z.enum(['percent_change', 'difference', 'ratio']);
+export const filterOperatorEnum = z.enum(['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'contains']);
+
+// ============================================================================
+// Calculation Config Schema
+// ============================================================================
+
+export const calculationFilterSchema = z.object({
+  field: z.string(),
+  operator: filterOperatorEnum,
+  value: z.any(), // Can be any type depending on field
+});
+
+export const aggregationSchema = z.object({
+  type: aggregationTypeEnum,
+  field: z.string().optional().or(z.undefined()), // Optional because COUNT doesn't need a field
+  alias: z.string().optional(),
+});
+
+export const comparisonSchema = z.object({
+  type: comparisonTypeEnum,
+  currentField: z.string(),
+  comparisonField: z.string(),
+});
+
+export const sortSchema = z.object({
+  field: z.string(),
+  order: z.enum(['asc', 'desc']),
+});
+
+export const calculationConfigSchema = z.object({
+  filters: z.array(calculationFilterSchema).optional(),
+  groupBy: z.array(z.string()).optional(),
+  aggregations: z.array(aggregationSchema),
+  comparisons: z.array(comparisonSchema).optional(),
+  sort: z.array(sortSchema).optional(),
+  limit: z.number().int().positive().optional(),
+});
+
+// ============================================================================
+// Visualization Config Schema
+// ============================================================================
+
+export const visualizationConfigSchema = z.object({
+  colors: z.array(z.string()).optional(),
+  format: formatEnum.optional(),
+  decimalPlaces: z.number().int().min(0).max(10).optional(),
+  labels: z.record(z.string()).optional(),
+  chartType: chartTypeEnum.optional(),
+  showLegend: z.boolean().optional(),
+  showTooltip: z.boolean().optional(),
+});
+
+// ============================================================================
+// Widget Definition Schema
+// ============================================================================
+
+export const widgetDefinitionSchema = z.object({
+  userId: z.number().int().positive().nullable().optional(),
+  widgetType: widgetTypeEnum,
+  name: z.string().min(1).max(255),
+  description: z.string().optional().nullable(),
+  apiEndpoint: z.string().max(500),
+  httpMethod: httpMethodEnum.optional(),
+  queryParams: z.record(z.any()).optional().nullable(),
+  calculationConfig: calculationConfigSchema,
+  visualizationConfig: visualizationConfigSchema,
+  refreshInterval: z.number().int().min(30000).max(3600000).optional(), // 30s to 60min per FR-004
+  errorConfig: z.record(z.any()).optional().nullable(),
+  isSystem: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateWidgetDefinitionSchema = widgetDefinitionSchema.partial();
+
+// ============================================================================
+// Dashboard Schema
+// ============================================================================
+
+export const globalFiltersSchema = z.object({
+  dateRange: z.object({
+    start: z.string(), // ISO 8601 date
+    end: z.string(),
+  }).optional(),
+  suppliers: z.array(z.string()).optional(),
+  categories: z.array(z.string()).optional(),
+  customFilters: z.record(z.any()).optional(),
+});
+
+export const dashboardSchema = z.object({
+  userId: z.number().int().positive(),
+  name: z.string().min(3).max(255),
+  description: z.string().optional().nullable(),
+  globalFilters: globalFiltersSchema.optional().nullable(),
+  isTemplate: z.boolean().optional(),
+  templateCategory: z.string().max(100).optional().nullable(),
+  isShared: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateDashboardSchema = dashboardSchema.partial().extend({
+  userId: z.number().int().positive().optional(), // userId not required for updates
+});
+
+// ============================================================================
+// Dashboard Widget Schema
+// ============================================================================
+
+export const dashboardWidgetSchema = z.object({
+  dashboardId: z.number().int().positive(),
+  widgetDefinitionId: z.number().int().positive(),
+  widgetTitle: z.string().max(255).optional().nullable(),
+  configOverride: z.record(z.any()).optional().nullable(),
+  isVisible: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+// ============================================================================
+// Widget Layout Schema
+// ============================================================================
+
+export const widgetLayoutSchema = z.object({
+  dashboardWidgetId: z.number().int().positive(),
+  breakpoint: breakpointEnum,
+  gridX: z.number().int().min(0),
+  gridY: z.number().int().min(0),
+  gridW: z.number().int().min(2).max(12), // Per FR-020
+  gridH: z.number().int().min(2).max(8),  // Per FR-020
+});
+
+export const bulkLayoutUpdateSchema = z.object({
+  layouts: z.array(widgetLayoutSchema),
+});
+
+// ============================================================================
+// Dashboard Version Schema
+// ============================================================================
+
+export const dashboardVersionSchema = z.object({
+  dashboardId: z.number().int().positive(),
+  versionNumber: z.number().int().positive(),
+  configSnapshot: z.record(z.any()),
+  changeDescription: z.string().optional().nullable(),
+  createdByUserId: z.number().int().positive(),
+});
+
+export const restoreVersionSchema = z.object({
+  versionNumber: z.number().int().positive(),
+});
+
+// ============================================================================
+// API Endpoint Metadata Schema
+// ============================================================================
+
+export const apiEndpointMetadataSchema = z.object({
+  endpointPath: z.string().max(500),
+  httpMethod: httpMethodEnum,
+  description: z.string(),
+  requestSchema: z.record(z.any()).optional().nullable(),
+  responseSchema: z.record(z.any()),
+  requiresAuth: z.boolean().optional(),
+  rateLimit: z.string().max(100).optional().nullable(),
+  category: z.string().max(100).optional().nullable(),
+  isDeprecated: z.boolean().optional(),
+});
+
+// ============================================================================
+// Widget Data Fetch Schema (for POST /api/widgets/data/fetch)
+// ============================================================================
+
+export const widgetDataFetchSchema = z.object({
+  widgetDefinitionId: z.number().int().positive(),
+  overrideParams: z.record(z.any()).optional(),
+  limit: z.number().int().positive().max(1000).optional(), // Limit data fetch size
+});
+
+// ============================================================================
+// Widget Preview Schema (for POST /api/widgets/data/preview)
+// ============================================================================
+
+export const widgetPreviewSchema = z.object({
+  apiEndpoint: z.string(),
+  httpMethod: httpMethodEnum.optional(),
+  queryParams: z.record(z.any()).optional(),
+  calculationConfig: calculationConfigSchema,
+  limit: z.number().int().positive().max(100).optional(), // Preview limited to 100 records per contracts
+});
+
+// ============================================================================
+// Template Create from Dashboard Schema
+// ============================================================================
+
+export const createTemplateSchema = z.object({
+  dashboardId: z.number().int().positive(),
+  name: z.string().min(3).max(255),
+  description: z.string(),
+  category: z.string().max(100),
+  previewImageUrl: z.string().max(500).optional().nullable(),
+});
+
+// ============================================================================
+// Type Exports
+// ============================================================================
+
+export type WidgetDefinitionInput = z.infer<typeof widgetDefinitionSchema>;
+export type UpdateWidgetDefinitionInput = z.infer<typeof updateWidgetDefinitionSchema>;
+export type DashboardInput = z.infer<typeof dashboardSchema>;
+export type UpdateDashboardInput = z.infer<typeof updateDashboardSchema>;
+export type DashboardWidgetInput = z.infer<typeof dashboardWidgetSchema>;
+export type WidgetLayoutInput = z.infer<typeof widgetLayoutSchema>;
+export type BulkLayoutUpdateInput = z.infer<typeof bulkLayoutUpdateSchema>;
+export type DashboardVersionInput = z.infer<typeof dashboardVersionSchema>;
+export type RestoreVersionInput = z.infer<typeof restoreVersionSchema>;
+export type ApiEndpointMetadataInput = z.infer<typeof apiEndpointMetadataSchema>;
+export type WidgetDataFetchInput = z.infer<typeof widgetDataFetchSchema>;
+export type WidgetPreviewInput = z.infer<typeof widgetPreviewSchema>;
+export type CreateTemplateInput = z.infer<typeof createTemplateSchema>;
+export type CalculationConfig = z.infer<typeof calculationConfigSchema>;
+export type VisualizationConfig = z.infer<typeof visualizationConfigSchema>;

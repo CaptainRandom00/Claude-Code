@@ -1,0 +1,44 @@
+[
+  {
+    "content": "Check if Docker services are running",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Verify backend API is accessible",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Check skill tree database tables exist",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Test skill tree API endpoints",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Fix frontend API connection issues",
+    "status": "in_progress",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Start backend API server",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Set up test authentication or bypass",
+    "status": "pending",
+    "priority": "high",
+    "id": "7"
+  }
+]

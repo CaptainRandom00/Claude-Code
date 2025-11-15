@@ -1,0 +1,172 @@
+// Blog API - List and Create
+// GET /api/blog - List all blog posts (with filters)
+// POST /api/blog - Create new blog post (admin only)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { blogPostSchema, blogFilterSchema, paginationSchema } from '@/lib/validations';
+import type { BlogPost } from '@/types/database';
+
+// GET /api/blog - List blog posts
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+
+    // Parse pagination and filters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const category = searchParams.get('category');
+    const published = searchParams.get('published') === 'true' ? true : searchParams.get('published') === 'false' ? false : undefined;
+    const search = searchParams.get('search');
+
+    const offset = (page - 1) * limit;
+
+    // Build query
+    let query = `
+      SELECT
+        id, slug, title, excerpt, content, featured_image,
+        author_id, category, tags, published, published_at,
+        created_at, updated_at
+      FROM blog_posts
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (category) {
+      query += ` AND category = $${paramIndex}`;
+      params.push(category);
+      paramIndex++;
+    }
+
+    if (published !== undefined) {
+      query += ` AND published = $${paramIndex}`;
+      params.push(published);
+      paramIndex++;
+    }
+
+    if (search) {
+      query += ` AND search_vector @@ plainto_tsquery('english', $${paramIndex})`;
+      params.push(search);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY published_at DESC NULLS LAST, created_at DESC`;
+    query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) FROM blog_posts WHERE 1=1';
+    const countParams: any[] = [];
+    let countParamIndex = 1;
+
+    if (category) {
+      countQuery += ` AND category = $${countParamIndex}`;
+      countParams.push(category);
+      countParamIndex++;
+    }
+
+    if (published !== undefined) {
+      countQuery += ` AND published = $${countParamIndex}`;
+      countParams.push(published);
+      countParamIndex++;
+    }
+
+    if (search) {
+      countQuery += ` AND search_vector @@ plainto_tsquery('english', $${countParamIndex})`;
+      countParams.push(search);
+    }
+
+    const [result, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count);
+
+    return NextResponse.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching blog posts:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch blog posts' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/blog - Create blog post (admin only)
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+
+    // Validate input
+    const validated = blogPostSchema.parse(body);
+
+    // Insert blog post
+    const result = await db.query(
+      `
+      INSERT INTO blog_posts (
+        slug, title, excerpt, content, featured_image,
+        author_id, category, tags, published, published_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+      `,
+      [
+        validated.slug,
+        validated.title,
+        validated.excerpt,
+        validated.content,
+        validated.featured_image,
+        validated.author_id || session.user.id,
+        validated.category,
+        validated.tags,
+        validated.published,
+        validated.published && !validated.published_at ? new Date() : validated.published_at,
+      ]
+    );
+
+    return NextResponse.json(result.rows[0], { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating blog post:', error);
+
+    if (error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error.code === '23505') { // Unique violation
+      return NextResponse.json(
+        { error: 'A blog post with this slug already exists' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create blog post' },
+      { status: 500 }
+    );
+  }
+}

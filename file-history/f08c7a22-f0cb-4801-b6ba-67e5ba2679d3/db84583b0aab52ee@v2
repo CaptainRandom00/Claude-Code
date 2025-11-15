@@ -1,0 +1,346 @@
+
+# Implementation Plan: Fix Sales Aggregation Calendar Navigation and Date Alignment
+
+**Branch**: `026-fix-sales-aggregation` | **Date**: 2025-10-10 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/Users/cedricmukolonga/BB_Management_System/specs/026-fix-sales-aggregation/spec.md`
+
+## Execution Flow (/plan command scope)
+```
+1. Load feature spec from Input path
+   ✓ Spec loaded successfully
+2. Fill Technical Context (scan for NEEDS CLARIFICATION)
+   ✓ Project Type: Web application (React + TypeScript frontend)
+   ✓ All technical details resolved from codebase analysis
+3. Fill the Constitution Check section based on the content of the constitution document.
+   ✓ Constitution v1.8.0 principles evaluated
+4. Evaluate Constitution Check section below
+   ✓ No violations - pure frontend UI fix
+   ✓ Update Progress Tracking: Initial Constitution Check
+5. Execute Phase 0 → research.md
+   ✓ Research component implementation and react-day-picker API
+6. Execute Phase 1 → contracts, data-model.md, quickstart.md, CLAUDE.md
+   ✓ No API contracts needed (frontend-only)
+   ✓ No data model changes (UI props only)
+7. Re-evaluate Constitution Check section
+   ✓ No new violations
+   ✓ Update Progress Tracking: Post-Design Constitution Check
+8. Plan Phase 2 → Describe task generation approach (DO NOT create tasks.md)
+   ✓ Task strategy defined
+9. STOP - Ready for /tasks command
+```
+
+**IMPORTANT**: The /plan command STOPS at step 8. Phases 2-4 are executed by other commands:
+- Phase 2: /tasks command creates tasks.md
+- Phase 3-4: Implementation execution (manual or via tools)
+
+## Summary
+
+Fix two critical usability issues in the Sales Aggregation calendar component: (1) missing month/year navigation controls that prevent users from browsing historical data, and (2) date misalignment with day-of-week column headers causing confusion about which day dates fall on.
+
+**Technical Approach**: Enhance the shadcn/ui Calendar component wrapper by adding react-day-picker props (`captionLayout`, `fixedWeeks`) and adjusting CSS classes for navigation button visibility and grid cell alignment. Preserve existing blue highlighting for aggregated dates and date selection functionality.
+
+## Technical Context
+
+**Language/Version**: TypeScript 5.x, React 18, Node.js 18+
+**Primary Dependencies**: react-day-picker (Calendar library), shadcn/ui (UI component system), Tailwind CSS (styling)
+**Storage**: N/A (frontend-only, no data persistence changes)
+**Testing**: Playwright (E2E browser automation), @testing-library/react (component testing)
+**Target Platform**: Web browsers (Chrome, Firefox, Safari) via Vite dev server
+**Project Type**: Web application (frontend + backend, but frontend-only changes for this feature)
+**Performance Goals**: <200ms navigation response time, smooth month transitions
+**Constraints**: Must preserve existing date selection and blue highlighting functionality, maintain accessibility standards
+**Scale/Scope**: Single Calendar component enhancement, 2 affected files (calendar.tsx, sales-aggregation.tsx), ~50 LOC changes
+
+## Constitution Check
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+### ✅ Principle I: Data-First Architecture
+- **Status**: N/A - No data model changes
+- **Justification**: Frontend UI fix only, existing aggregated data structure unchanged
+
+### ✅ Principle II: Modular Route Organization
+- **Status**: N/A - No backend route changes
+- **Justification**: No API endpoints modified
+
+### ✅ Principle III: Component-Based UI Development
+- **Status**: COMPLIANT
+- **Evidence**: Using shadcn/ui Calendar component wrapper pattern
+- **Implementation**: Prop-based configuration of react-day-picker, TypeScript interfaces maintained
+
+### ✅ Principle IV: File Processing Excellence
+- **Status**: N/A - No file processing involved
+
+### ✅ Principle V: Performance & Monitoring
+- **Status**: COMPLIANT
+- **Target**: <200ms navigation response time (FR-010)
+- **Method**: Client-side date calculations only, no API calls during navigation
+
+### ✅ Principle VI: End-to-End Testing & Audit Trail (NON-NEGOTIABLE)
+- **Status**: COMPLIANT
+- **Audit Structure**: `specs/026-fix-sales-aggregation/audit/` (to be created)
+- **Testing Plan**:
+  * Playwright E2E tests for month navigation across Chrome/Firefox/Safari
+  * Screenshot validation of date alignment with day-of-week headers
+  * Interaction tests for preserving existing functionality
+- **Workflow**: TDD approach with initial test failures → fixes → re-validation
+
+### ✅ Principle VII: Security & Authentication
+- **Status**: N/A - No authentication changes
+
+### ✅ Principle VIII: Testing & Verification
+- **Status**: COMPLIANT
+- **Approach**: Playwright visual regression tests with screenshots
+- **Coverage**: Navigation controls, date alignment, existing functionality preservation
+
+### ✅ Principle IX: API Documentation and Route Mapping System
+- **Status**: N/A - No API changes
+- **Evidence**: See `.specify/memory/api-skip-justification.txt`
+
+### ✅ Principle X: Intelligent API Development & Reuse
+- **Status**: SKIPPED - Frontend-only feature
+- **Evidence**: `.specify/memory/api-skip-justification.txt` created
+- **Justification**: Pure UI component enhancement, no backend/API work
+
+**Initial Constitution Check**: ✅ PASS (no violations, frontend-only UI fix)
+
+## Project Structure
+
+### Documentation (this feature)
+```
+specs/026-fix-sales-aggregation/
+├── spec.md              # Feature specification (complete)
+├── plan.md              # This file (/plan command output)
+├── research.md          # Phase 0 output (/plan command)
+├── quickstart.md        # Phase 1 output (/plan command)
+├── audit/               # Phase 1 output (/plan command - Principle VI)
+│   └── .gitkeep         # Audit trail structure ready
+└── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
+```
+
+### Source Code (repository root)
+```
+# Existing BB Management System structure (Option 2: Web application)
+
+client/                           # Frontend changes only
+├── src/
+│   ├── components/
+│   │   ├── ui/
+│   │   │   └── calendar.tsx     # MODIFY: Add captionLayout, fixedWeeks, adjust nav opacity
+│   │   └── dashboard/
+│   │       └── sales-aggregation.tsx  # MODIFY: Pass captionLayout prop to Calendar
+│   └── ...
+
+tests/                            # NEW tests
+├── playwright/
+│   └── sales-calendar-navigation.spec.ts  # NEW: E2E tests for navigation and alignment
+└── ...
+
+server/                           # NO CHANGES
+└── ...
+```
+
+**Structure Decision**: Option 2 (Web application) - frontend-only modifications, no backend changes
+
+## Phase 0: Outline & Research
+
+### Research Tasks Completed
+
+1. **react-day-picker API Investigation**
+   - **Decision**: Use `captionLayout="dropdown-buttons"` for month/year navigation
+   - **Rationale**: Provides accessible dropdowns for both month and year selection, standard react-day-picker feature
+   - **Alternatives considered**:
+     * `captionLayout="dropdown"` (month-only dropdown)
+     * Increasing arrow visibility only (insufficient - doesn't allow year navigation)
+     * Custom caption component (over-engineered for this use case)
+
+2. **Date Alignment Solutions**
+   - **Decision**: Add `fixedWeeks={true}` prop to ensure consistent 6-week calendar grid
+   - **Rationale**: Prevents layout shifts when navigating between months with different starting days
+   - **Alternatives considered**:
+     * CSS-only grid fixes (insufficient without fixedWeeks)
+     * Custom day component (over-engineered)
+
+3. **Navigation Button Visibility**
+   - **Decision**: Increase opacity from 50% to 100% in `nav_button` classNames
+   - **Rationale**: Makes navigation arrows immediately visible per FR-009
+   - **Alternatives considered**:
+     * Remove opacity entirely (would lose hover effect)
+     * Add background color (conflicts with outline variant design)
+
+4. **Existing Functionality Preservation**
+   - **Decision**: Maintain all existing props (mode, selected, onSelect, modifiers, modifiersClassNames)
+   - **Rationale**: FR-003, FR-004 require preserving blue highlighting and date selection
+   - **Risk**: Ensure captionLayout doesn't interfere with modifiers
+
+**Output**: See `research.md` for detailed findings
+
+## Phase 1: Design & Contracts
+
+### Data Model Changes
+**Status**: N/A - No data entities modified
+
+This is a pure UI component enhancement. No database schema, API contracts, or data structures are affected. The existing aggregated sales data structure remains unchanged.
+
+See `data-model.md` for confirmation of no changes.
+
+### API Contracts
+**Status**: N/A - No API endpoints
+
+Frontend-only changes. No REST/GraphQL endpoints required. Calendar data is already fetched via existing sales aggregation API.
+
+### Component Prop Interface Changes
+
+```typescript
+// client/src/components/dashboard/sales-aggregation.tsx
+// NEW props to pass to Calendar component:
+
+<CalendarComponent
+  mode="single"
+  selected={selectedCalendarDate}
+  onSelect={setSelectedCalendarDate}
+  modifiers={{
+    aggregated: aggregatedDates
+  }}
+  modifiersClassNames={{
+    aggregated: 'bg-blue-500 text-white font-bold hover:bg-blue-600'
+  }}
+  captionLayout="dropdown-buttons"  // NEW: Enable month/year dropdowns
+  fixedWeeks={true}                 // NEW: Ensure 6-week grid for alignment
+  showOutsideDays={true}            // ALREADY DEFAULT: Fill grid with adjacent month dates
+  className="rounded-md border"
+/>
+```
+
+```typescript
+// client/src/components/ui/calendar.tsx
+// MODIFY classNames for nav_button:
+
+nav_button: cn(
+  buttonVariants({ variant: "outline" }),
+  "h-7 w-7 bg-transparent p-0 opacity-100 hover:opacity-80"  // CHANGED: opacity 100 default, 80 on hover
+),
+```
+
+### Test Scenarios (from spec.md user stories)
+
+See `quickstart.md` for:
+- Manual testing steps for month/year navigation
+- Visual verification of date alignment with day-of-week headers
+- Validation of blue highlighting preservation
+- Cross-browser testing checklist (Chrome, Firefox, Safari)
+
+### Playwright E2E Test Plan
+
+```typescript
+// tests/playwright/sales-calendar-navigation.spec.ts
+// Test suite structure:
+
+describe('Sales Aggregation Calendar Navigation', () => {
+  test('should display month/year dropdown controls', ...)
+  test('should navigate to previous month and maintain alignment', ...)
+  test('should navigate to next month and maintain alignment', ...)
+  test('should preserve blue highlighting after navigation', ...)
+  test('should maintain date selection functionality', ...)
+  test('should display consistent 6-week grid across all months', ...)
+  test('should align dates with day-of-week headers correctly', ...)
+  test('should handle year transitions (Dec→Jan, Jan→Dec)', ...)
+})
+```
+
+### Agent Context Update
+
+Running agent context update script:
+
+```bash
+.specify/scripts/bash/update-agent-context.sh claude
+```
+
+This will update `CLAUDE.md` with:
+- Current feature: 026-fix-sales-aggregation
+- Component changes: calendar.tsx, sales-aggregation.tsx
+- New dependencies: None (existing react-day-picker)
+- Recent changes: Calendar navigation and alignment fix
+
+**Output**: Updated CLAUDE.md at repository root
+
+## Phase 2: Task Planning Approach
+*This section describes what the /tasks command will do - DO NOT execute during /plan*
+
+**Task Generation Strategy**:
+- Load `.specify/templates/tasks-template.md` as base
+- Generate tasks from component modifications and test requirements
+- No contract tests (no API changes)
+- No data model tasks (no schema changes)
+- Focus on component enhancement and E2E testing
+
+**Task Categories**:
+1. **Setup Tasks**: Create audit structure, Playwright test scaffolding
+2. **Component Modification Tasks**:
+   - Update calendar.tsx nav button opacity
+   - Add captionLayout and fixedWeeks props to sales-aggregation.tsx
+3. **Testing Tasks** (TDD order):
+   - Write failing Playwright tests for navigation
+   - Write failing tests for date alignment
+   - Run tests (expect failures)
+   - Implement fixes
+   - Re-run tests (expect passes)
+   - Visual regression with screenshots
+4. **Validation Tasks**:
+   - Cross-browser testing (Chrome/Firefox/Safari)
+   - Manual quickstart validation
+   - Performance verification (<200ms response)
+5. **Audit Trail Tasks**:
+   - Document test results in audit/
+   - Screenshot evidence of fixes
+   - Completion report
+
+**Ordering Strategy**:
+1. Setup (audit structure, test scaffolding) [P]
+2. Write failing tests (navigation, alignment) [P]
+3. Implement component fixes (sequential: calendar.tsx → sales-aggregation.tsx)
+4. Re-run tests and validate [Sequential]
+5. Cross-browser validation [P]
+6. Audit trail completion [Sequential]
+
+**Estimated Output**: 15-18 numbered, ordered tasks in tasks.md
+
+**IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
+
+## Phase 3+: Future Implementation
+*These phases are beyond the scope of the /plan command*
+
+**Phase 3**: Task execution (/tasks command creates tasks.md)
+**Phase 4**: Implementation (execute tasks.md following constitutional principles)
+**Phase 5**: Validation (Playwright tests, quickstart.md, performance validation, audit trail completion)
+
+## Complexity Tracking
+*Fill ONLY if Constitution Check has violations that must be justified*
+
+**No violations detected** - Pure frontend UI component enhancement with no constitutional conflicts.
+
+## Progress Tracking
+*This checklist is updated during execution flow*
+
+**Phase Status**:
+- [x] Phase 0: Research complete (/plan command)
+- [x] Phase 1: Design complete (/plan command)
+- [x] Phase 2: Task planning complete (/plan command - describe approach only)
+- [ ] Phase 3: Tasks generated (/tasks command)
+- [ ] Phase 4: Implementation complete
+- [ ] Phase 5: Validation passed
+
+**Gate Status**:
+- [x] Initial Constitution Check: PASS
+- [x] Post-Design Constitution Check: PASS
+- [x] All NEEDS CLARIFICATION resolved
+- [x] Complexity deviations documented (N/A - no deviations)
+
+**Execution Evidence**:
+- ✅ `.specify/memory/api-skip-justification.txt` created
+- ✅ Component analysis complete (calendar.tsx, sales-aggregation.tsx)
+- ✅ react-day-picker API research complete
+- ✅ Test strategy defined
+- ✅ No route analysis required (frontend-only)
+
+---
+*Based on Constitution v1.8.0 - See `.specify/memory/constitution.md`*

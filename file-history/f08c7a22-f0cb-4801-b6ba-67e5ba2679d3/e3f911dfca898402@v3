@@ -1,0 +1,456 @@
+
+# Implementation Plan: Product Image Management for Stock Profiles
+
+**Branch**: `025-product-image-management` | **Date**: 2025-10-07 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/025-product-image-management/spec.md`
+
+## Execution Flow (/plan command scope)
+```
+1. Load feature spec from Input path
+   → If not found: ERROR "No feature spec at {path}"
+2. Fill Technical Context (scan for NEEDS CLARIFICATION)
+   → Detect Project Type from context (web=frontend+backend, mobile=app+api)
+   → Set Structure Decision based on project type
+3. Fill the Constitution Check section based on the content of the constitution document.
+4. Evaluate Constitution Check section below
+   → If violations exist: Document in Complexity Tracking
+   → If no justification possible: ERROR "Simplify approach first"
+   → Update Progress Tracking: Initial Constitution Check
+5. Execute Phase 0 → research.md
+   → If NEEDS CLARIFICATION remain: ERROR "Resolve unknowns"
+6. Execute Phase 1 → contracts, data-model.md, quickstart.md, agent-specific template file (e.g., `CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot, `GEMINI.md` for Gemini CLI, `QWEN.md` for Qwen Code or `AGENTS.md` for opencode).
+7. Re-evaluate Constitution Check section
+   → If new violations: Refactor design, return to Phase 1
+   → Update Progress Tracking: Post-Design Constitution Check
+8. Plan Phase 2 → Describe task generation approach (DO NOT create tasks.md)
+9. STOP - Ready for /tasks command
+```
+
+**IMPORTANT**: The /plan command STOPS at step 7. Phases 2-4 are executed by other commands:
+- Phase 2: /tasks command creates tasks.md
+- Phase 3-4: Implementation execution (manual or via tools)
+
+## Summary
+Add comprehensive product image management to Stock Profiles Edit Product popup enabling users to upload, compress, view, and manage up to 5 product images per item with WebP compression (60-80% reduction), 1200x1200px max resolution, organized storage in `/uploads/product-images/{itemCode}/`, secure MD5-hashed filenames, thumbnail generation (300x300px), carousel viewer with keyboard navigation, primary image designation, and 1-year archive retention for deleted products.
+
+## Technical Context
+**Language/Version**: TypeScript 5.7.2, Node.js 18+ (ES modules)
+**Primary Dependencies**: Sharp 0.33.5 (image processing), Multer 1.4.5 (file uploads), Express 4.21.1, React 18.3.1, TanStack Query 5.69.2, Drizzle ORM 0.36.4
+**Storage**: MySQL 8.0+ (image metadata in JSON fields), File system (`/uploads/product-images/{itemCode}/` for originals and thumbnails)
+**Testing**: Playwright 1.55.0 (E2E browser automation), Jest 29.7.0 (unit tests), @testing-library/react 16.1.0 (component tests)
+**Target Platform**: Web application (frontend + backend), Safari 14+, Chrome 23+, Firefox 65+, Edge 18+ (native WebP support)
+**Project Type**: web (frontend: client/src/, backend: server/)
+**Performance Goals**: <200ms API response time (constitutional requirement), <5s image compression, <2s thumbnail generation, 60-80% file size reduction, 10 concurrent uploads without degradation
+**Constraints**: <200ms p95 latency, 10MB max file size per image, 5 images max per product, 1-year archive retention policy, WebP-only (no JPEG fallback), modern browsers required
+**Scale/Scope**: Product catalog with 10,088 existing products, up to 5 images per product (max 50,440 images), storage organized by itemCode folders, mobile/tablet responsive design, keyboard accessibility compliant
+
+## Constitution Check
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+### Principle I: Data-First Architecture
+✅ **PASS** - Feature starts with clear data model additions to `shared/schema.ts`:
+- New fields: `primary_image_path`, `image_metadata` (JSON), `image_count`, `last_image_updated`
+- Audit trail through timestamps and metadata tracking
+- Data integrity via existing product_profiles foreign key relationships
+
+### Principle II: Modular Route Organization
+✅ **PASS** - Follows established patterns:
+- Extends existing `routes-product-profiles.ts` with 4 new image endpoints
+- RESTful conventions: `/api/product-profiles/:itemCode/images`
+- Standardized response format (success/error structure)
+- Self-contained with clear input/output contracts
+
+### Principle III: Component-Based UI Development
+✅ **PASS** - Component architecture:
+- New standalone components: ProductImageManager, ImageCarousel, ImageUploadZone
+- Uses shadcn/ui for consistency (Dialog, Toast, Button components)
+- TanStack Query for server state (useProductImages hook)
+- TypeScript interfaces for all props and data structures
+
+### Principle IV: File Processing Excellence
+✅ **PASS** - Robust file handling:
+- Sharp library for image compression and thumbnail generation
+- Multer (already installed) for multipart/form-data uploads
+- Validation at every step (file type, size, dimensions)
+- Processing logs and audit trail (image_metadata JSON field)
+
+### Principle V: Performance & Monitoring
+✅ **PASS** - Meets performance standards:
+- Sub-200ms API response target (constitutional requirement)
+- Database indexing on product_profiles.item_code (already exists)
+- Winston logging (existing infrastructure)
+- Performance requirements: <5s compression, <2s thumbnails
+
+### Principle VI: End-to-End Testing & Audit Trail
+✅ **PASS** - Comprehensive E2E testing planned:
+- Playwright tests for complete user workflows (upload, view, navigate, delete, set primary)
+- Audit structure: `specs/025-product-image-management/audit/` folder
+- Browser automation testing across Chrome, Firefox, Safari (NFR-025.16)
+- Test execution logs, failure analysis, root cause investigations, re-test validation
+- TDD workflow: Initial E2E test → root cause → fix → re-test → validation report
+
+### Principle VII: Security & Authentication
+✅ **PASS** - Security enforced:
+- Requires authentication for all image operations (FR-025.54, FR-025.55)
+- Input validation: file type magic numbers, filename sanitization (FR-025.51, FR-025.52)
+- Rate limiting: 10 uploads per minute per user (FR-025.56)
+- EXIF metadata stripping for privacy (FR-025.15, NFR-025.9)
+- Hashed filenames to prevent predictable URLs (NFR-025.10)
+
+### Principle VIII: Testing & Verification
+✅ **PASS** - Comprehensive testing strategy:
+- Playwright for E2E tests (7 acceptance scenarios + 9 edge cases)
+- Jest for unit tests (compression, validation, service logic)
+- @testing-library/react for component tests
+- Screenshot capture for visual verification
+- Test documentation in audit/ folder
+
+### Principle IX: API Documentation and Route Mapping System
+⚠️ **CONDITIONAL EXECUTION REQUIRED** - API feature detected:
+- Keywords present: "API", "endpoint", "upload", "backend", "server"
+- Technical indicators: Backend changes (server/routes-product-profiles.ts, server/services/)
+- MUST execute route analysis during spec phase
+- MUST document in "## Existing Route Analysis" section in spec.md
+
+### Principle X: Intelligent API Development & Reuse
+⚠️ **CONDITIONAL EXECUTION REQUIRED** - API involvement confirmed:
+- Extends existing `/api/product-profiles` endpoint family
+- MUST run `npm run routes:search "product profiles images"` (spec phase)
+- MUST run `npm run routes:analyze` (plan phase)
+- MUST capture output to `.specify/memory/route-search-results.txt`
+- MUST justify new endpoints vs. extending existing ones
+
+### Initial Constitution Check Result
+**STATUS**: ✅ PASS
+
+**Route Analysis Completed**:
+1. ✅ Executed `npm run routes:find "product"` - found 11 existing product-profiles endpoints
+2. ✅ Executed `npm run routes:find "image"` - confirmed no existing image endpoints
+3. ✅ Captured results to `.specify/memory/route-search-results.txt`
+4. ✅ Verified no duplicate endpoints exist (image functionality is entirely new)
+5. ✅ Justified extending `routes-product-profiles.ts`: Images tightly coupled to products, follows :itemCode pattern, same auth requirements
+
+**Approval to Proceed**: Phase 0 research authorized
+
+## Project Structure
+
+### Documentation (this feature)
+```
+specs/[###-feature]/
+├── plan.md              # This file (/plan command output)
+├── research.md          # Phase 0 output (/plan command)
+├── data-model.md        # Phase 1 output (/plan command)
+├── quickstart.md        # Phase 1 output (/plan command)
+├── contracts/           # Phase 1 output (/plan command)
+└── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
+```
+
+### Source Code (repository root)
+```
+# Option 1: Single project (DEFAULT)
+src/
+├── models/
+├── services/
+├── cli/
+└── lib/
+
+tests/
+├── contract/
+├── integration/
+└── unit/
+
+# Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure]
+```
+
+**Structure Decision**: [DEFAULT to Option 1 unless Technical Context indicates web/mobile app]
+
+## Phase 0: Outline & Research
+1. **Extract unknowns from Technical Context** above:
+   - For each NEEDS CLARIFICATION → research task
+   - For each dependency → best practices task
+   - For each integration → patterns task
+
+2. **Generate and dispatch research agents**:
+   ```
+   For each unknown in Technical Context:
+     Task: "Research {unknown} for {feature context}"
+   For each technology choice:
+     Task: "Find best practices for {tech} in {domain}"
+   ```
+
+3. **Consolidate findings** in `research.md` using format:
+   - Decision: [what was chosen]
+   - Rationale: [why chosen]
+   - Alternatives considered: [what else evaluated]
+
+**Output**: research.md with all NEEDS CLARIFICATION resolved
+
+## Phase 1: Design & Contracts
+*Prerequisites: research.md complete*
+
+1. **Extract entities from feature spec** → `data-model.md`:
+   - Entity name, fields, relationships
+   - Validation rules from requirements
+   - State transitions if applicable
+
+2. **Generate API contracts** from functional requirements:
+   - For each user action → endpoint
+   - Use standard REST/GraphQL patterns
+   - Output OpenAPI/GraphQL schema to `/contracts/`
+
+3. **Generate contract tests** from contracts:
+   - One test file per endpoint
+   - Assert request/response schemas
+   - Tests must fail (no implementation yet)
+
+4. **Extract test scenarios** from user stories:
+   - Each story → integration test scenario
+   - Quickstart test = story validation steps
+
+5. **Update agent file incrementally** (O(1) operation):
+   - Run `.specify/scripts/bash/update-agent-context.sh claude`
+     **IMPORTANT**: Execute it exactly as specified above. Do not add or remove any arguments.
+   - If exists: Add only NEW tech from current plan
+   - Preserve manual additions between markers
+   - Update recent changes (keep last 3)
+   - Keep under 150 lines for token efficiency
+   - Output to repository root
+
+**Output**: data-model.md, /contracts/*, failing tests, quickstart.md, agent-specific file
+
+## Phase 2: Task Planning Approach
+*This section describes what the /tasks command will do - DO NOT execute during /plan*
+
+### Task Generation Strategy
+
+**Input Sources**:
+1. **data-model.md** → Database schema, TypeScript interfaces, migration tasks
+2. **contracts/product-images-api.yaml** → API endpoint contract tests (4 endpoints)
+3. **quickstart.md** → Integration test scenarios (8 scenarios)
+4. **research.md** → Implementation decisions (Sharp, Multer, WebP, security)
+
+**Task Categories & Dependencies**:
+
+```
+Phase A: Foundation (Parallel-Capable) [P]
+├─ Database Migration (schema changes)
+├─ Type Definitions (shared/types/)
+└─ Contract Test Stubs (fail-fast validation)
+
+Phase B: Backend Core (Sequential)
+├─ Image Service (Sharp compression, file handling)
+├─ Route Extensions (4 new endpoints in routes-product-profiles.ts)
+└─ Service Integration (ProductProfileService extensions)
+
+Phase C: Frontend Components (Parallel after Phase B)
+├─ ProductImageManager component [P]
+├─ ImageCarousel component [P]
+├─ ImageUploadZone component [P]
+└─ useProductImages hook [P]
+
+Phase D: Integration & Testing (Sequential after Phase C)
+├─ Contract Tests (validate API responses)
+├─ Unit Tests (compression, validation, service methods)
+├─ Integration Tests (upload flow, delete flow)
+└─ Playwright E2E Tests (8 scenarios from quickstart)
+
+Phase E: Documentation & Deployment
+├─ Update API documentation
+├─ Route registry update
+└─ Audit folder creation
+```
+
+### Task Ordering Strategy
+
+**TDD Principles**:
+- Contract tests before implementations (fail-fast)
+- Unit tests alongside service development
+- Integration tests after component completion
+- E2E tests validate complete workflows
+
+**Dependency Resolution**:
+1. Schema must exist before service can reference types
+2. Backend services must work before frontend can integrate
+3. Individual components can be built in parallel
+4. Tests reference implementations (built after)
+
+**Parallelization Markers**:
+- `[P]` = Independent, can be executed concurrently
+- No marker = Sequential dependency, must wait for previous task
+
+### Estimated Task Breakdown
+
+**Database & Schema** (3 tasks):
+1. [P] Create migration script 001_add_product_images.sql
+2. [P] Add ProductImage interface to shared/types/product-images.ts
+3. [P] Update shared/schema.ts with 4 new columns
+
+**Backend Services** (6 tasks):
+4. Create ProductImageService (Sharp integration, compression, thumbnails)
+5. Add multer configuration with security validation
+6. Extend routes-product-profiles.ts with POST /:itemCode/images
+7. Extend routes-product-profiles.ts with GET /:itemCode/images
+8. Extend routes-product-profiles.ts with DELETE /:itemCode/images/:imageId
+9. Extend routes-product-profiles.ts with PUT /:itemCode/images/:imageId/primary
+
+**Frontend Components** (5 tasks):
+10. [P] Create ProductImageManager component (grid layout, upload zone)
+11. [P] Create ImageCarousel component (viewer, navigation, actions)
+12. [P] Create ImageUploadZone component (drag-drop, progress)
+13. [P] Create useProductImages hook (TanStack Query integration)
+14. Integrate ProductImageManager into EditProductPopup.tsx
+
+**Testing Tasks** (8 tasks):
+15. [P] Contract test: POST /:itemCode/images endpoint
+16. [P] Contract test: GET /:itemCode/images endpoint
+17. [P] Contract test: DELETE /:itemCode/images/:imageId endpoint
+18. [P] Contract test: PUT /:itemCode/images/:imageId/primary endpoint
+19. [P] Unit test: ProductImageService (compression, validation)
+20. Integration test: Upload flow (multipart → compression → save)
+21. Integration test: Delete flow (remove from DB and filesystem)
+22. Playwright E2E test: All 8 quickstart scenarios
+
+**Documentation & Infrastructure** (3 tasks):
+23. Create audit folder structure: specs/025-product-image-management/audit/
+24. Update route registry with `npm run routes:update`
+25. Update CLAUDE.md recent changes (already done by update script)
+
+**Estimated Total**: 25 tasks
+
+### Task Execution Estimates
+
+**Parallel Batches**:
+- Batch 1 (Tasks 1-3): ~30 minutes (schema + types)
+- Batch 2 (Tasks 4-9): ~2 hours (backend services, sequential)
+- Batch 3 (Tasks 10-13): ~1.5 hours (frontend components, parallel)
+- Batch 4 (Task 14): ~30 minutes (integration)
+- Batch 5 (Tasks 15-22): ~2 hours (testing, mostly parallel)
+- Batch 6 (Tasks 23-25): ~15 minutes (documentation)
+
+**Total Estimated Implementation Time**: ~6.5 hours
+
+### Quality Gates
+
+**After Phase A (Schema)**:
+- ✅ Migration runs without errors
+- ✅ TypeScript compilation succeeds
+- ✅ Contract tests fail (expected - no implementation yet)
+
+**After Phase B (Backend)**:
+- ✅ Contract tests pass
+- ✅ API responds within <200ms (constitutional requirement)
+- ✅ Image compression achieves 60-80% reduction
+
+**After Phase C (Frontend)**:
+- ✅ Components render without errors
+- ✅ TypeScript compilation succeeds
+- ✅ Dev server starts successfully
+
+**After Phase D (Testing)**:
+- ✅ All contract tests pass
+- ✅ All unit tests pass (coverage >80%)
+- ✅ All integration tests pass
+- ✅ All 8 Playwright E2E scenarios pass
+
+**After Phase E (Complete)**:
+- ✅ Route registry updated
+- ✅ Audit folder created
+- ✅ No regressions in existing features
+
+### Success Criteria for /tasks Command
+
+The /tasks command will be considered successful when it generates:
+1. Exactly 25 tasks in dependency order
+2. Parallel execution markers `[P]` on independent tasks
+3. Clear task descriptions referencing design artifacts
+4. Estimated time for each task
+5. Quality gate checkpoints between phases
+
+**IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
+
+## Phase 3+: Future Implementation
+*These phases are beyond the scope of the /plan command*
+
+**Phase 3**: Task execution (/tasks command creates tasks.md)  
+**Phase 4**: Implementation (execute tasks.md following constitutional principles)  
+**Phase 5**: Validation (run tests, execute quickstart.md, performance validation)
+
+## Post-Design Constitution Check
+*Re-evaluation after Phase 1 design artifacts completed*
+
+### Design Review Against Constitution
+
+**Principle I: Data-First Architecture** ✅ CONFIRMED
+- data-model.md defines clear schema extensions (4 new columns)
+- Migration scripts prepared (001_add_product_images.sql)
+- JSON metadata structure fully specified with TypeScript interfaces
+
+**Principle II: Modular Route Organization** ✅ CONFIRMED
+- OpenAPI contract defines 4 RESTful endpoints
+- All routes follow `/api/product-profiles/:itemCode/images` pattern
+- Standardized response format maintained
+
+**Principle III: Component-Based UI Development** ✅ CONFIRMED
+- Quickstart defines component interaction flows
+- TanStack Query hooks documented (useProductImages)
+- shadcn/ui components identified (Dialog, Toast, Button)
+
+**Principle VI: End-to-End Testing & Audit Trail** ✅ CONFIRMED
+- Quickstart.md provides comprehensive Playwright test scenarios
+- 8 test scenarios covering all user workflows
+- Audit folder structure planned: `specs/025-product-image-management/audit/`
+
+**Principle IX & X: API Documentation & Route Reuse** ✅ CONFIRMED
+- Route analysis completed (no duplicates found)
+- Extends existing routes-product-profiles.ts (justified)
+- OpenAPI contract generated for all new endpoints
+
+**Post-Design Constitution Check Result**: ✅ **PASS**
+
+No design violations detected. All constitutional principles satisfied.
+
+## Complexity Tracking
+*Fill ONLY if Constitution Check has violations that must be justified*
+
+**No violations detected** - Feature follows all constitutional principles without deviations.
+
+
+## Progress Tracking
+*This checklist is updated during execution flow*
+
+**Phase Status**:
+- [x] Phase 0: Research complete (/plan command) - ✅ research.md generated
+- [x] Phase 1: Design complete (/plan command) - ✅ data-model.md, contracts/, quickstart.md, CLAUDE.md updated
+- [x] Phase 2: Task planning complete (/plan command - describe approach only) - ✅ 25 tasks planned with dependencies
+- [x] Phase 3: Tasks generated (/tasks command) - ✅ tasks.md created with 27 tasks
+- [ ] Phase 4: Implementation complete
+- [ ] Phase 5: Validation passed
+
+**Gate Status**:
+- [x] Initial Constitution Check: PASS
+- [x] Post-Design Constitution Check: PASS
+- [x] All NEEDS CLARIFICATION resolved
+- [x] Complexity deviations documented (none - no violations)
+
+---
+*Based on Constitution v2.1.1 - See `/memory/constitution.md`*

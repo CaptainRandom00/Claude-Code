@@ -1,0 +1,115 @@
+/**
+ * Product Image Management Types
+ * Feature: 025-product-image-management
+ *
+ * Type definitions for product image upload, storage, and management.
+ */
+
+/**
+ * Product Image Entity
+ * Stored as JSON array in product_profiles.image_metadata
+ */
+export interface ProductImage {
+  /** Unique identifier (UUIDv4) */
+  id: string;
+
+  /** Original filename from user upload (e.g., "product-photo.jpg") */
+  originalName: string;
+
+  /** Hashed filename on disk (e.g., "a7f3c2d1e4b5f6.webp") */
+  storedName: string;
+
+  /** Relative path to original compressed image */
+  path: string;
+
+  /** Relative path to 300x300 thumbnail */
+  thumbnailPath: string;
+
+  /** File size in bytes after WebP compression */
+  size: number;
+
+  /** Image width in pixels (max 1200) */
+  width: number;
+
+  /** Image height in pixels (max 1200) */
+  height: number;
+
+  /** Image format (always 'webp' after processing) */
+  format: 'webp';
+
+  /** Primary image flag (exactly one per product if images exist) */
+  isPrimary: boolean;
+
+  /** Upload timestamp (ISO 8601 format) */
+  uploadedAt: string;
+}
+
+/**
+ * Compression Statistics
+ * Returned after successful image compression
+ */
+export interface CompressionStats {
+  /** Original file size in bytes */
+  originalSize: number;
+
+  /** Compressed file size in bytes */
+  compressedSize: number;
+
+  /** Size reduction percentage */
+  reductionPercent: number;
+}
+
+/**
+ * Request payload for image upload
+ */
+export interface UploadImageRequest {
+  itemCode: string;
+  files: Express.Multer.File[];
+}
+
+/**
+ * Response for successful image upload
+ */
+export interface UploadImageResponse {
+  success: true;
+  images: ProductImage[];
+  compressionStats: CompressionStats[];
+}
+
+/**
+ * Request payload for setting primary image
+ */
+export interface SetPrimaryImageRequest {
+  itemCode: string;
+  imageId: string;
+}
+
+/**
+ * Request payload for deleting image
+ */
+export interface DeleteImageRequest {
+  itemCode: string;
+  imageId: string;
+}
+
+/**
+ * Image validation result
+ */
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Image processing result from Sharp
+ */
+export interface ImageProcessingResult {
+  original: Buffer;
+  thumbnail: Buffer;
+  stats: CompressionStats;
+  metadata: {
+    width: number;
+    height: number;
+    format: string;
+  };
+}

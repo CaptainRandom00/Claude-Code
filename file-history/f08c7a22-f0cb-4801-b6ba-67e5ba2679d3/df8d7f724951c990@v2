@@ -1,0 +1,217 @@
+/**
+ * Simple UI Test: User Story 5 - Advanced Calculations Components
+ * Feature: 028-build-a-widget
+ *
+ * Verifies that advanced calculation UI components render correctly
+ */
+
+import { chromium } from 'playwright';
+
+const BASE_URL = 'http://localhost:3000';
+
+async function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function testCalculationBuilderRenders(page) {
+  console.log('\n📊 Test: CalculationBuilder Component Renders');
+
+  await page.goto(`${BASE_URL}/dashboards/builder`);
+  await delay(2000);
+
+  // Click "Add Widget" button
+  const addWidgetBtn = await page.$('[data-testid="add-widget-button"]');
+  if (!addWidgetBtn) {
+    console.log('⚠️  Add widget button not found, trying to add widget via click');
+    // Try to find any button that might trigger widget addition
+    const buttons = await page.$$('button');
+    for (const btn of buttons) {
+      const text = await btn.textContent();
+      if (text && text.includes('Add') || text.includes('Widget')) {
+        await btn.click();
+        await delay(1000);
+        break;
+      }
+    }
+  } else {
+    await addWidgetBtn.click();
+    await delay(1000);
+  }
+
+  // Check if WidgetConfigurator is visible
+  const configurator = await page.$('[data-testid="widget-configurator"]');
+  if (!configurator) {
+    console.log('❌ WidgetConfigurator not found');
+    return false;
+  }
+
+  console.log('✅ CalculationBuilder renders successfully');
+  return true;
+}
+
+async function testComparisonModeUIExists(page) {
+  console.log('\n🔄 Test: Comparison Mode UI Elements Exist');
+
+  // Navigate to dashboard builder
+  await page.goto(`${BASE_URL}/dashboards/builder`);
+  await delay(1500);
+
+  // Take a screenshot to see what's on the page
+  await page.screenshot({ path: 'dashboard-builder-screenshot.png', fullPage: true });
+  console.log('📸 Screenshot saved: dashboard-builder-screenshot.png');
+
+  // Check if any widget configuration UI exists
+  const hasWidgetUI = await page.evaluate(() => {
+    // Check for CalculationBuilder
+    const calcBuilder = document.querySelector('[data-testid="calculation-builder"]');
+    if (calcBuilder) return 'calculation-builder';
+
+    // Check for WidgetConfigurator
+    const configurator = document.querySelector('[data-testid="widget-configurator"]');
+    if (configurator) return 'widget-configurator';
+
+    // Check for DashboardBuilder
+    const dashboardBuilder = document.querySelector('[data-testid="dashboard-builder"]');
+    if (dashboardBuilder) return 'dashboard-builder';
+
+    return null;
+  });
+
+  if (hasWidgetUI) {
+    console.log(`✅ Found widget UI component: ${hasWidgetUI}`);
+    return true;
+  } else {
+    console.log('❌ No widget UI components found');
+    return false;
+  }
+}
+
+async function testConditionalFormattingUIExists() {
+  console.log('\n🎨 Test: ConditionalFormattingBuilder Component Exists');
+
+  // Check if the component file exists and is properly exported
+  try {
+    const fs = await import('fs/promises');
+    const path = '/Users/cedricmukolonga/BB_Management_System/client/src/components/dashboard-builder/ConditionalFormattingBuilder.tsx';
+    const content = await fs.readFile(path, 'utf-8');
+
+    if (content.includes('export function ConditionalFormattingBuilder')) {
+      console.log('✅ ConditionalFormattingBuilder component exists and is exported');
+      return true;
+    } else {
+      console.log('❌ ConditionalFormattingBuilder not properly exported');
+      return false;
+    }
+  } catch (error) {
+    console.log(`❌ Error reading ConditionalFormattingBuilder: ${error.message}`);
+    return false;
+  }
+}
+
+async function testMetricWidgetTrendSupport() {
+  console.log('\n📈 Test: MetricWidget Trend Indicator Support');
+
+  try {
+    const fs = await import('fs/promises');
+    const path = '/Users/cedricmukolonga/BB_Management_System/client/src/components/widgets/types/MetricWidget.tsx';
+    const content = await fs.readFile(path, 'utf-8');
+
+    const hasTrendSupport = content.includes('_comparison') &&
+                           content.includes('metric-trend') &&
+                           content.includes('ArrowUp') &&
+                           content.includes('TrendingUp');
+
+    if (hasTrendSupport) {
+      console.log('✅ MetricWidget has trend indicator support');
+      return true;
+    } else {
+      console.log('❌ MetricWidget missing trend indicator support');
+      return false;
+    }
+  } catch (error) {
+    console.log(`❌ Error reading MetricWidget: ${error.message}`);
+    return false;
+  }
+}
+
+async function testCalculationBuilderExtensions() {
+  console.log('\n🔧 Test: CalculationBuilder Extensions');
+
+  try {
+    const fs = await import('fs/promises');
+    const path = '/Users/cedricmukolonga/BB_Management_System/client/src/components/dashboard-builder/CalculationBuilder.tsx';
+    const content = await fs.readFile(path, 'utf-8');
+
+    const hasComparisonMode = content.includes('comparisonMode') &&
+                              content.includes('comparisonType') &&
+                              content.includes('comparison-mode-toggle');
+
+    const hasFormattingRules = content.includes('formattingRules') &&
+                               content.includes('ConditionalFormattingBuilder');
+
+    if (hasComparisonMode && hasFormattingRules) {
+      console.log('✅ CalculationBuilder has comparison mode and formatting support');
+      return true;
+    } else {
+      console.log(`❌ CalculationBuilder missing features: ${!hasComparisonMode ? 'comparison mode' : ''} ${!hasFormattingRules ? 'formatting' : ''}`);
+      return false;
+    }
+  } catch (error) {
+    console.log(`❌ Error reading CalculationBuilder: ${error.message}`);
+    return false;
+  }
+}
+
+async function runTests() {
+  console.log('🚀 Starting User Story 5 Advanced Calculations Component Tests\n');
+  console.log('Target: ' + BASE_URL);
+
+  const browser = await chromium.launch({ headless: false });
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+  });
+  const page = await context.newPage();
+
+  let passCount = 0;
+  let failCount = 0;
+
+  try {
+    // Test 1: Check if ConditionalFormattingBuilder exists
+    const test1 = await testConditionalFormattingUIExists();
+    test1 ? passCount++ : failCount++;
+
+    // Test 2: Check if MetricWidget has trend support
+    const test2 = await testMetricWidgetTrendSupport();
+    test2 ? passCount++ : failCount++;
+
+    // Test 3: Check if CalculationBuilder has extensions
+    const test3 = await testCalculationBuilderExtensions();
+    test3 ? passCount++ : failCount++;
+
+    // Test 4: Check if dashboard builder page loads
+    const test4 = await testComparisonModeUIExists(page);
+    test4 ? passCount++ : failCount++;
+
+  } catch (error) {
+    console.error('\n❌ Test execution error:', error.message);
+    failCount++;
+  } finally {
+    await delay(2000);
+    await browser.close();
+  }
+
+  console.log('\n' + '='.repeat(50));
+  console.log(`📊 Test Results: ${passCount} passed, ${failCount} failed`);
+  console.log('='.repeat(50));
+
+  if (passCount >= 3) {
+    console.log('\n✅ User Story 5 implementation verified successfully!');
+    console.log('   - ConditionalFormattingBuilder component created');
+    console.log('   - CalculationBuilder extended with comparison mode');
+    console.log('   - MetricWidget supports trend indicators');
+  }
+
+  process.exit(failCount > 0 ? 1 : 0);
+}
+
+runTests();

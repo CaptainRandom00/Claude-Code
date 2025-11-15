@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Remove duplicate header from Stock Ordering component",
+    "status": "in_progress",
+    "activeForm": "Removing duplicate header from Stock Ordering component"
+  },
+  {
+    "content": "Remove duplicate header from Case Size Management component",
+    "status": "pending",
+    "activeForm": "Removing duplicate header from Case Size Management component"
+  },
+  {
+    "content": "Remove duplicate header from Stock Profiles component",
+    "status": "pending",
+    "activeForm": "Removing duplicate header from Stock Profiles component"
+  },
+  {
+    "content": "Remove duplicate header from Sales Aggregation component",
+    "status": "pending",
+    "activeForm": "Removing duplicate header from Sales Aggregation component"
+  },
+  {
+    "content": "Remove duplicate header from Tasks & Handover component",
+    "status": "pending",
+    "activeForm": "Removing duplicate header from Tasks & Handover component"
+  },
+  {
+    "content": "Test all components to ensure no layout breaks",
+    "status": "pending",
+    "activeForm": "Testing all components to ensure no layout breaks"
+  }
+]

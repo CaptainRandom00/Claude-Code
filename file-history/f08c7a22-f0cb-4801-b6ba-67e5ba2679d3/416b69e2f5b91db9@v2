@@ -1,0 +1,760 @@
+# API Contracts: Widget Dashboard Framework
+
+**Feature**: Widget-Based Dashboard Framework
+**Branch**: `028-build-a-widget`
+**Date**: 2025-10-11
+**Route File**: `server/routes-widget-dashboard.ts` (to be created)
+
+---
+
+## Overview
+
+This document defines the REST API contracts for the widget-based dashboard framework. All endpoints follow the existing system patterns with consistent error handling and authentication requirements.
+
+**Base Path**: `/api/widgets`
+**Authentication**: Session-based (existing system)
+**Error Format**: Standard `{ success, error, details }` response
+
+---
+
+## 1. Widget Definition Endpoints
+
+### 1.1 Create Widget Definition
+
+**Endpoint**: `POST /api/widgets/definitions`
+**Auth**: Required
+**Description**: Create a new widget definition
+
+**Request Body**:
+```typescript
+{
+  widgetType: 'metric' | 'chart' | 'table' | 'alert' | 'progress';
+  name: string; // 3-255 chars
+  description?: string;
+  apiEndpoint: string; // Must be whitelisted
+  httpMethod?: 'GET' | 'POST' | 'PUT' | 'DELETE'; // Default: GET
+  queryParams?: Record<string, any>;
+  calculationConfig: {
+    filters?: Array<{
+      field: string;
+      operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'contains';
+      value: any;
+    }>;
+    groupBy?: string[];
+    aggregations: Array<{
+      type: 'sum' | 'average' | 'count' | 'min' | 'max';
+      field: string;
+      alias?: string;
+    }>;
+    comparisons?: Array<{
+      type: 'percent_change' | 'difference' | 'ratio';
+      currentField: string;
+      comparisonField: string;
+    }>;
+    sort?: Array<{ field: string; order: 'asc' | 'desc' }>;
+    limit?: number;
+  };
+  visualizationConfig: {
+    colors?: string[];
+    format?: 'currency' | 'percentage' | 'number' | 'date';
+    decimalPlaces?: number;
+    labels?: Record<string, string>;
+    chartType?: 'line' | 'bar' | 'area' | 'pie' | 'candlestick';
+    showLegend?: boolean;
+    showTooltip?: boolean;
+  };
+  refreshInterval?: number; // 30000-3600000ms, default 60000
+  errorConfig?: {
+    showLastData?: boolean;
+    retryAttempts?: number;
+    retryDelay?: number;
+  };
+}
+```
+
+**Response** (201 Created):
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    widgetType: string;
+    name: string;
+    description: string | null;
+    apiEndpoint: string;
+    httpMethod: string;
+    queryParams: object | null;
+    calculationConfig: object;
+    visualizationConfig: object;
+    refreshInterval: number;
+    errorConfig: object | null;
+    isSystem: boolean;
+    isActive: boolean;
+    userId: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+**Errors**:
+- `400`: Invalid widget configuration (validation errors)
+- `403`: API endpoint not whitelisted
+- `401`: Not authenticated
+
+---
+
+### 1.2 Get Widget Definitions
+
+**Endpoint**: `GET /api/widgets/definitions`
+**Auth**: Required
+**Description**: List user's widget definitions + system widgets
+
+**Query Parameters**:
+- `type?: 'metric' | 'chart' | 'table' | 'alert' | 'progress'` - Filter by widget type
+- `includeSystem?: boolean` - Include system widgets (default: true)
+- `isActive?: boolean` - Filter by active status (default: true)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Array<WidgetDefinition>; // Same shape as create response
+}
+```
+
+---
+
+### 1.3 Get Widget Definition by ID
+
+**Endpoint**: `GET /api/widgets/definitions/:id`
+**Auth**: Required
+**Description**: Get single widget definition details
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: WidgetDefinition;
+}
+```
+
+**Errors**:
+- `404`: Widget definition not found
+- `403`: Access denied (not owner and not system widget)
+
+---
+
+### 1.4 Update Widget Definition
+
+**Endpoint**: `PUT /api/widgets/definitions/:id`
+**Auth**: Required
+**Description**: Update existing widget definition (user-created only)
+
+**Request Body**: Same as create (partial updates supported)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: WidgetDefinition;
+}
+```
+
+**Errors**:
+- `403`: Cannot update system widgets
+- `404`: Widget not found
+
+---
+
+### 1.5 Delete Widget Definition
+
+**Endpoint**: `DELETE /api/widgets/definitions/:id`
+**Auth**: Required
+**Description**: Soft delete widget definition (sets `is_active = false`)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: { id: number; deleted: true };
+}
+```
+
+**Errors**:
+- `403`: Cannot delete system widgets or widgets in use by active dashboards
+
+---
+
+## 2. Dashboard Endpoints
+
+### 2.1 Create Dashboard
+
+**Endpoint**: `POST /api/widgets/dashboards`
+**Auth**: Required
+**Description**: Create new dashboard
+
+**Request Body**:
+```typescript
+{
+  name: string; // 3-255 chars
+  description?: string;
+  globalFilters?: {
+    dateRange?: { start: string; end: string };
+    suppliers?: string[];
+    categories?: string[];
+    customFilters?: Record<string, any>;
+  };
+  widgets?: Array<{
+    widgetDefinitionId: number;
+    title?: string; // Custom title override
+    layouts: {
+      xxs: { x: number; y: number; w: number; h: number };
+      xs: { x: number; y: number; w: number; h: number };
+      sm: { x: number; y: number; w: number; h: number };
+      md: { x: number; y: number; w: number; h: number };
+      lg: { x: number; y: number; w: number; h: number };
+    };
+  }>;
+}
+```
+
+**Response** (201 Created):
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    userId: number;
+    name: string;
+    description: string | null;
+    globalFilters: object | null;
+    isTemplate: boolean;
+    isShared: boolean;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+    widgets: Array<{
+      dashboardWidgetId: number;
+      widgetDefinitionId: number;
+      widgetTitle: string | null;
+      widget: WidgetDefinition;
+      layouts: Array<{
+        breakpoint: string;
+        gridX: number;
+        gridY: number;
+        gridW: number;
+        gridH: number;
+      }>;
+    }>;
+    versionNumber: number; // Initial version = 1
+  };
+}
+```
+
+**Errors**:
+- `400`: Invalid dashboard configuration
+- `403`: Widget limit exceeded (max 50 per dashboard)
+
+---
+
+### 2.2 Get User Dashboards
+
+**Endpoint**: `GET /api/widgets/dashboards`
+**Auth**: Required
+**Description**: List user's dashboards
+
+**Query Parameters**:
+- `includeWidgets?: boolean` - Include widget details (default: false)
+- `isActive?: boolean` - Filter by active status (default: true)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Array<Dashboard>;
+}
+```
+
+---
+
+### 2.3 Get Dashboard by ID
+
+**Endpoint**: `GET /api/widgets/dashboards/:id`
+**Auth**: Required
+**Description**: Get complete dashboard with widgets and layouts
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Dashboard; // Full dashboard object with widgets and layouts
+}
+```
+
+**Errors**:
+- `404`: Dashboard not found
+- `403`: Access denied (not owner)
+
+---
+
+### 2.4 Update Dashboard
+
+**Endpoint**: `PUT /api/widgets/dashboards/:id`
+**Auth**: Required
+**Description**: Update dashboard configuration (auto-creates version)
+
+**Request Body**: Same as create (partial updates supported)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    dashboard: Dashboard;
+    versionNumber: number; // Incremented version
+  };
+}
+```
+
+---
+
+### 2.5 Delete Dashboard
+
+**Endpoint**: `DELETE /api/widgets/dashboards/:id`
+**Auth**: Required
+**Description**: Soft delete dashboard (30-day retention per FR-050)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    id: number;
+    deleted: true;
+    recoverable: true;
+    recoverableUntil: string; // ISO timestamp (now + 30 days)
+  };
+}
+```
+
+---
+
+### 2.6 Update Widget Layouts
+
+**Endpoint**: `PATCH /api/widgets/dashboards/:dashboardId/layouts`
+**Auth**: Required
+**Description**: Update widget positions (specific breakpoint)
+
+**Request Body**:
+```typescript
+{
+  breakpoint: 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
+  layouts: Array<{
+    dashboardWidgetId: number;
+    x: number;
+    y: number;
+    w: number; // 2-12
+    h: number; // 2-8
+  }>;
+}
+```
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    dashboardId: number;
+    breakpoint: string;
+    layouts: Array<WidgetLayout>;
+    versionNumber: number; // New version created
+  };
+}
+```
+
+**Errors**:
+- `400`: Invalid layout (overlapping widgets, out of bounds)
+
+---
+
+### 2.7 Get Dashboard Versions
+
+**Endpoint**: `GET /api/widgets/dashboards/:id/versions`
+**Auth**: Required
+**Description**: Get version history (last 24 hours, max 5 versions)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Array<{
+    versionNumber: number;
+    configSnapshot: object;
+    changeDescription: string | null;
+    createdByUserId: number;
+    createdAt: string;
+  }>;
+}
+```
+
+---
+
+### 2.8 Restore Dashboard Version
+
+**Endpoint**: `POST /api/widgets/dashboards/:id/versions/:versionNumber/restore`
+**Auth**: Required
+**Description**: Restore dashboard to previous version (creates new version)
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    dashboard: Dashboard;
+    restoredFromVersion: number;
+    newVersionNumber: number;
+  };
+}
+```
+
+---
+
+## 3. Dashboard Template Endpoints
+
+### 3.1 Get Templates
+
+**Endpoint**: `GET /api/widgets/templates`
+**Auth**: Required
+**Description**: List available dashboard templates
+
+**Query Parameters**:
+- `category?: string` - Filter by category
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    name: string;
+    description: string;
+    category: string;
+    previewImageUrl: string | null;
+    sortOrder: number;
+  }>;
+}
+```
+
+---
+
+### 3.2 Create Dashboard from Template
+
+**Endpoint**: `POST /api/widgets/dashboards/from-template/:templateId`
+**Auth**: Required
+**Description**: Instantiate dashboard from template
+
+**Request Body**:
+```typescript
+{
+  name: string; // Custom dashboard name
+  customizeFilters?: object; // Override template filters
+}
+```
+
+**Response** (201 Created):
+```typescript
+{
+  success: true;
+  data: Dashboard; // New dashboard with template configuration
+}
+```
+
+---
+
+## 4. API Metadata Discovery
+
+### 4.1 Get Available API Endpoints
+
+**Endpoint**: `GET /api/widgets/metadata/endpoints`
+**Auth**: Required
+**Description**: List available API endpoints for widget configuration
+
+**Query Parameters**:
+- `category?: string` - Filter by category
+- `method?: string` - Filter by HTTP method
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: Array<{
+    id: number;
+    endpointPath: string;
+    httpMethod: string;
+    description: string;
+    requestSchema: object | null;
+    responseSchema: object;
+    requiresAuth: boolean;
+    rateLimit: string | null;
+    category: string | null;
+    isDeprecated: boolean;
+  }>;
+}
+```
+
+---
+
+### 4.2 Get Endpoint Schema
+
+**Endpoint**: `GET /api/widgets/metadata/endpoints/:id/schema`
+**Auth**: Required
+**Description**: Get detailed schema for specific endpoint
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    endpoint: string;
+    method: string;
+    requestSchema: {
+      type: 'object';
+      properties: Record<string, JSONSchema>;
+      required?: string[];
+    };
+    responseSchema: {
+      type: 'object';
+      properties: Record<string, JSONSchema>;
+    };
+    examples: Array<{
+      request: object;
+      response: object;
+    }>;
+  };
+}
+```
+
+---
+
+## 5. Widget Data Proxy
+
+### 5.1 Fetch Widget Data with Calculation
+
+**Endpoint**: `POST /api/widgets/data/fetch`
+**Auth**: Required
+**Description**: Unified endpoint for fetching and calculating widget data
+
+**Request Body**:
+```typescript
+{
+  apiEndpoint: string;
+  httpMethod: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  queryParams?: Record<string, any>;
+  calculationConfig: {
+    filters?: Array<Filter>;
+    groupBy?: string[];
+    aggregations: Array<Aggregation>;
+    comparisons?: Array<Comparison>;
+    sort?: Array<Sort>;
+    limit?: number;
+  };
+}
+```
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    raw: any; // Original API response
+    calculated: any; // Result after calculation pipeline
+    metadata: {
+      recordCount: number;
+      calculationTime: number; // milliseconds
+      cacheHit: boolean;
+    };
+  };
+}
+```
+
+**Errors**:
+- `400`: Invalid calculation configuration
+- `403`: API endpoint not accessible
+- `504`: Calculation timeout (>30 seconds per FR-058)
+
+---
+
+### 5.2 Preview Widget Data
+
+**Endpoint**: `POST /api/widgets/data/preview`
+**Auth**: Required
+**Description**: Preview widget data without saving (real-time preview per FR-031)
+
+**Request Body**: Same as fetch
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    preview: any; // Calculated result (max 100 records)
+    estimatedTotal: number;
+    previewTime: number; // Must be <500ms per FR-031
+  };
+}
+```
+
+---
+
+## 6. Utility Endpoints
+
+### 6.1 Validate Widget Configuration
+
+**Endpoint**: `POST /api/widgets/validate`
+**Auth**: Required
+**Description**: Validate widget configuration without creating
+
+**Request Body**: Same as create widget definition
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    valid: boolean;
+    errors?: Array<{
+      field: string;
+      message: string;
+    }>;
+    warnings?: Array<{
+      field: string;
+      message: string;
+    }>;
+  };
+}
+```
+
+---
+
+### 6.2 Get System Limits
+
+**Endpoint**: `GET /api/widgets/system/limits`
+**Auth**: Required
+**Description**: Get system constraints for widgets and dashboards
+
+**Response** (200 OK):
+```typescript
+{
+  success: true;
+  data: {
+    maxWidgetsPerDashboard: 50; // FR-057
+    maxDashboardsPerUser: 100;
+    maxMemoryPerDashboard: 250; // MB (FR-057)
+    maxConcurrentRequests: 10; // Per dashboard (FR-059)
+    maxBandwidthPerMinute: 50; // MB (FR-061)
+    calculationTimeout: 30; // Seconds (FR-058)
+    refreshIntervalRange: {
+      min: 30000; // 30 seconds (FR-004)
+      max: 3600000; // 60 minutes (FR-004)
+    };
+    widgetDimensions: {
+      minWidth: 2; // Grid cells (FR-020)
+      maxWidth: 12; // Grid cells (FR-020)
+      minHeight: 2; // Grid cells (FR-020)
+      maxHeight: 8; // Grid cells (FR-020)
+    };
+  };
+}
+```
+
+---
+
+## Error Response Format
+
+All endpoints use consistent error format:
+
+```typescript
+{
+  success: false;
+  error: string; // Human-readable error message
+  details?: any; // Additional error context (validation errors, etc.)
+}
+```
+
+**Common HTTP Status Codes**:
+- `200`: Success
+- `201`: Created
+- `400`: Bad Request (validation errors)
+- `401`: Unauthorized (not authenticated)
+- `403`: Forbidden (access denied)
+- `404`: Not Found
+- `500`: Internal Server Error
+- `504`: Gateway Timeout (calculation timeout)
+
+---
+
+## Rate Limiting
+
+Per Constitution Principle VII and spec FR-027:
+
+- **Widget creation**: 100 requests/hour per user
+- **Dashboard creation**: 50 requests/hour per user
+- **Data fetching**: 1000 requests/hour per user
+- **Layout updates**: 500 requests/hour per user (supports auto-save)
+
+**Rate Limit Headers**:
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 997
+X-RateLimit-Reset: 1678901234
+```
+
+---
+
+## Authentication & Authorization
+
+### Session Requirements:
+- All endpoints require active session (existing system auth)
+- Widget definitions: User can CRUD own widgets + read system widgets
+- Dashboards: User can CRUD own dashboards
+- Templates: Read-only access for all authenticated users
+- API metadata: Read-only access for all authenticated users
+
+### Permission Matrix:
+
+| Resource | Create | Read Own | Read All | Update Own | Delete Own |
+|----------|--------|----------|----------|------------|------------|
+| Widget Definitions | ✅ | ✅ | ❌ (system only) | ✅ | ✅ |
+| Dashboards | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Templates | ❌ (admin) | ✅ | ✅ | ❌ (admin) | ❌ (admin) |
+| API Metadata | ❌ (system) | ✅ | ✅ | ❌ (system) | ❌ (system) |
+
+---
+
+## API Documentation Requirements (Principle IX)
+
+Route file MUST include manifest comment block:
+
+```typescript
+/**
+ * @route POST /api/widgets/definitions
+ * @auth required
+ * @rateLimit 100/hour
+ * @consumes WidgetDefinitionInput
+ * @produces WidgetDefinition
+ * @integrates api_endpoints_metadata (validation)
+ */
+```
+
+All endpoints will be documented in routes.registry.json upon implementation.
+
+---
+
+## Next Steps
+
+1. Implement route file: `server/routes-widget-dashboard.ts`
+2. Create Zod validation schemas in `server/validation/widget-schemas.ts`
+3. Implement service layer in `server/services/widget-service.ts`
+4. Update route registry with new endpoints
+5. Generate OpenAPI spec for widget endpoints
